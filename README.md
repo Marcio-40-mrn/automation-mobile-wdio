@@ -141,11 +141,15 @@ O workflow `.github/workflows/mobile_test.yml` executa dois jobs em paralelo a c
 | `EXPO_TOKEN` | Token EAS para download de builds |
 | `EXPO_PROJECT_ID` | UUID do projeto ecomm no EAS (expo.dev → projeto → Project Settings → Project ID) |
 
-Além dos secrets, a esteira lê as variáveis de seleção de build como **Repo Variables**
-(Settings → Secrets and variables → Actions → aba **Variables**, não são secrets):
-`BUILD_PROFILE_ANDROID`, `BUILD_PROFILE_IOS`, `BUILD_SELECTION`, `BUILD_FROM` e `BUILD_TO`.
-Todas opcionais — variável não cadastrada chega vazia ao script e cai no default
-(`development` + build mais recente), então a esteira roda igual sem nenhuma configuração nova.
+As variáveis de seleção de build também são **secrets** (Settings → Secrets and variables →
+Actions → aba **Secrets**): `BUILD_PROFILE_ANDROID`, `BUILD_PROFILE_IOS`, `BUILD_SELECTION`,
+`BUILD_FROM` e `BUILD_TO`. Todas opcionais — secret não cadastrado chega vazio ao script e cai
+no default (`development` + build mais recente), então a esteira roda sem configuração nova.
+
+Elas ficaram um tempo como `${{ vars.X }}` no workflow enquanto estavam cadastradas na aba
+Secrets. `vars.` e `secrets.` são namespaces separados e não têm fallback entre si, então
+todas chegavam vazias e a esteira baixava silenciosamente o build `development`. Se voltar a
+aparecer `Profile : development` no log com os secrets preenchidos, é esse descasamento.
 
 ### Conta distinta por device (multiusuário no Device Farm)
 

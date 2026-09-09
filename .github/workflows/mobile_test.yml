@@ -34,10 +34,10 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           EXPO_PROJECT_ID: ${{ secrets.EXPO_PROJECT_ID }}
-          BUILD_PROFILE_ANDROID: ${{ vars.BUILD_PROFILE_ANDROID }}
-          BUILD_SELECTION: ${{ vars.BUILD_SELECTION }}
-          BUILD_FROM: ${{ vars.BUILD_FROM }}
-          BUILD_TO: ${{ vars.BUILD_TO }}
+          BUILD_PROFILE_ANDROID: ${{ secrets.BUILD_PROFILE_ANDROID }}
+          BUILD_SELECTION: ${{ secrets.BUILD_SELECTION }}
+          BUILD_FROM: ${{ secrets.BUILD_FROM }}
+          BUILD_TO: ${{ secrets.BUILD_TO }}
         run: |
           node scripts/install-apk.mjs --no-install
           echo "APP_VERSION=$(jq -r '.appVersion' .build-info.json)" >> $GITHUB_ENV
@@ -295,10 +295,10 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           EXPO_PROJECT_ID: ${{ secrets.EXPO_PROJECT_ID }}
-          BUILD_PROFILE_IOS: ${{ vars.BUILD_PROFILE_IOS }}
-          BUILD_SELECTION: ${{ vars.BUILD_SELECTION }}
-          BUILD_FROM: ${{ vars.BUILD_FROM }}
-          BUILD_TO: ${{ vars.BUILD_TO }}
+          BUILD_PROFILE_IOS: ${{ secrets.BUILD_PROFILE_IOS }}
+          BUILD_SELECTION: ${{ secrets.BUILD_SELECTION }}
+          BUILD_FROM: ${{ secrets.BUILD_FROM }}
+          BUILD_TO: ${{ secrets.BUILD_TO }}
         run: |
           node scripts/install-apk.mjs --no-install --platform ios
           echo "APP_VERSION=$(jq -r '.appVersion' .build-info.json)" >> $GITHUB_ENV

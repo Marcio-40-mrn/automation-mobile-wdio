@@ -34,9 +34,11 @@ const platformUpper = (() => {
     return idx !== -1 ? process.argv[idx + 1].toUpperCase() : 'ANDROID';
 })();
 
-// ── Seleção do build: profile e data vêm do ambiente (.env local / Repo Variables na esteira) ──
+// ── Seleção do build: profile e data vêm do ambiente (.env local / Repo Secrets na esteira) ──
 // Ausentes => comportamento histórico: profile 'development' + build mais recente.
-// Vazio conta como ausente: `${{ vars.X }}` de uma variável não cadastrada vira string vazia.
+// Vazio conta como ausente: `${{ secrets.X }}` de um secret não cadastrado vira string vazia,
+// e foi exatamente isso que fez a esteira baixar 'development' quando os valores estavam
+// cadastrados como Secrets mas o workflow lia do namespace `vars.` (namespaces distintos).
 const envValue = (name) => {
     const value = process.env[name]?.trim();
     return value ? value : undefined;
