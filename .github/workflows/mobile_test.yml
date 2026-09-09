@@ -142,17 +142,23 @@ jobs:
         id: schedule
         env:
           CLIENT_USERS_EMAILS: ${{ secrets.CLIENT_USERS_ANDROID_EMAILS }}
+          CLIENT_PASSWORD: ${{ secrets.CLIENT_PASSWORD }}
         run: |
           # Remove qualquer whitespace/quebra de linha que possa ter entrado ao colar o
           # secret (emails+virgula nao tem espaco, entao isso so limpa o valor).
           USERS=$(printf '%s' "$CLIENT_USERS_EMAILS" | tr -d '[:space:]')
+          # Um valor vazio aqui vira {"value":""}, que o schedule-run rejeita com um
+          # ParamValidation apontando so o indice do array (ver run #2). Falha nomeada.
+          for v in CLIENT_PASSWORD USERS APP_VERSION APP_BUILD_VERSION; do
+            [ -n "${!v}" ] || { echo "::error::Variavel $v esta vazia — verifique os secrets do repositorio"; exit 1; }
+          done
           RUN_ARN=$(aws devicefarm schedule-run \
             --project-arn "${{ secrets.DEVICE_FARM_PROJECT_ARN }}" \
             --app-arn "${{ steps.apk_upload.outputs.apk_arn }}" \
             --device-pool-arn "${{ secrets.DEVICE_FARM_DEVICE_POOL_ARN }}" \
             --name "CI Run #${{ github.run_number }}" \
             --test "{\"type\":\"APPIUM_NODE\",\"testPackageArn\":\"${{ steps.test_upload.outputs.test_arn }}\",\"testSpecArn\":\"${{ steps.testspec_upload.outputs.spec_arn }}\"}" \
-            --configuration "{\"environmentVariables\":[{\"name\":\"CLIENT_USER\",\"value\":\"${{ secrets.CLIENT_USER }}\"},{\"name\":\"CLIENT_PASSWORD\",\"value\":\"${{ secrets.CLIENT_PASSWORD }}\"},{\"name\":\"CLIENT_USERS_EMAILS\",\"value\":\"$USERS\"},{\"name\":\"APP_VERSION\",\"value\":\"${{ env.APP_VERSION }}\"},{\"name\":\"APP_BUILD_VERSION\",\"value\":\"${{ env.APP_BUILD_VERSION }}\"}]}" \
+            --configuration "{\"environmentVariables\":[{\"name\":\"CLIENT_PASSWORD\",\"value\":\"$CLIENT_PASSWORD\"},{\"name\":\"CLIENT_USERS_EMAILS\",\"value\":\"$USERS\"},{\"name\":\"APP_VERSION\",\"value\":\"${{ env.APP_VERSION }}\"},{\"name\":\"APP_BUILD_VERSION\",\"value\":\"${{ env.APP_BUILD_VERSION }}\"}]}" \
             --region us-west-2 \
             --query 'run.arn' --output text)
           echo "run_arn=$RUN_ARN" >> $GITHUB_OUTPUT
@@ -397,17 +403,23 @@ jobs:
         id: schedule_ios
         env:
           CLIENT_USERS_EMAILS: ${{ secrets.CLIENT_USERS_IOS_EMAILS }}
+          CLIENT_PASSWORD: ${{ secrets.CLIENT_PASSWORD }}
         run: |
           # Remove qualquer whitespace/quebra de linha que possa ter entrado ao colar o
           # secret (emails+virgula nao tem espaco, entao isso so limpa o valor).
           USERS=$(printf '%s' "$CLIENT_USERS_EMAILS" | tr -d '[:space:]')
+          # Um valor vazio aqui vira {"value":""}, que o schedule-run rejeita com um
+          # ParamValidation apontando so o indice do array (ver run #2). Falha nomeada.
+          for v in CLIENT_PASSWORD USERS APP_VERSION APP_BUILD_VERSION; do
+            [ -n "${!v}" ] || { echo "::error::Variavel $v esta vazia — verifique os secrets do repositorio"; exit 1; }
+          done
           RUN_ARN=$(aws devicefarm schedule-run \
             --project-arn "${{ secrets.DEVICE_FARM_PROJECT_ARN }}" \
             --app-arn "${{ steps.ipa_upload.outputs.ipa_arn }}" \
             --device-pool-arn "${{ secrets.DEVICE_FARM_IOS_DEVICE_POOL_ARN }}" \
             --name "CI iOS Run #${{ github.run_number }}" \
             --test "{\"type\":\"APPIUM_NODE\",\"testPackageArn\":\"${{ steps.test_upload_ios.outputs.test_arn }}\",\"testSpecArn\":\"${{ steps.testspec_upload_ios.outputs.spec_arn }}\"}" \
-            --configuration "{\"environmentVariables\":[{\"name\":\"CLIENT_USER\",\"value\":\"${{ secrets.CLIENT_USER }}\"},{\"name\":\"CLIENT_PASSWORD\",\"value\":\"${{ secrets.CLIENT_PASSWORD }}\"},{\"name\":\"CLIENT_USERS_EMAILS\",\"value\":\"$USERS\"},{\"name\":\"APP_VERSION\",\"value\":\"${{ env.APP_VERSION }}\"},{\"name\":\"APP_BUILD_VERSION\",\"value\":\"${{ env.APP_BUILD_VERSION }}\"}]}" \
+            --configuration "{\"environmentVariables\":[{\"name\":\"CLIENT_PASSWORD\",\"value\":\"$CLIENT_PASSWORD\"},{\"name\":\"CLIENT_USERS_EMAILS\",\"value\":\"$USERS\"},{\"name\":\"APP_VERSION\",\"value\":\"${{ env.APP_VERSION }}\"},{\"name\":\"APP_BUILD_VERSION\",\"value\":\"${{ env.APP_BUILD_VERSION }}\"}]}" \
             --region us-west-2 \
             --query 'run.arn' --output text)
           echo "run_arn=$RUN_ARN" >> $GITHUB_OUTPUT

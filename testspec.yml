@@ -37,8 +37,7 @@ phases:
           if [ $n -ge 3 ]; then echo "npm install falhou após 3 tentativas"; exit 1; fi
           echo "npm install falhou (tentativa $n) — nova tentativa em 10s"; sleep 10
         done
-      - 'echo "CLIENT_USER=$CLIENT_USER" > .env'
-      - 'echo "CLIENT_PASSWORD=$CLIENT_PASSWORD" >> .env'
+      - 'echo "CLIENT_PASSWORD=$CLIENT_PASSWORD" > .env'
       - 'echo "CLIENT_USERS_EMAILS=$CLIENT_USERS_EMAILS" >> .env'
       # Ambiente customizado nao sobe o Appium sozinho: inicia em background com base path /wd/hub
       - >-
