@@ -1,0 +1,764 @@
+name: Mobile Tests — AWS Device Farm
+
+on:
+  workflow_dispatch:
+  pull_request:
+
+env:
+  AWS_DEFAULT_REGION: us-west-2
+
+jobs:
+  run-on-device-farm:
+    runs-on: ubuntu-latest
+    outputs:
+      run_arn: ${{ steps.schedule.outputs.run_arn }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      # --- Obter APK do EAS Build ---
+      - name: Download APK from latest EAS Build
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_PROJECT_ID: ${{ secrets.EXPO_PROJECT_ID }}
+          BUILD_PROFILE_ANDROID: ${{ vars.BUILD_PROFILE_ANDROID }}
+          BUILD_SELECTION: ${{ vars.BUILD_SELECTION }}
+          BUILD_FROM: ${{ vars.BUILD_FROM }}
+          BUILD_TO: ${{ vars.BUILD_TO }}
+        run: |
+          node scripts/install-apk.mjs --no-install
+          echo "APP_VERSION=$(jq -r '.appVersion' .build-info.json)" >> $GITHUB_ENV
+          echo "APP_BUILD_VERSION=$(jq -r '.appBuildVersion' .build-info.json)" >> $GITHUB_ENV
+
+      # --- Upload APK para Device Farm ---
+      - name: Create APK upload on Device Farm
+        id: apk_upload
+        run: |
+          RESPONSE=$(aws devicefarm create-upload \
+            --project-arn "${{ secrets.DEVICE_FARM_PROJECT_ARN }}" \
+            --name "app-run${{ github.run_number }}.apk" \
+            --type ANDROID_APP \
+            --region us-west-2)
+          echo "apk_arn=$(echo $RESPONSE | jq -r '.upload.arn')" >> $GITHUB_OUTPUT
+          echo "apk_url=$(echo $RESPONSE | jq -r '.upload.url')" >> $GITHUB_OUTPUT
+
+      - name: Upload APK to Device Farm S3
+        run: curl -T app.apk "${{ steps.apk_upload.outputs.apk_url }}"
+
+      - name: Wait for APK upload to succeed
+        run: |
+          ARN="${{ steps.apk_upload.outputs.apk_arn }}"
+          for i in $(seq 1 20); do
+            STATUS=$(aws devicefarm get-upload --arn "$ARN" --region us-west-2 | jq -r '.upload.status')
+            echo "APK upload status ($i/20): $STATUS"
+            if [ "$STATUS" = "SUCCEEDED" ]; then exit 0; fi
+            if [ "$STATUS" = "FAILED" ]; then echo "APK upload falhou"; exit 1; fi
+            sleep 10
+          done
+          echo "Timeout aguardando upload do APK"; exit 1
+
+      # --- Criar ZIP do test package ---
+      - name: Create test package ZIP
+        run: |
+          zip -r test-package.zip . \
+            --exclude "node_modules/*" \
+            --exclude ".git/*" \
+            --exclude "allure-results/*" \
+            --exclude "allure-report/*" \
+            --exclude "ctrf/*" \
+            --exclude "_results_/*" \
+            --exclude "app.apk" \
+            --exclude "test-package.zip"
+          echo "ZIP criado: $(du -sh test-package.zip | cut -f1)"
+
+      - name: Create test package upload on Device Farm
+        id: test_upload
+        run: |
+          RESPONSE=$(aws devicefarm create-upload \
+            --project-arn "${{ secrets.DEVICE_FARM_PROJECT_ARN }}" \
+            --name "test-package-run${{ github.run_number }}.zip" \
+            --type APPIUM_NODE_TEST_PACKAGE \
+            --region us-west-2)
+          echo "test_arn=$(echo $RESPONSE | jq -r '.upload.arn')" >> $GITHUB_OUTPUT
+          echo "test_url=$(echo $RESPONSE | jq -r '.upload.url')" >> $GITHUB_OUTPUT
+
+      - name: Upload test package to Device Farm S3
+        run: curl -T test-package.zip "${{ steps.test_upload.outputs.test_url }}"
+
+      - name: Wait for test package upload to succeed
+        run: |
+          ARN="${{ steps.test_upload.outputs.test_arn }}"
+          for i in $(seq 1 30); do
+            STATUS=$(aws devicefarm get-upload --arn "$ARN" --region us-west-2 | jq -r '.upload.status')
+            echo "Test package upload status ($i/30): $STATUS"
+            if [ "$STATUS" = "SUCCEEDED" ]; then exit 0; fi
+            if [ "$STATUS" = "FAILED" ]; then echo "Test package upload falhou"; exit 1; fi
+            sleep 15
+          done
+          echo "Timeout aguardando upload do test package"; exit 1
+
+      # --- Upload testspec ---
+      - name: Create testspec upload on Device Farm
+        id: testspec_upload
+        run: |
+          RESPONSE=$(aws devicefarm create-upload \
+            --project-arn "${{ secrets.DEVICE_FARM_PROJECT_ARN }}" \
+            --name "testspec-run${{ github.run_number }}.yml" \
+            --type APPIUM_NODE_TEST_SPEC \
+            --region us-west-2)
+          echo "spec_arn=$(echo $RESPONSE | jq -r '.upload.arn')" >> $GITHUB_OUTPUT
+          echo "spec_url=$(echo $RESPONSE | jq -r '.upload.url')" >> $GITHUB_OUTPUT
+
+      - name: Upload testspec to Device Farm S3
+        run: curl -T testspec.yml "${{ steps.testspec_upload.outputs.spec_url }}"
+
+      - name: Wait for testspec upload to succeed
+        run: |
+          ARN="${{ steps.testspec_upload.outputs.spec_arn }}"
+          for i in $(seq 1 10); do
+            STATUS=$(aws devicefarm get-upload --arn "$ARN" --region us-west-2 | jq -r '.upload.status')
+            echo "Testspec upload status ($i/10): $STATUS"
+            if [ "$STATUS" = "SUCCEEDED" ]; then exit 0; fi
+            if [ "$STATUS" = "FAILED" ]; then echo "Testspec upload falhou"; exit 1; fi
+            sleep 5
+          done
+          echo "Timeout aguardando upload do testspec"; exit 1
+
+      # --- Agendar run no Device Farm ---
+      - name: Schedule Device Farm run
+        id: schedule
+        env:
+          CLIENT_USERS_EMAILS: ${{ secrets.CLIENT_USERS_ANDROID_EMAILS }}
+        run: |
+          # Remove qualquer whitespace/quebra de linha que possa ter entrado ao colar o
+          # secret (emails+virgula nao tem espaco, entao isso so limpa o valor).
+          USERS=$(printf '%s' "$CLIENT_USERS_EMAILS" | tr -d '[:space:]')
+          RUN_ARN=$(aws devicefarm schedule-run \
+            --project-arn "${{ secrets.DEVICE_FARM_PROJECT_ARN }}" \
+            --app-arn "${{ steps.apk_upload.outputs.apk_arn }}" \
+            --device-pool-arn "${{ secrets.DEVICE_FARM_DEVICE_POOL_ARN }}" \
+            --name "CI Run #${{ github.run_number }}" \
+            --test "{\"type\":\"APPIUM_NODE\",\"testPackageArn\":\"${{ steps.test_upload.outputs.test_arn }}\",\"testSpecArn\":\"${{ steps.testspec_upload.outputs.spec_arn }}\"}" \
+            --configuration "{\"environmentVariables\":[{\"name\":\"CLIENT_USER\",\"value\":\"${{ secrets.CLIENT_USER }}\"},{\"name\":\"CLIENT_PASSWORD\",\"value\":\"${{ secrets.CLIENT_PASSWORD }}\"},{\"name\":\"CLIENT_USERS_EMAILS\",\"value\":\"$USERS\"},{\"name\":\"APP_VERSION\",\"value\":\"${{ env.APP_VERSION }}\"},{\"name\":\"APP_BUILD_VERSION\",\"value\":\"${{ env.APP_BUILD_VERSION }}\"}]}" \
+            --region us-west-2 \
+            --query 'run.arn' --output text)
+          echo "run_arn=$RUN_ARN" >> $GITHUB_OUTPUT
+          echo "Run agendado: $RUN_ARN"
+
+      # --- Aguardar conclusão ---
+      - name: Wait for Device Farm run to complete
+        run: |
+          ARN="${{ steps.schedule.outputs.run_arn }}"
+          echo "Aguardando run: $ARN"
+          STATUS=""
+          RESULT_VAL=""
+          REACHED_TERMINAL=false
+          for i in $(seq 1 120); do
+            RESULT=$(aws devicefarm get-run --arn "$ARN" --region us-west-2 | jq -r '.run | "\(.status) \(.result)"')
+            STATUS=$(echo $RESULT | cut -d' ' -f1)
+            RESULT_VAL=$(echo $RESULT | cut -d' ' -f2)
+            echo "Status ($i/120): $STATUS / $RESULT_VAL"
+            if [ "$STATUS" != "PENDING" ] && [ "$STATUS" != "RUNNING" ] && [ "$STATUS" != "SCHEDULING" ]; then
+              echo "Run concluído com resultado: $RESULT_VAL"
+              REACHED_TERMINAL=true
+              break
+            fi
+            sleep 60
+          done
+          # Timeout sem estado terminal = falha real de automação (esteira travou) -> quebra.
+          if [ "$REACHED_TERMINAL" != "true" ]; then
+            echo "::error::Timeout aguardando o Device Farm (último status: $STATUS). A esteira não conseguiu obter o resultado."
+            exit 1
+          fi
+          # Resultado do teste (PASSED/FAILED/ERRORED/WARNED) NÃO quebra a esteira: reflete no relatório.
+          echo "::notice::Android Device Farm: $RESULT_VAL — ver relatório Allure"
+          echo "**Android Device Farm:** \`$RESULT_VAL\` — resultado reflete no relatório, não quebra a esteira." >> "$GITHUB_STEP_SUMMARY"
+
+      # --- Download de artifacts ---
+      - name: Download artifacts from Device Farm
+        if: always()
+        run: |
+          RUN_ARN="${{ steps.schedule.outputs.run_arn }}"
+          mkdir -p artifacts allure-results
+
+          # O relatório junta TODOS os devices: baixa o "Customer Artifacts" (zip com o
+          # allure-results, incl. vídeo) da Tests Suite de CADA device do run. Cada resultado
+          # já carrega o rótulo do aparelho/conta (test.spec.ts) para a navegação por device.
+          i=0
+          for JOB_ARN in $(aws devicefarm list-jobs --arn "$RUN_ARN" --region us-west-2 | jq -r '.jobs[].arn'); do
+            NAME=$(aws devicefarm get-job --arn "$JOB_ARN" --region us-west-2 | jq -r '.job.device.name')
+            SUITE_ARN=$(aws devicefarm list-suites --arn "$JOB_ARN" --region us-west-2 \
+              | jq -r '.suites[] | select(.name=="Tests Suite") | .arn')
+            if [ -z "$SUITE_ARN" ] || [ "$SUITE_ARN" = "null" ]; then
+              echo "Sem Tests Suite (pulando): $NAME"; i=$((i+1)); continue
+            fi
+            TEST_ARN=$(aws devicefarm list-tests --arn "$SUITE_ARN" --region us-west-2 | jq -r '.tests[0].arn')
+            URL=$(aws devicefarm list-artifacts --arn "$TEST_ARN" --type FILE --region us-west-2 \
+              | jq -r '.artifacts[] | select(.name=="Customer Artifacts") | .url')
+            if [ -n "$URL" ] && [ "$URL" != "null" ]; then
+              curl -sL --retry 3 --max-time 180 "$URL" -o "artifacts/ca-$i.zip" || true
+              echo "Baixado Customer Artifacts de: $NAME -> ca-$i.zip"
+            else
+              echo "Sem Customer Artifacts: $NAME"
+            fi
+            i=$((i+1))
+          done
+
+          echo "Artifacts baixados: $(ls artifacts/ | wc -l) arquivos"
+          ls -la artifacts/
+
+      - name: Upload raw Device Farm artifacts (debug)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: devicefarm-raw-android-${{ github.run_number }}
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Extract allure-results from artifacts
+        if: always()
+        run: |
+          # Cada "Customer Artifacts" é um zip com o allure-results aninhado em
+          # Host_Machine_Files/$DEVICEFARM_LOG_DIR/allure-results/. Extrai cada zip num subdir
+          # próprio e MESCLA todos os allure-results num só. Os arquivos de resultado/anexo têm
+          # nome UUID (únicos entre devices), então cp -n (no-clobber) traz todos; os fixos
+          # (environment.properties, categories.json, executor.json) ficam com 1 cópia.
+          mkdir -p extracted
+          n=0
+          for f in artifacts/*; do
+            [ -f "$f" ] || continue
+            if unzip -l "$f" >/dev/null 2>&1; then
+              mkdir -p "extracted/dev-$n"
+              unzip -o "$f" -d "extracted/dev-$n" >/dev/null 2>&1 || true
+              n=$((n+1))
+            fi
+          done
+          find extracted -type d -name allure-results | while read -r d; do
+            cp -rn "$d/." allure-results/ 2>/dev/null || true
+          done
+          echo "Arquivos em allure-results/: $(ls allure-results/ 2>/dev/null | wc -l)"
+          ls -la allure-results/ 2>/dev/null || true
+
+      - name: Upload allure-results as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-${{ github.run_number }}
+          path: allure-results/
+          if-no-files-found: warn
+          retention-days: 30
+
+  # --- Job iOS Device Farm ---
+  run-ios-on-device-farm:
+    runs-on: ubuntu-latest
+    outputs:
+      run_arn: ${{ steps.schedule_ios.outputs.run_arn }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      # --- Obter IPA do EAS Build ---
+      - name: Download iOS build from latest EAS Build
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_PROJECT_ID: ${{ secrets.EXPO_PROJECT_ID }}
+          BUILD_PROFILE_IOS: ${{ vars.BUILD_PROFILE_IOS }}
+          BUILD_SELECTION: ${{ vars.BUILD_SELECTION }}
+          BUILD_FROM: ${{ vars.BUILD_FROM }}
+          BUILD_TO: ${{ vars.BUILD_TO }}
+        run: |
+          node scripts/install-apk.mjs --no-install --platform ios
+          echo "APP_VERSION=$(jq -r '.appVersion' .build-info.json)" >> $GITHUB_ENV
+          echo "APP_BUILD_VERSION=$(jq -r '.appBuildVersion' .build-info.json)" >> $GITHUB_ENV
+
+      # --- Upload IPA para Device Farm ---
+      - name: Create IPA upload on Device Farm
+        id: ipa_upload
+        run: |
+          RESPONSE=$(aws devicefarm create-upload \
+            --project-arn "${{ secrets.DEVICE_FARM_PROJECT_ARN }}" \
+            --name "app-ios-run${{ github.run_number }}.ipa" \
+            --type IOS_APP \
+            --region us-west-2)
+          echo "ipa_arn=$(echo $RESPONSE | jq -r '.upload.arn')" >> $GITHUB_OUTPUT
+          echo "ipa_url=$(echo $RESPONSE | jq -r '.upload.url')" >> $GITHUB_OUTPUT
+
+      - name: Upload IPA to Device Farm S3
+        run: curl -T app.ipa "${{ steps.ipa_upload.outputs.ipa_url }}"
+
+      - name: Wait for IPA upload to succeed
+        run: |
+          ARN="${{ steps.ipa_upload.outputs.ipa_arn }}"
+          for i in $(seq 1 20); do
+            STATUS=$(aws devicefarm get-upload --arn "$ARN" --region us-west-2 | jq -r '.upload.status')
+            echo "IPA upload status ($i/20): $STATUS"
+            if [ "$STATUS" = "SUCCEEDED" ]; then exit 0; fi
+            if [ "$STATUS" = "FAILED" ]; then echo "IPA upload falhou"; exit 1; fi
+            sleep 10
+          done
+          echo "Timeout aguardando upload do IPA"; exit 1
+
+      # --- Criar ZIP do test package ---
+      - name: Create test package ZIP
+        run: |
+          zip -r test-package.zip . \
+            --exclude "node_modules/*" \
+            --exclude ".git/*" \
+            --exclude "allure-results/*" \
+            --exclude "allure-report/*" \
+            --exclude "ctrf/*" \
+            --exclude "_results_/*" \
+            --exclude "app.ipa" \
+            --exclude "test-package.zip"
+          echo "ZIP criado: $(du -sh test-package.zip | cut -f1)"
+
+      - name: Create test package upload on Device Farm
+        id: test_upload_ios
+        run: |
+          RESPONSE=$(aws devicefarm create-upload \
+            --project-arn "${{ secrets.DEVICE_FARM_PROJECT_ARN }}" \
+            --name "test-package-ios-run${{ github.run_number }}.zip" \
+            --type APPIUM_NODE_TEST_PACKAGE \
+            --region us-west-2)
+          echo "test_arn=$(echo $RESPONSE | jq -r '.upload.arn')" >> $GITHUB_OUTPUT
+          echo "test_url=$(echo $RESPONSE | jq -r '.upload.url')" >> $GITHUB_OUTPUT
+
+      - name: Upload test package to Device Farm S3
+        run: curl -T test-package.zip "${{ steps.test_upload_ios.outputs.test_url }}"
+
+      - name: Wait for test package upload to succeed
+        run: |
+          ARN="${{ steps.test_upload_ios.outputs.test_arn }}"
+          for i in $(seq 1 30); do
+            STATUS=$(aws devicefarm get-upload --arn "$ARN" --region us-west-2 | jq -r '.upload.status')
+            echo "Test package upload status ($i/30): $STATUS"
+            if [ "$STATUS" = "SUCCEEDED" ]; then exit 0; fi
+            if [ "$STATUS" = "FAILED" ]; then echo "Test package upload falhou"; exit 1; fi
+            sleep 15
+          done
+          echo "Timeout aguardando upload do test package"; exit 1
+
+      # --- Upload testspec ---
+      - name: Create testspec upload on Device Farm
+        id: testspec_upload_ios
+        run: |
+          RESPONSE=$(aws devicefarm create-upload \
+            --project-arn "${{ secrets.DEVICE_FARM_PROJECT_ARN }}" \
+            --name "testspec-ios-run${{ github.run_number }}.yml" \
+            --type APPIUM_NODE_TEST_SPEC \
+            --region us-west-2)
+          echo "spec_arn=$(echo $RESPONSE | jq -r '.upload.arn')" >> $GITHUB_OUTPUT
+          echo "spec_url=$(echo $RESPONSE | jq -r '.upload.url')" >> $GITHUB_OUTPUT
+
+      - name: Upload testspec to Device Farm S3
+        run: curl -T testspec-ios.yml "${{ steps.testspec_upload_ios.outputs.spec_url }}"
+
+      - name: Wait for testspec upload to succeed
+        run: |
+          ARN="${{ steps.testspec_upload_ios.outputs.spec_arn }}"
+          for i in $(seq 1 10); do
+            STATUS=$(aws devicefarm get-upload --arn "$ARN" --region us-west-2 | jq -r '.upload.status')
+            echo "Testspec upload status ($i/10): $STATUS"
+            if [ "$STATUS" = "SUCCEEDED" ]; then exit 0; fi
+            if [ "$STATUS" = "FAILED" ]; then echo "Testspec upload falhou"; exit 1; fi
+            sleep 5
+          done
+          echo "Timeout aguardando upload do testspec"; exit 1
+
+      # --- Agendar run iOS ---
+      - name: Schedule iOS Device Farm run
+        id: schedule_ios
+        env:
+          CLIENT_USERS_EMAILS: ${{ secrets.CLIENT_USERS_IOS_EMAILS }}
+        run: |
+          # Remove qualquer whitespace/quebra de linha que possa ter entrado ao colar o
+          # secret (emails+virgula nao tem espaco, entao isso so limpa o valor).
+          USERS=$(printf '%s' "$CLIENT_USERS_EMAILS" | tr -d '[:space:]')
+          RUN_ARN=$(aws devicefarm schedule-run \
+            --project-arn "${{ secrets.DEVICE_FARM_PROJECT_ARN }}" \
+            --app-arn "${{ steps.ipa_upload.outputs.ipa_arn }}" \
+            --device-pool-arn "${{ secrets.DEVICE_FARM_IOS_DEVICE_POOL_ARN }}" \
+            --name "CI iOS Run #${{ github.run_number }}" \
+            --test "{\"type\":\"APPIUM_NODE\",\"testPackageArn\":\"${{ steps.test_upload_ios.outputs.test_arn }}\",\"testSpecArn\":\"${{ steps.testspec_upload_ios.outputs.spec_arn }}\"}" \
+            --configuration "{\"environmentVariables\":[{\"name\":\"CLIENT_USER\",\"value\":\"${{ secrets.CLIENT_USER }}\"},{\"name\":\"CLIENT_PASSWORD\",\"value\":\"${{ secrets.CLIENT_PASSWORD }}\"},{\"name\":\"CLIENT_USERS_EMAILS\",\"value\":\"$USERS\"},{\"name\":\"APP_VERSION\",\"value\":\"${{ env.APP_VERSION }}\"},{\"name\":\"APP_BUILD_VERSION\",\"value\":\"${{ env.APP_BUILD_VERSION }}\"}]}" \
+            --region us-west-2 \
+            --query 'run.arn' --output text)
+          echo "run_arn=$RUN_ARN" >> $GITHUB_OUTPUT
+          echo "Run iOS agendado: $RUN_ARN"
+
+      # --- Aguardar conclusão ---
+      - name: Wait for iOS Device Farm run to complete
+        run: |
+          ARN="${{ steps.schedule_ios.outputs.run_arn }}"
+          echo "Aguardando run iOS: $ARN"
+          STATUS=""
+          RESULT_VAL=""
+          REACHED_TERMINAL=false
+          for i in $(seq 1 120); do
+            RESULT=$(aws devicefarm get-run --arn "$ARN" --region us-west-2 | jq -r '.run | "\(.status) \(.result)"')
+            STATUS=$(echo $RESULT | cut -d' ' -f1)
+            RESULT_VAL=$(echo $RESULT | cut -d' ' -f2)
+            echo "Status ($i/120): $STATUS / $RESULT_VAL"
+            if [ "$STATUS" != "PENDING" ] && [ "$STATUS" != "RUNNING" ] && [ "$STATUS" != "SCHEDULING" ]; then
+              echo "Run iOS concluído com resultado: $RESULT_VAL"
+              REACHED_TERMINAL=true
+              break
+            fi
+            sleep 60
+          done
+          # Timeout sem estado terminal = falha real de automação (esteira travou) -> quebra.
+          if [ "$REACHED_TERMINAL" != "true" ]; then
+            echo "::error::Timeout aguardando o Device Farm iOS (último status: $STATUS). A esteira não conseguiu obter o resultado."
+            exit 1
+          fi
+          # Resultado do teste (PASSED/FAILED/ERRORED/WARNED) NÃO quebra a esteira: reflete no relatório.
+          echo "::notice::iOS Device Farm: $RESULT_VAL — ver relatório Allure"
+          echo "**iOS Device Farm:** \`$RESULT_VAL\` — resultado reflete no relatório, não quebra a esteira." >> "$GITHUB_STEP_SUMMARY"
+
+      # --- Download de artifacts iOS ---
+      - name: Download artifacts from iOS Device Farm run
+        if: always()
+        run: |
+          RUN_ARN="${{ steps.schedule_ios.outputs.run_arn }}"
+          mkdir -p artifacts allure-results
+
+          # Mesma regra do Android: junta TODOS os devices no relatório — baixa o "Customer
+          # Artifacts" da Tests Suite de cada aparelho. (Enquanto o fluxo iOS não passar no
+          # onboarding, os resultados vêm com falha, mas cada device ainda aparece navegável.)
+          i=0
+          for JOB_ARN in $(aws devicefarm list-jobs --arn "$RUN_ARN" --region us-west-2 | jq -r '.jobs[].arn'); do
+            NAME=$(aws devicefarm get-job --arn "$JOB_ARN" --region us-west-2 | jq -r '.job.device.name')
+            SUITE_ARN=$(aws devicefarm list-suites --arn "$JOB_ARN" --region us-west-2 \
+              | jq -r '.suites[] | select(.name=="Tests Suite") | .arn')
+            if [ -z "$SUITE_ARN" ] || [ "$SUITE_ARN" = "null" ]; then
+              echo "Sem Tests Suite (pulando): $NAME"; i=$((i+1)); continue
+            fi
+            TEST_ARN=$(aws devicefarm list-tests --arn "$SUITE_ARN" --region us-west-2 | jq -r '.tests[0].arn')
+            URL=$(aws devicefarm list-artifacts --arn "$TEST_ARN" --type FILE --region us-west-2 \
+              | jq -r '.artifacts[] | select(.name=="Customer Artifacts") | .url')
+            if [ -n "$URL" ] && [ "$URL" != "null" ]; then
+              curl -sL --retry 3 --max-time 180 "$URL" -o "artifacts/ca-$i.zip" || true
+              echo "Baixado Customer Artifacts de: $NAME -> ca-$i.zip"
+            else
+              echo "Sem Customer Artifacts: $NAME"
+            fi
+            i=$((i+1))
+          done
+          echo "Artifacts iOS baixados: $(ls artifacts/ | wc -l) arquivos"
+
+      - name: Upload raw iOS Device Farm artifacts (debug)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: devicefarm-raw-ios-${{ github.run_number }}
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Extract allure-results from iOS artifacts
+        if: always()
+        run: |
+          # Cada "Customer Artifacts" é um zip com o allure-results aninhado. Extrai cada um num
+          # subdir próprio e MESCLA todos num só (cp -n: arquivos UUID únicos entram todos; os
+          # fixos ficam com 1 cópia).
+          mkdir -p extracted
+          n=0
+          for f in artifacts/*; do
+            [ -f "$f" ] || continue
+            if unzip -l "$f" >/dev/null 2>&1; then
+              mkdir -p "extracted/dev-$n"
+              unzip -o "$f" -d "extracted/dev-$n" >/dev/null 2>&1 || true
+              n=$((n+1))
+            fi
+          done
+          find extracted -type d -name allure-results | while read -r d; do
+            cp -rn "$d/." allure-results/ 2>/dev/null || true
+          done
+          echo "Arquivos em allure-results/ (iOS): $(ls allure-results/ 2>/dev/null | wc -l)"
+          ls -la allure-results/ 2>/dev/null || true
+
+      - name: Upload iOS allure-results as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-ios-${{ github.run_number }}
+          path: allure-results/
+          if-no-files-found: warn
+          retention-days: 30
+
+  # --- Job de publicação do relatório ---
+  publish-report:
+    needs: [run-on-device-farm, run-ios-on-device-farm]
+    runs-on: ubuntu-latest
+    if: always()
+    # Rede de segurança: a publicação leva poucos minutos. Sem esse teto, um step que
+    # trave pendura o run por horas (já aconteceu num step de re-encode de vídeo).
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    # Serializa publicações de runs sobrepostas para evitar corrida de push na branch reports.
+    concurrency:
+      group: reports-publish
+      cancel-in-progress: false
+    # Quantas execuções ficam publicadas na branch reports (as N mais recentes).
+    env:
+      REPORTS_KEEP: 3
+
+    steps:
+      - name: Checkout main (para ter os scripts)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Install allure-commandline
+        run: npm install -g allure-commandline
+
+      - name: Download Android allure-results artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: allure-results-${{ github.run_number }}
+          path: allure-results-android/
+        continue-on-error: true
+
+      - name: Download iOS allure-results artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: allure-results-ios-${{ github.run_number }}
+          path: allure-results-ios/
+        continue-on-error: true
+
+      - name: Checkout reports branch
+        uses: actions/checkout@v4
+        with:
+          ref: reports
+          path: reports-branch
+          # fetch-depth: 1 — só a árvore do commit mais recente (já contém todos os run-N/).
+          # Evita baixar todo o histórico pesado da branch (relatórios + vídeos), que corrompia
+          # o checkout e causava "fatal: could not parse HEAD" no commit.
+          fetch-depth: 1
+
+      - name: Copy Allure history per platform (Trend tab)
+        run: |
+          # Cada plataforma acumula só o seu histórico: lê do último run que tenha
+          # a subpasta da plataforma. Roda ANTES de criar o diretório do run atual.
+          LATEST=$(ls reports-branch/ | grep "^run-" | sort -V | tail -1)
+          for PLAT in android ios; do
+            SRC="reports-branch/$LATEST/$PLAT/history"
+            if [ -n "$LATEST" ] && [ -d "$SRC" ]; then
+              mkdir -p "allure-results-$PLAT/history"
+              cp -r "$SRC/." "allure-results-$PLAT/history/"
+              echo "Histórico $PLAT copiado de: $LATEST"
+            else
+              echo "Nenhum histórico $PLAT anterior encontrado"
+            fi
+          done
+
+      # NÃO reintroduzir um step de re-encode de vídeo (ffmpeg) aqui. Ele nunca entregou
+      # nada: na primeira versão morria no apt-get sob continue-on-error (no-op silencioso)
+      # e, quando passou a rodar de verdade, o ffmpeg sem -nostdin lia a stdin do loop
+      # `find ... | while read` e travava no handler interativo ("Enter command: ..."),
+      # pendurando o run por horas. O .mp4 do Appium é publicado como está: o Android grava
+      # em H.264 via MediaProjection, que o navegador toca nativamente.
+
+      - name: Generate Allure HTML reports per platform
+        run: |
+          # "Tem resultado" = existe pelo menos um *-result.json. Diretório não-vazio não serve
+          # como critério: um job que falhou antes do Device Farm ainda deixa a pasta com os
+          # arquivos fixos (environment.properties/categories.json) e o history/ copiado acima,
+          # e o Allure gera dali um relatório de 0 testes — que era publicado e consumia um
+          # slot da retenção, derrubando um relatório real.
+          for PLAT in android ios; do
+            SRC="allure-results-$PLAT"
+            COUNT=$(find "$SRC" -name '*-result.json' 2>/dev/null | wc -l)
+            if [ "$COUNT" -gt 0 ]; then
+              allure generate "./$SRC" --clean -o "./allure-report-$PLAT"
+              echo "Relatório $PLAT gerado ($COUNT resultados)"
+            else
+              NOME=$([ "$PLAT" = "android" ] && echo Android || echo iOS)
+              echo "::warning::$NOME sem resultados — relatório não gerado."
+              echo "**$NOME:** nenhum resultado — o job não chegou a agendar run no Device Farm." >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+
+      - name: Generate Allure single-file reports (baixável)
+        if: always()
+        run: |
+          # Mesmo critério do passo anterior: só gera com resultado de teste real.
+          for PLAT in android ios; do
+            SRC="allure-results-$PLAT"
+            if [ "$(find "$SRC" -name '*-result.json' 2>/dev/null | wc -l)" -gt 0 ]; then
+              allure generate "./$SRC" --clean --single-file -o "./allure-single-$PLAT"
+              echo "Single-file $PLAT em ./allure-single-$PLAT/index.html"
+            else
+              echo "Sem resultados $PLAT — pulando single-file"
+            fi
+          done
+
+      - name: Upload Android Allure report (single-file) como artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report-android-${{ github.run_number }}
+          path: allure-single-android/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload iOS Allure report (single-file) como artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report-ios-${{ github.run_number }}
+          path: allure-single-ios/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Publish reports to reports branch
+        if: always()
+        run: |
+          RUN_DIR="run-${{ github.run_number }}-$(date -u +%Y-%m-%d)"
+          KEEP="$REPORTS_KEEP"
+
+          # --- Guarda: nada gerado -> não publica, mas explica claramente o motivo ---
+          if [ ! -d "allure-report-android" ] && [ ! -d "allure-report-ios" ]; then
+            MSG="Device Farm não retornou allure-results (Android nem iOS) — relatório não publicado nesta run."
+            echo "::error::$MSG"
+            echo "**Publicação:** $MSG" >> "$GITHUB_STEP_SUMMARY"
+            # exit 1, não 0: sem resultado o relatório do Pages para de ser atualizado, e um
+            # job verde esconde isso (foi o que aconteceu no run-22, 2026-09-01 — a quebra só
+            # apareceu quando alguém abriu o log). Falhar aqui deixa o run vermelho na hora.
+            exit 1
+          fi
+
+          cd reports-branch
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # (Re)aplica a contribuição desta run sobre a árvore ATUAL da branch reports.
+          # É idempotente: pode rodar de novo após re-sincronizar com o remoto.
+          apply_changes() {
+            for PLAT in android ios; do
+              if [ -d "../allure-report-$PLAT" ]; then
+                rm -rf "$RUN_DIR/$PLAT"
+                mkdir -p "$RUN_DIR/$PLAT"
+                cp -r "../allure-report-$PLAT/." "$RUN_DIR/$PLAT/"
+                echo "Copiado $PLAT para: $RUN_DIR/$PLAT"
+              else
+                echo "Sem relatório $PLAT para copiar"
+              fi
+            done
+          }
+
+          # Mantém apenas as $KEEP execuções mais recentes. A run atual é sempre a de maior
+          # número, então nunca é podada. `find -printf` não depende de glob (sem diretório
+          # o padrão viraria o literal "run-*/") e `sort -V` ordena run-49 antes de run-100.
+          prune_old_runs() {
+            local DIRS
+            DIRS=$(find . -maxdepth 1 -type d -name 'run-*' -printf '%f\n' | sort -V | head -n -"$KEEP")
+            if [ -z "$DIRS" ]; then
+              echo "Nada a podar (branch com no máximo $KEEP runs)."
+              return 0
+            fi
+            while IFS= read -r d; do
+              [ -z "$d" ] && continue
+              echo "Removendo run antigo: $d"
+              rm -rf "$d"
+            done <<< "$DIRS"
+          }
+
+          # A branch reports é recriada a cada publicação como UM commit órfão com
+          # apenas as $KEEP execuções mais recentes. Só apagar os runs antigos
+          # não devolveria espaço: os vídeos continuariam no histórico e o repositório
+          # seguiria crescendo ~1GB por execução.
+          n=0
+          while true; do
+            # Árvore atualmente publicada, para detectar "nada mudou" (ver abaixo).
+            OLD_TREE=$(git rev-parse HEAD^{tree})
+
+            apply_changes
+            prune_old_runs
+            node ../scripts/generate-report-index.mjs .
+            # Remove anexos > 95MB (limite de 100MB por arquivo do GitHub).
+            # Exclui .git/ — caso contrário o packfile (>95MB com vídeos acumulados)
+            # é apagado e o git seguinte falha com "fatal: could not parse HEAD".
+            find . -path './.git' -prune -o -type f -size +95M -print0 | xargs -0 -r rm -f
+
+            # --orphan descarta o histórico (e os vídeos já podados) da branch.
+            git checkout -q --orphan "publish-$n"
+            git add -A
+            git commit -q -m "Relatório: $RUN_DIR (últimos $KEEP runs)"
+
+            # Num commit órfão não há pai, então `git status`/`git diff --staged` nunca
+            # ficam vazios. A comparação de "nada novo" é feita pelo hash da árvore.
+            if [ "$(git rev-parse HEAD^{tree})" = "$OLD_TREE" ]; then
+              echo "Árvore idêntica à já publicada — nada novo para publicar."
+              echo "**Publicação:** nada novo para publicar nesta run." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+
+            if git push --force origin HEAD:reports; then
+              echo "Relatório publicado com sucesso."
+              echo "**Publicação:** relatório \`$RUN_DIR\` publicado na branch reports (mantidos os $KEEP mais recentes)." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+
+            n=$((n+1))
+            if [ "$n" -ge 5 ]; then
+              echo "::error::Falha ao publicar o relatório após 5 tentativas (push rejeitado pelo remoto)."
+              echo "**Publicação:** FALHOU após 5 tentativas de push na branch reports." >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+            echo "Push rejeitado (corrida com outra run) — re-sincronizando com o remoto (tentativa $n/5)"
+            git fetch --depth 1 origin reports
+            git reset --hard FETCH_HEAD
+            # Sem o clean, arquivos não rastreados da tentativa anterior sobrevivem ao
+            # reset e sujam a árvore da tentativa seguinte.
+            git clean -fdq
+          done
+
+      - name: Print report URL
+        run: |
+          REPO="${{ github.repository }}"
+          OWNER=$(echo $REPO | cut -d'/' -f1 | tr '[:upper:]' '[:lower:]')
+          REPO_NAME=$(echo $REPO | cut -d'/' -f2)
+          RUN_DIR="run-${{ github.run_number }}-$(date -u +%Y-%m-%d)"
+          echo ""
+          echo "1) Online (GitHub Pages):"
+          echo "   Android: https://${OWNER}.github.io/${REPO_NAME}/${RUN_DIR}/android/"
+          echo "   iOS:     https://${OWNER}.github.io/${REPO_NAME}/${RUN_DIR}/ios/"
+          echo "   Índice de todos os runs: https://${OWNER}.github.io/${REPO_NAME}/"
+          echo ""
+          echo "2) Download: aba Actions deste run -> artifacts"
+          echo "   'allure-report-android-${{ github.run_number }}' e 'allure-report-ios-${{ github.run_number }}'"
+          echo "   Baixe o ZIP, extraia e abra index.html (autocontido, sem servidor)."
