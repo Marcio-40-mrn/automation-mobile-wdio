@@ -1,6 +1,6 @@
 # STATE
 
-Atualizado em **2026-09-10**.
+Atualizado em **2026-09-10** (noite).
 
 > Este arquivo foi mesclado nesta data. A cópia do `.planning/` trazida de outra pasta em
 > 2026-09-10 sobrescreveu a versão de 09-09 com a de 09-08 — os drafts e o relatório de
@@ -13,10 +13,12 @@ Atualizado em **2026-09-10**.
 **Android: verde.** `CI Run #6` (2026-09-09) fechou **18/18 PASSED** no pool de 6 devices.
 É a referência, e o desenho do Android não deve ser alterado.
 
-**Marco atual: M3, passo 5** — a mesma suíte rodando no iOS. O código iOS **já foi
-exercitado contra aparelho de verdade**: no `CI iOS Run #6` o onboarding, o alerta de
-localização, os três aceites, o login e o `voltar()` pelo chevron funcionaram. O fluxo
-morre depois disso, por bugs pontuais (ver Pendências).
+**Marco atual: M3, passo 5** — a mesma suíte rodando no iOS. **Primeiro iOS verde:** no
+`CI iOS Run #8` (2026-09-10 18:31, 5 runs de 1 device) o **iPhone 15 passou ponta a ponta**
+— onboarding, login, favoritar, validar em Favoritos, desfavoritar (coração de maior x = 155),
+logout. Os outros quatro falharam por duas causas distintas, ambas medidas nos artefatos
+(ver Pendências): três por **caractere perdido na digitação do login** e um (14 Pro Max) em
+`abrirFavoritos()`.
 
 Lembrete do que o M3 é, porque é fácil de distorcer: **uma suíte só**. O
 `test/specs/test.spec.ts` não muda, nenhum page object novo é criado, e o `if` de
@@ -24,34 +26,18 @@ plataforma mora dentro do método — como o `ativarApp()` de `HomePage.ts` já 
 
 ## Working tree
 
-Branch `main`, HEAD em **`3a6f813`**. As correções de 2026-09-09 (`.env` do iOS viajando no
-ZIP e o chevron do `voltarIOS()`) **estão commitadas** ali e **foram validadas** no
-`CI iOS Run #6` — não são mais pendência.
+Branch `main`, HEAD em **`a53c6b6`**. Tudo que a versão anterior deste arquivo listava como
+"não commitado" (um email por device, `a0608ba`; os quatro page objects do fluxo iOS,
+`a53c6b6`) **está commitado e foi exercitado no `CI iOS Run #8`**. Os drafts, o
+`RELATORIO-ANOMALIAS-IOS.md` e o plano de 09-08 continuam fora do git por `.gitignore`.
 
-Não commitado (a mudança de hoje, "um email por device"):
-
-| Arquivo | O que mudou |
-|---|---|
-| `.github/workflows/mobile_test.yml` | job iOS: 5 runs de 1 device em vez de 1 run de 5. Novo step `Resolver devices e contas do pool iOS` (monta `<nome, arn, email>`), `Agendar runs iOS (um por device)` gera e sobe um testspec por aparelho, e o wait/download passam a iterar os 5 runs. **Job Android e `publish-report` byte a byte idênticos.** |
-| `testspec-ios.yml` | o bloco do `.env` deixa de preservar `CLIENT_USERS_EMAILS`/`IOS_DEVICE_MAP` e passa a montar o `.env` a partir da linha `__CREDENCIAIS_DO_RUN__` que o CI injeta |
-| `test/utils/credentials.ts` | ramo iOS lê `CLIENT_USER` (a conta já vem resolvida). Ramo Android inalterado |
-| `test/utils/device-index.ts` | `resolveIOSDevice()`, `IOSDeviceEntry` e o memo removidos. `deviceIndex.android` intacto |
-| `test/utils/device-name.ts` | iOS lê `DEVICE_LABEL`. Mapa e ramo Android intactos |
-| `wdio.conf.ts` | `deviceLabel()` prefere `DEVICE_LABEL` — some o `Device=<UDID>` do `environment.properties` no iOS |
-
-E os quatro page objects, com as correções do fluxo iOS (todas iOS-only; nenhum ramo Android
-foi tocado):
+Não commitado (mudança de 2026-09-10, noite — "digitação perde caracteres"):
 
 | Arquivo | O que mudou |
 |---|---|
-| `test/pageobjects/BasePage.ts` | `fechaBannerIOS()` **não clica e não lança** — só registra diagnóstico. Ver "O `Close` fantasma" abaixo |
-| `test/pageobjects/CategoriasPage.ts` | `favoritarPrimeiroProdutoIOS()` escolhe o card por **largura** (não pelo índice `[1]`, que pegava o wrapper da tela); guarda do coração passou a comparar `x` **e** `y` |
-| `test/pageobjects/FavoritosPage.ts` | `validaElememnto()` no iOS ancora no `flatlist-favorites` e faz poll no `label`; `tirarSelecaoItemIOS()` escolhe o coração pelo **maior `x` dentro do card** e faz poll de 30s no lugar do `pause(3000)` |
-| `test/pageobjects/HomePage.ts` | `abrirCategorias()` no iOS confere que o alvo está no rodapé antes de clicar, e que a tela de categorias abriu depois |
-
-Também não commitado: os 35 drafts em `.planning/drafts/ios/`, o
-`RELATORIO-ANOMALIAS-IOS.md` e `plans/2026-09-08-ramo-ios-nos-page-objects.md`, copiados
-para cá em 2026-09-10.
+| `test/pageobjects/LoginPage.ts` | ramo iOS: novo `digitarIOS()` — clica no campo, espera `isKeyboardShown()` + 1s de reflow, digita com `maxTypingFrequency: 20` (setting do WDA, restaurado para 60 depois); `logarIOS()` passa a detectar o modal `Incorrect username and/or password` e falha **no passo de login**, em vez de ler "botão sumiu = logou". **Ramo Android byte a byte idêntico.** |
+| `.planning/RELATORIO-ANOMALIAS-IOS.md` | nova seção 4.4 (digitação perde caracteres; vídeo não mostra senha; senha em texto puro no `appium.log` do host) |
+| `.planning/STATE.md`, `.planning/ROADMAP.md` | este registro |
 
 ## O levantamento iOS (2026-09-04)
 
@@ -137,18 +123,45 @@ Funcionou: 5 runs separados (`CI iOS Run #7 - Apple iPhone 13 / 14 / 14 Pro Max 
 Max`), **os 5 aparelhos executaram**, 5 contas distintas, e Android sem regressão
 (`CI Run #7` = 18/18 PASSED). Nenhum `Device iOS não encontrado`.
 
-### Validar as correções de fluxo iOS
+### Correções de fluxo iOS — VALIDADAS no `CI iOS Run #8` (onde o login passou)
 
-Ainda não rodaram. No próximo run, conferir no log:
+No iPhone 15 (PASSED) e no 14 Pro Max (logou): `🛍 Produto escolhido: Camisa Manga Longa Slim
+em Tricoline Stretch Liso Branco` só com o nome; `💔 Desfavoritar: 2 action-button no card
+(x = 155, 21); escolhido o de maior x = 155`; nenhum `Banner do Insider não fechou`, nenhum
+`🔎 [diag banner]` (o `Close` fantasma não apareceu neste run); `voltar`, `abrirPerfil`,
+`logout` e `confirmarLogout` exercitados pela primeira vez e passaram
+(`✅ Logout confirmado pelo estado da tela`).
 
-- `🛍 Produto escolhido:` só com o nome, sem "Filter and sort";
-- `💔 Desfavoritar: N action-button no card (x = ...); escolhido o de maior x = ...` — tem que
-  escolher o de **maior** x;
-- nenhum `Banner do Insider não fechou`, e nenhum aparelho indo parar em Meus Pedidos;
-- a linha `🔎 [diag banner]` quando o `Close` fantasma aparecer — é ela que traz o dado para
-  construir a checagem de presença de verdade;
-- os quatro últimos steps (`voltar`, `abrirPerfil`, `logout`, `confirmarLogout`) serão
-  exercitados **pela primeira vez**; se algo aparecer ali, é terreno novo, não regressão.
+### Login iOS perde caracteres na digitação — CORRIGIDO em 2026-09-10, aguardando run
+
+Causa dos "email ou senha incorreto" do Run #7 (`marciorocha`, "em observação") e do Run #8
+(iPhones 13, 14 e 15 Pro Max). **Medido nos artefatos, não deduzido** — detalhe completo na
+seção 4.4 do `RELATORIO-ANOMALIAS-IOS.md`:
+
+- testspec e `🔑 Conta deste run` corretos nos 5 aparelhos → não é `.env`/secret;
+- `appium.log`: `setValue` sai completo (`"m","a","r","c","i","o",...`) → não é o Appium;
+- frame do vídeo após o `setValue`: `mariorocha@maildrop.cc` (iPhone 14) e `qaest@maildrop.cc`
+  (15 Pro Max) → a letra some **no ato de digitar**;
+- o WDA dá o tap para focar e digita 23 caracteres em <1s, com o teclado ainda subindo; o
+  iPhone 15 passou pelo mesmo caminho e logou — é aleatório;
+- iPhone 13 digitou o email certo e foi recusado: o vídeo **não mostra senha** (campo
+  `secureTextEntry` sai vazio até no aparelho que logou), então a letra perdida na senha é a
+  única variável restante (inferência; o resto é medição).
+
+Agravante corrigido junto: `logarIOS()` dava `✅ Login efetivado` com o modal de erro na tela,
+porque o modal cobre o botão "Sign in" e a âncora era "botão sumiu". O teste morria 20s depois
+em `tab-categories still not displayed` — o sintoma errado, no passo errado.
+
+No próximo run, conferir: `⌨ Email: N caracteres digitados com o teclado aberto` nos 5; frame
+do vídeo com os 5 emails íntegros; nenhum `Login efetivado` seguido de `tab-categories`. Se
+aparecer o novo erro `o app recusou as credenciais`, o frame diz se ainda falta letra (baixar
+mais o `maxTypingFrequency`) ou se é outra coisa.
+
+### `abrirFavoritos()` não abriu a lista no iPhone 14 Pro Max — NÃO investigado
+
+`Favoritos: a lista "flatlist-favorites" nao apareceu em 30s` depois de logar e favoritar
+normalmente. Único aparelho com esse sintoma no Run #8; log e vídeo estão nos artefatos do run
+(`CI iOS Run #8 - Apple iPhone 14 Pro Max`). Investigar antes de tratar como flaky.
 
 ### Sessões de Remote Access: o que não fazer
 
@@ -163,10 +176,11 @@ captura, pegar `getPageSource()` UMA vez e medir os rects parseando o XML local 
 referências de elemento obsoletas (um clique depois disso não registra). E **sempre fechar a
 sessão** (`deleteSession`) ao final: uma sessão deixada aberta segura o device.
 
-### Bugs de teste no iOS — corrigidos em 2026-09-10, aguardando run
+### Bugs de teste no iOS — corrigidos e VALIDADOS no `CI iOS Run #8` (registro)
 
 Os três vieram do `CI iOS Run #7` (5 runs de 1 device, todos os aparelhos executaram) e do run
-local do Marcio. **Todos com causa medida em aparelho, nenhum por dedução.**
+local do Marcio. **Todos com causa medida em aparelho, nenhum por dedução.** Fica como
+registro do diagnóstico; o resultado está na pendência "Correções de fluxo iOS" acima.
 
 - **Nome do produto poluído — CORRIGIDO.** O predicate
   `name BEGINSWITH "Camisa" AND name CONTAINS "R$"` casa também com o **wrapper da tela**,
@@ -194,11 +208,6 @@ local do Marcio. **Todos com causa medida em aparelho, nenhum por dedução.**
   commit `8536e92`: a grade tem duas colunas, então todo card da mesma coluna divide o mesmo
   intervalo de `x` e o coração da linha de baixo passava na checagem. Resultado seria ler o
   nome de uma camisa e favoritar outra. Agora compara `x` e `y`.
-
-**Não confundir com falha de código:** no `CI iOS Run #7` o iPhone 14 falhou com
-`tab-categories still not displayed` usando a conta `marciorocha@maildrop.cc`, que no CI
-respondeu "email ou senha incorreto". No run local a mesma conta logou normalmente. Em
-observação.
 
 ### Outras
 

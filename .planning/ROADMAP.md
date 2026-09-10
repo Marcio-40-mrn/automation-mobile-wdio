@@ -52,10 +52,12 @@ Passos:
 4. ✅ Ramo iOS preenchido em `test/pageobjects/` (2026-09-08) — 14 ramificações em 6
    arquivos, `tsc --noEmit` limpo. **Escrito a partir dos drafts, ainda não exercitado
    contra device**: o que valida é o passo 5.
-5. 🔄 A suíte roda no iOS ponta a ponta. **Parcialmente exercitada** no `CI iOS Run #6`
-   (2026-09-09): onboarding, alerta de localização, os três aceites, login e o `voltar()` pelo
-   chevron passaram em aparelho real. Falta fechar três bugs pontuais — nome do produto
-   poluído, banner que não fecha e `tab-categories` ausente — listados no `STATE.md`.
+5. 🔄 A suíte roda no iOS ponta a ponta. **Passou pela primeira vez** no `CI iOS Run #8`
+   (2026-09-10), no iPhone 15 — os 17 steps, de `ativarApp` a `confirmarLogout`. Os outros
+   quatro aparelhos falharam por duas causas medidas nos artefatos: três por **caractere
+   perdido na digitação do login** (corrigido em `LoginPage.ts`, aguardando run) e um em
+   `abrirFavoritos()` (14 Pro Max, não investigado). Detalhes no `STATE.md`. O passo fecha
+   quando os 5 aparelhos passarem no mesmo run.
 
 O bloqueio original deste marco — 19 dos 31 seletores eram Android-only e os 12
 `accessibility id:` não podiam ser presumidos — **está resolvido**: o valor iOS de cada um
