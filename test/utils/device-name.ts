@@ -1,15 +1,13 @@
-import { resolveIOSDevice } from "./device-index";
-
 // Nome amigável do device em runtime, para rotular a execução no relatório Allure.
 //
 // Android: a identidade vem do MODELO (ro.product.model), lido das capabilities da sessão
 // (`browser.capabilities.deviceModel`, ex.: "SM-S918U1"). O mapa é por PREFIXO de modelo
 // (sem o sufixo de região), casado com `startsWith` — mesma ideia do device-index.ts.
 //
-// iOS: o `deviceModel` não existe nas capabilities do XCUITest e o DEVICEFARM_DEVICE_NAME é
-// o UDID — era por isso que o relatório rotulava os aparelhos com "00008110-...". O nome sai
-// do mesmo mapa que o CI gera para escolher a conta (IOS_DEVICE_MAP), que já traz o nome do
-// aparelho como a API do Device Farm o chama ("Apple iPhone 13").
+// iOS: o `deviceModel` não existe nas capabilities do XCUITest e o DEVICEFARM_DEVICE_NAME é o
+// UDID — era por isso que o relatório rotulava os aparelhos com "00008110-...". Como agora o
+// CI agenda um run POR aparelho, ele já sabe de qual se trata (o ARN do device fixa o modelo) e
+// injeta o nome em DEVICE_LABEL, junto com a conta. Nada a resolver em runtime.
 //
 // Fallback: modelo cru -> DEVICEFARM_DEVICE_NAME -> 'AVD-S24' (execução local).
 const deviceNames: Record<string, string> = {
@@ -28,8 +26,7 @@ export async function friendlyDeviceName(): Promise<string> {
     if (!isDeviceFarm) return isIOS ? 'iOS Remote' : 'AVD-S24';
 
     if (isIOS) {
-        const entry = await resolveIOSDevice();
-        return entry?.name || process.env.DEVICEFARM_DEVICE_NAME || 'Device Farm iOS';
+        return process.env.DEVICE_LABEL || process.env.DEVICEFARM_DEVICE_NAME || 'Device Farm iOS';
     }
 
     const model = String((browser?.capabilities as any)?.deviceModel ?? '');

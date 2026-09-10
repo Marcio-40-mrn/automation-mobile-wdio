@@ -18,6 +18,11 @@ Um único cenário, em `test/specs/test.spec.ts`, rodando por device:
 - O teste não pode depender de nome de produto fixo: o catálogo muda entre versões e
   ambientes.
 - O teste não pode depender de coordenada de tela: resolução e layout variam por device.
+  **Exceção obrigatória no iOS**, em dois pontos do onboarding onde o app não expõe elemento
+  nenhum: o CTA "Toque para começar" e o alerta de localização do SpringBoard (drafts `01` e
+  `02`). Onde não há saída, a coordenada é guardada como **fração** da janela — nunca como
+  pixel absoluto — e multiplicada pelo `getWindowRect()` do device real. Cada um desses
+  pontos é dívida a ser cobrada do time do app, na forma de um `accessibilityIdentifier`.
 - Todo passo é precedido de uma tentativa de fechar o banner do Insider, que aparece em
   qualquer tela, a qualquer momento.
 - A falha tem que ser explícita e no passo certo. Nada de seguir em silêncio e estourar
@@ -37,6 +42,12 @@ Cada uma custou um incidente. Detalhes no `CLAUDE.md`.
   com o `wdio.conf.ts`.
 - **Não subir execução no AVD sem pedido explícito do Marcio.** O emulador é ambiente de
   trabalho dele; dois runs simultâneos invalidam os dois.
+- **Uma suíte só, para as duas plataformas.** Nunca criar spec, classe ou arquivo de page
+  object separado por sistema operacional. O `test/specs/test.spec.ts` é o mesmo, os page
+  objects são os mesmos e os nomes de método são os mesmos; quem precisar detecta a
+  plataforma (`process.env.PLATFORM === 'ios'`) e escolhe o seletor **dentro do método** —
+  o padrão que o `ativarApp()` de `test/pageobjects/HomePage.ts` inaugurou. Duplicar a suíte
+  dobra o custo de cada mudança de fluxo e faz as duas versões divergirem em silêncio.
 
 ## Restrições conhecidas de ambiente
 

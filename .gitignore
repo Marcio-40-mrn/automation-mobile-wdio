@@ -24,3 +24,6 @@ test/Draft.ts
 /mkdocs.yml
 /docs/
 /.github/workflows/techdocs.yml
+.planning/drafts/
+.planning/RELATORIO-ANOMALIAS-IOS.md
+.planning/plans/2026-09-08-ramo-ios-nos-page-objects.md

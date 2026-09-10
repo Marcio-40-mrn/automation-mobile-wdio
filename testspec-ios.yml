@@ -39,30 +39,32 @@ phases:
           if [ $n -ge 3 ]; then echo "npm install falhou após 3 tentativas"; exit 1; fi
           echo "npm install falhou (tentativa $n) — nova tentativa em 10s"; sleep 10
         done
-      # O .env deste pacote vem PRONTO do workflow (step "Gerar .env do test package (iOS)"),
-      # com as credenciais E o IOS_DEVICE_MAP (a conta de cada aparelho).
-      # Motivo: o host iOS nao recebe as environmentVariables do run — o script que o Device
-      # Farm gera para o iOS monta o proprio ambiente e exporta so as DEVICEFARM_* (conferido
-      # no artefato "Test spec shell script"). No host Android o ambiente e herdado do agente e
-      # a variavel tem valor; aqui nao. Sobrescrever este arquivo as cegas zerava justamente as
-      # credenciais, e o login ia com user=undefined nos 5 aparelhos (run #5).
-      # Por isso: se o .env do pacote ja traz as credenciais, ele e PRESERVADO — reescrever
-      # apagaria o IOS_DEVICE_MAP junto. O ambiente do host so entra como complemento, se um
-      # dia a AWS passar a repassar as variaveis e o pacote vier sem elas.
-      # O diagnostico imprime o COMPRIMENTO das variaveis, nunca o conteudo.
+      # Credenciais DESTE run. O iOS roda um run POR APARELHO (5 runs de 1 device), e o
+      # workflow injeta abaixo o email daquele aparelho, substituindo a linha marcadora
+      # __CREDENCIAIS_DO_RUN__ por um "export". Assim cada device loga com uma conta diferente
+      # sem precisar se identificar — ver o cabecalho do test/utils/credentials.ts.
+      #
+      # Motivo de ser aqui e nao nas environmentVariables do run: o host iOS NAO recebe as
+      # environmentVariables — o script que o Device Farm gera monta o proprio ambiente e
+      # exporta so as DEVICEFARM_* (conferido no artefato "Test spec shell script" do run #6,
+      # onde o diagnostico imprimiu CLIENT_USERS_EMAILS len=0). No host Android o ambiente e
+      # herdado do agente e as variaveis chegam; aqui nao.
+      - __CREDENCIAIS_DO_RUN__
+      # As fases do testspec nao compartilham shell (por isso o "nvm use"/"cd" se repetem em
+      # cada uma), entao o export acima nao sobrevive ate a fase "test". Quem atravessa e o
+      # .env, lido pelo dotenv.config() do wdio.conf.ts.
+      # O diagnostico imprime o COMPRIMENTO das credenciais, nunca o conteudo.
       - |
-        echo "[diag] host env: CLIENT_USERS_EMAILS len=${#CLIENT_USERS_EMAILS} CLIENT_PASSWORD len=${#CLIENT_PASSWORD}"
-        if grep -q '^CLIENT_USERS_EMAILS=.' .env 2>/dev/null; then
-          echo "[diag] .env do test package ja traz as credenciais - preservando"
-        elif [ -n "$CLIENT_USERS_EMAILS" ] && [ -n "$CLIENT_PASSWORD" ]; then
-          { echo "CLIENT_PASSWORD=$CLIENT_PASSWORD"; echo "CLIENT_USERS_EMAILS=$CLIENT_USERS_EMAILS"; } >> .env
-          echo "[diag] credenciais do ambiente do host anexadas ao .env"
-        else
-          echo "ERRO: sem credenciais no .env do test package e sem elas no ambiente do host - ver o step 'Gerar .env do test package (iOS)' no workflow"
-          exit 1
-        fi
-        grep -q '^IOS_DEVICE_MAP=.' .env || { echo "ERRO: IOS_DEVICE_MAP ausente no .env - sem ele os aparelhos cairiam na mesma conta"; exit 1; }
-        echo "[diag] .env final: $(wc -l < .env) linha(s)"
+        [ -n "$CLIENT_USER" ] || { echo "ERRO: CLIENT_USER ausente - o workflow nao substituiu a linha __CREDENCIAIS_DO_RUN__ do testspec (step 'Agendar runs iOS (um por device)')"; exit 1; }
+        [ -n "$CLIENT_PASSWORD" ] || { echo "ERRO: CLIENT_PASSWORD ausente - idem"; exit 1; }
+        {
+          echo "CLIENT_USER=$CLIENT_USER"
+          echo "CLIENT_PASSWORD=$CLIENT_PASSWORD"
+          echo "DEVICE_LABEL=$DEVICE_LABEL"
+          echo "APP_VERSION=$APP_VERSION"
+          echo "APP_BUILD_VERSION=$APP_BUILD_VERSION"
+        } > .env
+        echo "[diag] .env do run: CLIENT_USER len=${#CLIENT_USER} CLIENT_PASSWORD len=${#CLIENT_PASSWORD} DEVICE_LABEL=$DEVICE_LABEL"
       # Ambiente customizado nao sobe o Appium sozinho: inicia em background com base path /wd/hub
       - >-
         appium --base-path=/wd/hub --log-timestamp --relaxed-security

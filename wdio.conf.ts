@@ -126,7 +126,11 @@ function buildServices(): object[] {
 }
 
 function deviceLabel(): string {
-    if (isDeviceFarm) return process.env.DEVICEFARM_DEVICE_NAME ?? 'Device Farm';
+    // DEVICE_LABEL primeiro: no iOS o DEVICEFARM_DEVICE_NAME e o UDID, e era ele que aparecia
+    // como "Device=00008110-..." no environment.properties. Como o iOS roda um run por
+    // aparelho, o CI ja sabe o modelo e manda o nome pronto no .env do testspec. No Android a
+    // variavel nao existe e o comportamento segue identico (DEVICEFARM_DEVICE_NAME ja e o nome).
+    if (isDeviceFarm) return process.env.DEVICE_LABEL || process.env.DEVICEFARM_DEVICE_NAME || 'Device Farm';
     if (isRemote)     return 'iOS Remote (Device Farm)';
     if (isIOS)        return 'iOS Remote';
     return 'AVD-S24';

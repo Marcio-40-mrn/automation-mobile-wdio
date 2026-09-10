@@ -271,9 +271,6 @@ jobs:
   # --- Job iOS Device Farm ---
   run-ios-on-device-farm:
     runs-on: ubuntu-latest
-    outputs:
-      run_arn: ${{ steps.schedule_ios.outputs.run_arn }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -332,99 +329,80 @@ jobs:
           echo "Timeout aguardando upload do IPA"; exit 1
 
       # --- Credenciais e mapa de devices para o host iOS ---
-      # O host iOS NAO recebe as environmentVariables do run. O script que o Device Farm gera
-      # (artefato "Test spec shell script") monta o proprio ambiente e exporta so as
-      # DEVICEFARM_*: nao existe um "export CLIENT_USERS_EMAILS" nele. No Android o script
-      # herda o ambiente do agente, e por isso la a variavel tem valor. Resultado no iOS: o
-      # echo "CLIENT_USERS_EMAILS=$CLIENT_USERS_EMAILS" do testspec expandia vazio, o
-      # getCredentials caia no fallback local (CLIENT_USER, que so existe na maquina do dev) e
-      # o login ia com user=undefined nos 5 aparelhos (CI iOS Run #5, 5/5 FAILED, LoginPage:47).
+      # O iOS roda UM RUN POR APARELHO. Duas razoes, as duas medidas:
       #
-      # Por isso o .env e gravado AQUI, onde o secret existe, e viaja dentro do ZIP do test
-      # package. O dotenv.config() do wdio.conf.ts ja le esse arquivo do cwd no host.
+      # 1. As environmentVariables do Device Farm sao do RUN, nao do JOB. Num run com 5 devices
+      #    todos recebem exatamente as mesmas variaveis — nao existe "este device usa o email 3".
+      # 2. O host iOS nem recebe essas variaveis: o script que a AWS gera monta o proprio
+      #    ambiente e exporta so as DEVICEFARM_* (conferido no artefato "Test spec shell script"
+      #    do run #6, onde o diagnostico imprimiu CLIENT_USERS_EMAILS len=0).
       #
-      # O .env leva tambem o IOS_DEVICE_MAP: a conta de cada aparelho. No iOS nao da para
-      # mapear conta por modelo (o XCUITest nao devolve deviceModel) nem por UDID (muda a cada
-      # run). O que identifica cada um dos 5 e o par (versao de OS, resolucao em pontos), e o
-      # CI consegue montar esse mapa antes do run porque cada ARN de device do Device Farm fixa
-      # modelo + versao de OS. Gerar aqui, e nao hardcodar, evita que o mapa apodreca: se o
-      # pool mudar, o run novo regera; se duas chaves colidirem, falha ANTES de gastar device.
+      # O desenho anterior contornava isso mandando a lista inteira e fazendo cada aparelho
+      # descobrir seu indice por (versao de OS, resolucao). Nao funcionou: a API informa a versao
+      # completa ("17.3.1") e o host exporta truncada ("17.3"), entao 2 dos 5 nao casavam — e,
+      # pior, o codigo ABORTAVA quando nao casava. No CI iOS Run #6 o iPhone 14 e o iPhone 15 Pro
+      # Max nao executaram teste nenhum por causa disso.
       #
-      # SO estas chaves no .env: um REMOTE_HOST aqui ligaria o isRemote do wdio.conf.ts dentro
-      # do Device Farm e mandaria a sessao para o endpoint de Remote Access.
-      - name: Gerar .env do test package (iOS)
+      # Agora quem decide e o CI: um run por ARN de device, com o email daquele aparelho injetado
+      # no testspec do run. Nenhum aparelho fica de fora por nao ser reconhecido.
+      - name: Resolver devices e contas do pool iOS
+        id: pool_ios
         env:
           CLIENT_USERS_EMAILS: ${{ secrets.CLIENT_USERS_IOS_EMAILS }}
-          CLIENT_PASSWORD: ${{ secrets.CLIENT_PASSWORD }}
           POOL_ARN: ${{ secrets.DEVICE_FARM_IOS_DEVICE_POOL_ARN }}
         run: |
-          set -euo pipefail
-          # Mesmo tr do Schedule iOS run: o valor tem que ser byte a byte igual nos dois caminhos.
+          # Mesmo tr de antes: o valor colado no secret pode trazer quebra de linha.
           USERS=$(printf '%s' "$CLIENT_USERS_EMAILS" | tr -d '[:space:]')
-          for v in CLIENT_PASSWORD USERS; do
-            [ -n "${!v}" ] || { echo "::error::Variavel $v esta vazia — verifique os secrets do repositorio"; exit 1; }
-          done
+          if [ -z "$USERS" ]; then
+            echo "::error::CLIENT_USERS_IOS_EMAILS esta vazio — verifique os secrets do repositorio"; exit 1
+          fi
 
-          # ARNs do pool. A regra tem que ser por ARN (pool PRIVATE com lista fixa): e o que
-          # garante modelo + versao de OS conhecidos antes do run.
+          # A regra tem que ser por ARN (pool PRIVATE com lista fixa): e o que da uma lista
+          # estavel de aparelhos para iterar, com modelo conhecido antes do run.
           ARNS_JSON=$(aws devicefarm get-device-pool --arn "$POOL_ARN" --region us-west-2 \
             --query "devicePool.rules[?attribute=='ARN'].value | [0]" --output text)
           if [ -z "$ARNS_JSON" ] || [ "$ARNS_JSON" = "None" ]; then
-            echo "::error::O pool iOS nao tem regra por ARN. O mapa de contas depende disso — ajuste o pool para uma lista fixa de devices."
+            echo "::error::O pool iOS nao tem regra por ARN. A distribuicao de contas depende disso — ajuste o pool para uma lista fixa de devices."
             exit 1
           fi
 
-          : > devices.tsv
+          : > devices-raw.tsv
           for A in $(printf '%s' "$ARNS_JSON" | jq -r '.[]'); do
-            aws devicefarm get-device --arn "$A" --region us-west-2 \
-              --query 'device.[name,os,resolution.width,resolution.height]' --output text >> devices.tsv
+            NAME=$(aws devicefarm get-device --arn "$A" --region us-west-2 --query 'device.name' --output text)
+            printf '%s\t%s\n' "$NAME" "$A" >> devices-raw.tsv
           done
-          echo "Devices do pool iOS:"; cat devices.tsv
+          # Ordenado por nome para cada aparelho manter a mesma conta entre runs (o Trend do
+          # Allure depende dessa estabilidade). Se o pool mudar, o run novo so redistribui — e
+          # nenhum device deixa de rodar por causa disso.
+          # LC_ALL=C: ordem de BYTE, igual em qualquer locale do runner. Sem isso o collation
+          # muda a posicao de "iPhone 14" vs "iPhone 14 Pro Max" e as contas trocariam de dono
+          # entre runs, quebrando o Trend.
+          LC_ALL=C sort -o devices-raw.tsv devices-raw.tsv
 
-          # Chave = "<os>|<largura>x<altura>" em PONTOS (pixels/3), a mesma unidade do
-          # driver.getWindowRect(). Ordenado por nome, para cada aparelho manter a mesma conta
-          # entre runs (o Trend do Allure depende dessa estabilidade).
-          MAP=$(sort -t "$(printf '\t')" -k1,1 devices.tsv | awk -F'\t' '
-            BEGIN { ok = 1; n = 0 }
-            {
-              if ($3 % 3 != 0 || $4 % 3 != 0) {
-                printf "::error::%s tem resolucao %sx%s, que nao e @3x: a chave os|pontos nao serve para ele\n", $1, $3, $4 > "/dev/stderr"
-                ok = 0; next
-              }
-              key = $2 "|" ($3 / 3) "x" ($4 / 3)
-              if (key in dono) {
-                printf "::error::Chave duplicada \"%s\": %s e %s cairiam na MESMA conta\n", key, dono[key], $1 > "/dev/stderr"
-                ok = 0
-              }
-              dono[key] = $1
-              entries[n] = sprintf("{\"key\":\"%s\",\"index\":%d,\"name\":\"%s\"}", key, n, $1)
-              n++
-            }
-            END {
-              if (!ok || n == 0) exit 1
-              printf "["
-              for (i = 0; i < n; i++) printf "%s%s", (i ? "," : ""), entries[i]
-              printf "]"
-            }')
-
-          DEVICES=$(printf '%s' "$MAP" | jq 'length')
+          DEVICES=$(wc -l < devices-raw.tsv | tr -d ' ')
           CONTAS=$(printf '%s' "$USERS" | awk -F, '{print NF}')
           if [ "$DEVICES" -gt "$CONTAS" ]; then
-            echo "::error::O pool iOS tem $DEVICES devices e o secret CLIENT_USERS_IOS_EMAILS traz $CONTAS conta(s). Faltam contas — devices repetiriam conta e brigariam pelos favoritos."
+            echo "::error::O pool iOS tem $DEVICES devices e CLIENT_USERS_IOS_EMAILS traz $CONTAS conta(s). Faltam contas — dois aparelhos cairiam na mesma e brigariam pelos favoritos."
             exit 1
           fi
 
-          {
-            echo "CLIENT_PASSWORD=$CLIENT_PASSWORD"
-            echo "CLIENT_USERS_EMAILS=$USERS"
-            echo "IOS_DEVICE_MAP=$MAP"
-          } > .env
-          rm -f devices.tsv
-          # Sem imprimir credencial: so as contagens e o mapa, que nao e secreto.
-          echo ".env gerado: $CONTAS conta(s) para $DEVICES device(s)"
-          printf '%s' "$MAP" | jq -r '.[] | "  conta[\(.index)] -> \(.name)  [\(.key)]"'
+          # devices.tsv: <nome>TAB<arn>TAB<email>. Uma conta por aparelho, na ordem.
+          : > devices.tsv
+          i=1
+          while IFS="$(printf '\t')" read -r NAME A; do
+            EMAIL=$(printf '%s' "$USERS" | cut -d, -f"$i")
+            if [ -z "$EMAIL" ]; then echo "::error::Sem email para o device $i ($NAME)"; exit 1; fi
+            printf '%s\t%s\t%s\n' "$NAME" "$A" "$EMAIL" >> devices.tsv
+            i=$((i+1))
+          done < devices-raw.tsv
+          rm -f devices-raw.tsv
 
-      # --- Criar ZIP do test package ---
+          # Nao imprime o email inteiro: so o prefixo, o bastante para conferir que sao distintos.
+          echo "Devices do pool iOS e a conta de cada um:"
+          awk -F'\t' '{ split($3, p, "@"); printf "  %s -> %s@...\n", $1, p[1] }' devices.tsv
+          echo "devices=$DEVICES" >> $GITHUB_OUTPUT
+
+      # --- Criar ZIP do test package (um so, sem credenciais) ---
       - name: Create test package ZIP
         run: |
           zip -r test-package.zip . \
@@ -435,13 +413,18 @@ jobs:
             --exclude "ctrf/*" \
             --exclude "_results_/*" \
             --exclude "app.ipa" \
+            --exclude "devices.tsv" \
+            --exclude "ios-runs.tsv" \
+            --exclude "testspec-ios-*.yml" \
             --exclude "test-package.zip"
           echo "ZIP criado: $(du -sh test-package.zip | cut -f1)"
-          # O "zip -r ." inclui dotfiles, entao o .env gerado acima entra no pacote. Ele NAO
-          # esta na lista de --exclude de proposito. Falhar aqui e melhor que descobrir no
-          # aparelho: sem o .env, os 5 devices morrem no login.
-          unzip -l test-package.zip | grep -qE ' \.env$' || { echo "::error::.env nao entrou no ZIP do test package"; exit 1; }
-          echo ".env presente no ZIP"
+          # As credenciais NAO entram mais no ZIP. Elas variam por aparelho, e o ZIP e o mesmo
+          # para os 5 — quem carrega o email de cada um e o testspec do respectivo run.
+          if unzip -l test-package.zip | grep -qE ' [.]env$'; then
+            echo "::error::.env nao deveria estar no ZIP do test package — as credenciais vao pelo testspec de cada run"
+            exit 1
+          fi
+          echo "ZIP sem .env, como esperado"
 
       - name: Create test package upload on Device Farm
         id: test_upload_ios
@@ -469,118 +452,157 @@ jobs:
           done
           echo "Timeout aguardando upload do test package"; exit 1
 
-      # --- Upload testspec ---
-      - name: Create testspec upload on Device Farm
-        id: testspec_upload_ios
-        run: |
-          RESPONSE=$(aws devicefarm create-upload \
-            --project-arn "${{ secrets.DEVICE_FARM_PROJECT_ARN }}" \
-            --name "testspec-ios-run${{ github.run_number }}.yml" \
-            --type APPIUM_NODE_TEST_SPEC \
-            --region us-west-2)
-          echo "spec_arn=$(echo $RESPONSE | jq -r '.upload.arn')" >> $GITHUB_OUTPUT
-          echo "spec_url=$(echo $RESPONSE | jq -r '.upload.url')" >> $GITHUB_OUTPUT
-
-      - name: Upload testspec to Device Farm S3
-        run: curl -T testspec-ios.yml "${{ steps.testspec_upload_ios.outputs.spec_url }}"
-
-      - name: Wait for testspec upload to succeed
-        run: |
-          ARN="${{ steps.testspec_upload_ios.outputs.spec_arn }}"
-          for i in $(seq 1 10); do
-            STATUS=$(aws devicefarm get-upload --arn "$ARN" --region us-west-2 | jq -r '.upload.status')
-            echo "Testspec upload status ($i/10): $STATUS"
-            if [ "$STATUS" = "SUCCEEDED" ]; then exit 0; fi
-            if [ "$STATUS" = "FAILED" ]; then echo "Testspec upload falhou"; exit 1; fi
-            sleep 5
-          done
-          echo "Timeout aguardando upload do testspec"; exit 1
-
-      # --- Agendar run iOS ---
-      - name: Schedule iOS Device Farm run
+      # --- Um testspec e um run por aparelho ---
+      # O testspec e o unico canal que chega no host iOS com valor por aparelho, e ele ja tinha a
+      # funcao de montar o .env. Por isso o email vai nele, e nao num .env dentro do ZIP: um .env
+      # por device exigiria 5 ZIPs de ~33 MB, contra 5 arquivos de poucos KB aqui.
+      - name: Agendar runs iOS (um por device)
         id: schedule_ios
         env:
-          CLIENT_USERS_EMAILS: ${{ secrets.CLIENT_USERS_IOS_EMAILS }}
           CLIENT_PASSWORD: ${{ secrets.CLIENT_PASSWORD }}
         run: |
-          # Remove qualquer whitespace/quebra de linha que possa ter entrado ao colar o
-          # secret (emails+virgula nao tem espaco, entao isso so limpa o valor).
-          USERS=$(printf '%s' "$CLIENT_USERS_EMAILS" | tr -d '[:space:]')
-          # Um valor vazio aqui vira {"value":""}, que o schedule-run rejeita com um
-          # ParamValidation apontando so o indice do array (ver run #2). Falha nomeada.
-          for v in CLIENT_PASSWORD USERS APP_VERSION APP_BUILD_VERSION; do
-            [ -n "${!v}" ] || { echo "::error::Variavel $v esta vazia — verifique os secrets do repositorio"; exit 1; }
+          for v in CLIENT_PASSWORD APP_VERSION APP_BUILD_VERSION; do
+            if [ -z "${!v}" ]; then echo "::error::Variavel $v esta vazia — verifique os secrets do repositorio"; exit 1; fi
           done
-          RUN_ARN=$(aws devicefarm schedule-run \
-            --project-arn "${{ secrets.DEVICE_FARM_PROJECT_ARN }}" \
-            --app-arn "${{ steps.ipa_upload.outputs.ipa_arn }}" \
-            --device-pool-arn "${{ secrets.DEVICE_FARM_IOS_DEVICE_POOL_ARN }}" \
-            --name "CI iOS Run #${{ github.run_number }}" \
-            --test "{\"type\":\"APPIUM_NODE\",\"testPackageArn\":\"${{ steps.test_upload_ios.outputs.test_arn }}\",\"testSpecArn\":\"${{ steps.testspec_upload_ios.outputs.spec_arn }}\"}" \
-            --configuration "{\"environmentVariables\":[{\"name\":\"CLIENT_PASSWORD\",\"value\":\"$CLIENT_PASSWORD\"},{\"name\":\"CLIENT_USERS_EMAILS\",\"value\":\"$USERS\"},{\"name\":\"APP_VERSION\",\"value\":\"${{ env.APP_VERSION }}\"},{\"name\":\"APP_BUILD_VERSION\",\"value\":\"${{ env.APP_BUILD_VERSION }}\"}]}" \
-            --region us-west-2 \
-            --query 'run.arn' --output text)
-          echo "run_arn=$RUN_ARN" >> $GITHUB_OUTPUT
-          echo "Run iOS agendado: $RUN_ARN"
-
-      # --- Aguardar conclusão ---
-      - name: Wait for iOS Device Farm run to complete
-        run: |
-          ARN="${{ steps.schedule_ios.outputs.run_arn }}"
-          echo "Aguardando run iOS: $ARN"
-          STATUS=""
-          RESULT_VAL=""
-          REACHED_TERMINAL=false
-          for i in $(seq 1 120); do
-            RESULT=$(aws devicefarm get-run --arn "$ARN" --region us-west-2 | jq -r '.run | "\(.status) \(.result)"')
-            STATUS=$(echo $RESULT | cut -d' ' -f1)
-            RESULT_VAL=$(echo $RESULT | cut -d' ' -f2)
-            echo "Status ($i/120): $STATUS / $RESULT_VAL"
-            if [ "$STATUS" != "PENDING" ] && [ "$STATUS" != "RUNNING" ] && [ "$STATUS" != "SCHEDULING" ]; then
-              echo "Run iOS concluído com resultado: $RESULT_VAL"
-              REACHED_TERMINAL=true
-              break
-            fi
-            sleep 60
-          done
-          # Timeout sem estado terminal = falha real de automação (esteira travou) -> quebra.
-          if [ "$REACHED_TERMINAL" != "true" ]; then
-            echo "::error::Timeout aguardando o Device Farm iOS (último status: $STATUS). A esteira não conseguiu obter o resultado."
+          MARCADOR=$(grep -n '^      - __CREDENCIAIS_DO_RUN__$' testspec-ios.yml | cut -d: -f1)
+          if [ -z "$MARCADOR" ]; then
+            echo "::error::testspec-ios.yml nao tem a linha __CREDENCIAIS_DO_RUN__ — sem ela nao ha onde injetar a conta do aparelho"
             exit 1
           fi
-          # Resultado do teste (PASSED/FAILED/ERRORED/WARNED) NÃO quebra a esteira: reflete no relatório.
-          echo "::notice::iOS Device Farm: $RESULT_VAL — ver relatório Allure"
-          echo "**iOS Device Farm:** \`$RESULT_VAL\` — resultado reflete no relatório, não quebra a esteira." >> "$GITHUB_STEP_SUMMARY"
+
+          : > ios-runs.tsv
+          IDX=0
+          while IFS="$(printf '\t')" read -r NAME ARN EMAIL; do
+            IDX=$((IDX+1))
+            SPEC="testspec-ios-$IDX.yml"
+
+            # printf '%q' devolve o valor ja citado para reuso em shell: cobre apostrofo, espaco,
+            # aspas, $ e barra invertida na senha ou no email sem corromper o testspec. A
+            # substituicao e por head/tail (nao sed/awk) justamente para nao reinterpretar esses
+            # escapes uma segunda vez.
+            LINE="      - export CLIENT_USER=$(printf '%q' "$EMAIL") CLIENT_PASSWORD=$(printf '%q' "$CLIENT_PASSWORD") DEVICE_LABEL=$(printf '%q' "$NAME") APP_VERSION=$(printf '%q' "$APP_VERSION") APP_BUILD_VERSION=$(printf '%q' "$APP_BUILD_VERSION")"
+            {
+              head -n $((MARCADOR - 1)) testspec-ios.yml
+              printf '%s\n' "$LINE"
+              tail -n +$((MARCADOR + 1)) testspec-ios.yml
+            } > "$SPEC"
+
+            if grep -q '^      - __CREDENCIAIS_DO_RUN__$' "$SPEC"; then
+              echo "::error::marcador nao foi substituido em $SPEC"; exit 1
+            fi
+            if ! grep -q '^      - export CLIENT_USER=' "$SPEC"; then
+              echo "::error::o testspec de $NAME saiu sem a linha de credenciais"; exit 1
+            fi
+
+            RESP=$(aws devicefarm create-upload \
+              --project-arn "${{ secrets.DEVICE_FARM_PROJECT_ARN }}" \
+              --name "testspec-ios-run${{ github.run_number }}-$IDX.yml" \
+              --type APPIUM_NODE_TEST_SPEC \
+              --region us-west-2)
+            SPEC_ARN=$(printf '%s' "$RESP" | jq -r '.upload.arn')
+            SPEC_URL=$(printf '%s' "$RESP" | jq -r '.upload.url')
+            curl -sS -T "$SPEC" "$SPEC_URL"
+
+            ST=""
+            for i in $(seq 1 10); do
+              ST=$(aws devicefarm get-upload --arn "$SPEC_ARN" --region us-west-2 --query 'upload.status' --output text)
+              if [ "$ST" = "SUCCEEDED" ]; then break; fi
+              if [ "$ST" = "FAILED" ]; then echo "::error::upload do testspec de $NAME falhou"; exit 1; fi
+              sleep 5
+            done
+            if [ "$ST" != "SUCCEEDED" ]; then echo "::error::timeout no upload do testspec de $NAME"; exit 1; fi
+
+            # --device-selection-configuration mira UM aparelho pelo ARN, sem precisar criar um
+            # device pool de 1 device para cada. Se a AWS recusar este parametro na conta, o
+            # plano B e create-device-pool com uma regra ARN/IN por aparelho e --device-pool-arn.
+            RUN_ARN=$(aws devicefarm schedule-run \
+              --project-arn "${{ secrets.DEVICE_FARM_PROJECT_ARN }}" \
+              --app-arn "${{ steps.ipa_upload.outputs.ipa_arn }}" \
+              --device-selection-configuration "{\"filters\":[{\"attribute\":\"ARN\",\"operator\":\"IN\",\"values\":[\"$ARN\"]}],\"maxDevices\":1}" \
+              --name "CI iOS Run #${{ github.run_number }} - $NAME" \
+              --test "{\"type\":\"APPIUM_NODE\",\"testPackageArn\":\"${{ steps.test_upload_ios.outputs.test_arn }}\",\"testSpecArn\":\"$SPEC_ARN\"}" \
+              --region us-west-2 \
+              --query 'run.arn' --output text)
+            if [ -z "$RUN_ARN" ] || [ "$RUN_ARN" = "None" ]; then
+              echo "::error::schedule-run falhou para $NAME (ARN $ARN)"; exit 1
+            fi
+
+            printf '%s\t%s\n' "$NAME" "$RUN_ARN" >> ios-runs.tsv
+            echo "Run agendado: $NAME -> $RUN_ARN"
+          done < devices.tsv
+
+          echo "Total de runs iOS agendados: $(wc -l < ios-runs.tsv | tr -d ' ')"
+
+      # --- Aguardar conclusao de todos os runs ---
+      # Os runs sao independentes e rodam em paralelo no Device Farm, entao o tempo de parede e o
+      # do aparelho mais lento, nao a soma dos cinco.
+      - name: Wait for iOS Device Farm runs to complete
+        run: |
+          if [ ! -s ios-runs.tsv ]; then echo "::error::nenhum run iOS foi agendado"; exit 1; fi
+          TOTAL=$(wc -l < ios-runs.tsv | tr -d ' ')
+          TERMINOU=false
+          for i in $(seq 1 120); do
+            echo "Polling ($i/120):"
+            PENDENTES=0
+            while IFS="$(printf '	')" read -r NAME ARN; do
+              LINHA=$(aws devicefarm get-run --arn "$ARN" --region us-west-2 --query 'run.[status,result]' --output text)
+              ST=$(printf '%s' "$LINHA" | awk '{print $1}')
+              RES=$(printf '%s' "$LINHA" | awk '{print $2}')
+              if [ "$ST" != "COMPLETED" ] && [ "$ST" != "STOPPED" ]; then PENDENTES=$((PENDENTES+1)); fi
+              echo "  $NAME: $ST / $RES"
+            done < ios-runs.tsv
+            echo "  -> $PENDENTES de $TOTAL ainda em andamento"
+            if [ "$PENDENTES" -eq 0 ]; then TERMINOU=true; break; fi
+            sleep 60
+          done
+
+          # Timeout sem estado terminal = falha real de automacao (esteira travou) -> quebra.
+          if [ "$TERMINOU" != "true" ]; then
+            echo "::error::Timeout aguardando os runs iOS ($PENDENTES de $TOTAL ainda em andamento). A esteira nao conseguiu obter o resultado."
+            exit 1
+          fi
+
+          # Resultado do teste (PASSED/FAILED/ERRORED/WARNED) NAO quebra a esteira: reflete no relatorio.
+          echo "### iOS Device Farm — $TOTAL run(s), um por aparelho" >> "$GITHUB_STEP_SUMMARY"
+          while IFS="$(printf '\t')" read -r NAME ARN; do
+            RES=$(aws devicefarm get-run --arn "$ARN" --region us-west-2 --query 'run.result' --output text)
+            echo "- $RES — $NAME" >> "$GITHUB_STEP_SUMMARY"
+            echo "::notice::iOS $NAME: $RES"
+          done < ios-runs.tsv
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Resultado reflete no relatorio Allure; nao quebra a esteira." >> "$GITHUB_STEP_SUMMARY"
 
       # --- Download de artifacts iOS ---
-      - name: Download artifacts from iOS Device Farm run
+      - name: Download artifacts from iOS Device Farm runs
         if: always()
         run: |
-          RUN_ARN="${{ steps.schedule_ios.outputs.run_arn }}"
           mkdir -p artifacts allure-results
+          if [ ! -s ios-runs.tsv ]; then echo "Nenhum run iOS para baixar"; exit 0; fi
 
-          # Mesma regra do Android: junta TODOS os devices no relatório — baixa o "Customer
-          # Artifacts" da Tests Suite de cada aparelho. (Enquanto o fluxo iOS não passar no
-          # onboarding, os resultados vêm com falha, mas cada device ainda aparece navegável.)
+          # Mesma regra do Android: junta TODOS os aparelhos no relatorio, baixando o "Customer
+          # Artifacts" da Tests Suite de cada um. A unica diferenca e o laco externo: antes eram
+          # os jobs de 1 run, agora sao os 5 runs — cada um com exatamente 1 job.
           i=0
-          for JOB_ARN in $(aws devicefarm list-jobs --arn "$RUN_ARN" --region us-west-2 | jq -r '.jobs[].arn'); do
-            NAME=$(aws devicefarm get-job --arn "$JOB_ARN" --region us-west-2 | jq -r '.job.device.name')
-            SUITE_ARN=$(aws devicefarm list-suites --arn "$JOB_ARN" --region us-west-2 \
-              | jq -r '.suites[] | select(.name=="Tests Suite") | .arn')
-            if [ -z "$SUITE_ARN" ] || [ "$SUITE_ARN" = "null" ]; then
-              echo "Sem Tests Suite (pulando): $NAME"; i=$((i+1)); continue
-            fi
-            TEST_ARN=$(aws devicefarm list-tests --arn "$SUITE_ARN" --region us-west-2 | jq -r '.tests[0].arn')
-            URL=$(aws devicefarm list-artifacts --arn "$TEST_ARN" --type FILE --region us-west-2 \
-              | jq -r '.artifacts[] | select(.name=="Customer Artifacts") | .url')
-            if [ -n "$URL" ] && [ "$URL" != "null" ]; then
-              curl -sL --retry 3 --max-time 180 "$URL" -o "artifacts/ca-$i.zip" || true
-              echo "Baixado Customer Artifacts de: $NAME -> ca-$i.zip"
-            else
-              echo "Sem Customer Artifacts: $NAME"
-            fi
-            i=$((i+1))
-          done
+          while IFS="$(printf '\t')" read -r DEV_NAME RUN_ARN; do
+            for JOB_ARN in $(aws devicefarm list-jobs --arn "$RUN_ARN" --region us-west-2 | jq -r '.jobs[].arn'); do
+              NAME=$(aws devicefarm get-job --arn "$JOB_ARN" --region us-west-2 | jq -r '.job.device.name')
+              SUITE_ARN=$(aws devicefarm list-suites --arn "$JOB_ARN" --region us-west-2 \
+                | jq -r '.suites[] | select(.name=="Tests Suite") | .arn')
+              if [ -z "$SUITE_ARN" ] || [ "$SUITE_ARN" = "null" ]; then
+                echo "Sem Tests Suite (pulando): $NAME"; i=$((i+1)); continue
+              fi
+              TEST_ARN=$(aws devicefarm list-tests --arn "$SUITE_ARN" --region us-west-2 | jq -r '.tests[0].arn')
+              URL=$(aws devicefarm list-artifacts --arn "$TEST_ARN" --type FILE --region us-west-2 \
+                | jq -r '.artifacts[] | select(.name=="Customer Artifacts") | .url')
+              if [ -n "$URL" ] && [ "$URL" != "null" ]; then
+                curl -sL --retry 3 --max-time 180 "$URL" -o "artifacts/ca-$i.zip" || true
+                echo "Baixado Customer Artifacts de: $NAME -> ca-$i.zip"
+              else
+                echo "Sem Customer Artifacts: $NAME"
+              fi
+              i=$((i+1))
+            done
+          done < ios-runs.tsv
           echo "Artifacts iOS baixados: $(ls artifacts/ | wc -l) arquivos"
 
       - name: Upload raw iOS Device Farm artifacts (debug)
