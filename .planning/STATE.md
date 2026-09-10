@@ -39,6 +39,16 @@ Não commitado (a mudança de hoje, "um email por device"):
 | `test/utils/device-name.ts` | iOS lê `DEVICE_LABEL`. Mapa e ramo Android intactos |
 | `wdio.conf.ts` | `deviceLabel()` prefere `DEVICE_LABEL` — some o `Device=<UDID>` do `environment.properties` no iOS |
 
+E os quatro page objects, com as correções do fluxo iOS (todas iOS-only; nenhum ramo Android
+foi tocado):
+
+| Arquivo | O que mudou |
+|---|---|
+| `test/pageobjects/BasePage.ts` | `fechaBannerIOS()` **não clica e não lança** — só registra diagnóstico. Ver "O `Close` fantasma" abaixo |
+| `test/pageobjects/CategoriasPage.ts` | `favoritarPrimeiroProdutoIOS()` escolhe o card por **largura** (não pelo índice `[1]`, que pegava o wrapper da tela); guarda do coração passou a comparar `x` **e** `y` |
+| `test/pageobjects/FavoritosPage.ts` | `validaElememnto()` no iOS ancora no `flatlist-favorites` e faz poll no `label`; `tirarSelecaoItemIOS()` escolhe o coração pelo **maior `x` dentro do card** e faz poll de 30s no lugar do `pause(3000)` |
+| `test/pageobjects/HomePage.ts` | `abrirCategorias()` no iOS confere que o alvo está no rodapé antes de clicar, e que a tela de categorias abriu depois |
+
 Também não commitado: os 35 drafts em `.planning/drafts/ios/`, o
 `RELATORIO-ANOMALIAS-IOS.md` e `plans/2026-09-08-ramo-ios-nos-page-objects.md`, copiados
 para cá em 2026-09-10.
@@ -121,28 +131,74 @@ Cobertura: fluxo do M1 inteiro **e** o fluxo de compra do `test/Draft.ts` até o
 
 ## Pendências abertas
 
-### Validar a mudança de hoje
+### Um email por device — VALIDADO no `CI iOS Run #7`
 
-Ainda não rodou no CI. O que conferir no primeiro run: os **5** aparelhos executam (nenhum
-`Device iOS não encontrado`), e os 5 logs trazem `🔑 Conta deste run:` com emails
-**diferentes entre si**. Se o `--device-selection-configuration` for recusado pela conta AWS,
-o plano B é `create-device-pool` com uma regra ARN/IN por aparelho.
+Funcionou: 5 runs separados (`CI iOS Run #7 - Apple iPhone 13 / 14 / 14 Pro Max / 15 / 15 Pro
+Max`), **os 5 aparelhos executaram**, 5 contas distintas, e Android sem regressão
+(`CI Run #7` = 18/18 PASSED). Nenhum `Device iOS não encontrado`.
 
-### Bugs de teste no iOS (medidos no `CI iOS Run #6`)
+### Validar as correções de fluxo iOS
 
-- **iPhone 14 Pro Max — nome do produto poluído.** Chegou até Favoritos. O
-  `favoritarPrimeiroProdutoIOS()` (`CategoriasPage.ts`) capturou
-  `Camisas Filter and sort 152 products Camisa Manga Longa Slim...`: a class chain
-  `**/XCUIElementTypeOther[name BEGINSWITH "Camisa" AND name CONTAINS "R$"][1]` casa com o
-  **wrapper da tela**, cujo `name` agrega os labels dos filhos. O guard `CONTAINS "R$"` foi
-  escrito para descartar o título e não cobre o container. Favoritar funcionou; só o nome
-  saiu sujo, e por isso a validação em Favoritos não casa. **O draft `14` descreve o card
-  (`185x488` externo, `183x472` interno) mas não lista esse wrapper** — decidir o seletor
-  com uma captura nova, não por tentativa.
-- **iPhone 13 — banner do Insider não fecha.** `accessibility id:Close` visível, três
-  cliques, e o banner continua na tela.
-- **iPhone 15 — `tab-categories` não aparece** depois do login (20s). Possivelmente o mesmo
-  banner cobrindo a home.
+Ainda não rodaram. No próximo run, conferir no log:
+
+- `🛍 Produto escolhido:` só com o nome, sem "Filter and sort";
+- `💔 Desfavoritar: N action-button no card (x = ...); escolhido o de maior x = ...` — tem que
+  escolher o de **maior** x;
+- nenhum `Banner do Insider não fechou`, e nenhum aparelho indo parar em Meus Pedidos;
+- a linha `🔎 [diag banner]` quando o `Close` fantasma aparecer — é ela que traz o dado para
+  construir a checagem de presença de verdade;
+- os quatro últimos steps (`voltar`, `abrirPerfil`, `logout`, `confirmarLogout`) serão
+  exercitados **pela primeira vez**; se algo aparecer ali, é terreno novo, não regressão.
+
+### Sessões de Remote Access: o que não fazer
+
+Custou três sessões em 2026-09-10. Abrir sessão Appium com `bundleId` **reativa o app, e a
+sessão nova costuma vir com ele resetado** (cai nas boas-vindas mesmo com `noReset: true`), o
+que obriga a refazer onboarding + login — 3 a 4 minutos. E a URL pré-assinada **expira em
+poucos minutos e não renova** (`403 Invalid pre-signed URL`).
+
+Regra prática: **o Marcio navega até a tela e avisa; o Claude só conecta e captura.** Na
+captura, pegar `getPageSource()` UMA vez e medir os rects parseando o XML local — dezenas de
+`getLocation()/getSize()` custam ~300ms cada na sessão remota, somam 20-30s e deixam as
+referências de elemento obsoletas (um clique depois disso não registra). E **sempre fechar a
+sessão** (`deleteSession`) ao final: uma sessão deixada aberta segura o device.
+
+### Bugs de teste no iOS — corrigidos em 2026-09-10, aguardando run
+
+Os três vieram do `CI iOS Run #7` (5 runs de 1 device, todos os aparelhos executaram) e do run
+local do Marcio. **Todos com causa medida em aparelho, nenhum por dedução.**
+
+- **Nome do produto poluído — CORRIGIDO.** O predicate
+  `name BEGINSWITH "Camisa" AND name CONTAINS "R$"` casa também com o **wrapper da tela**,
+  cujo `name` agrega os labels dos filhos (`Camisas Filter and sort 152 products Camisa Manga
+  Longa Slim...`). O guard `CONTAINS "R$"` existia para descartar o *título*, não o
+  *container*. Medido na listagem real: 10 nós de **402pt** (wrapper), 3 de **370pt** (linha da
+  grade) e os cards de **185pt**. Filtro: largura < 60% da janela.
+- **"Banner do Insider não fechou" — era o `Close` FANTASMA, e ele tocava em Meus Pedidos.**
+  O nó do `Close` sobrevive escondido na árvore e o `isDisplayed()` do WDA mente sobre ele. O
+  `elementClick` então tocava o rect velho — `[318,286 24x24]`, centro **(330,298)** — que cai
+  dentro do `menu-card` "My Orders" `[205,222 181x105]`, e de nenhum outro. Confirmado no vídeo
+  do iPhone 15 Pro Max (t≈184s, tela "Meus pedidos" entrando por cima do Account Menu) e no
+  log, onde as 3 tentativas usam o mesmo element id e os 3 cliques retornam `RESULT null`.
+  Correção: `fechaBannerIOS()` **não clica e não lança** — só registra rect do `Close` e estado
+  do `InsiderWKWebView`/`InsiderTemplateWindow`, para fechar o discriminador de presença num
+  próximo run. O banner real foi visto **uma vez em 8 sessões**; o falso positivo derrubava 3
+  de 5 aparelhos.
+- **Desfavoritar clicava na SACOLA — CORRIGIDO.** Medido em sessão de Remote Access
+  (2026-09-10), tela de Favoritos: card `[16,131 181x457]` com **dois** `action-button`,
+  coração em **x=155** e sacola em **x=21**; o `class chain [...][1]` resolvia para **x=21**.
+  Ou seja, o toque mandava o item para a sacola, a lista não mudava, e o erro dizia "o conteúdo
+  não mudou depois do toque no coração". Correção: coração pelo **maior x dentro do rect do
+  card**, e poll de 30s no lugar do `pause(3000)` (desfavoritar é chamada de backend).
+- **Guarda do coração na listagem comparava só o `x` — CORRIGIDO.** Bug latente, escrito no
+  commit `8536e92`: a grade tem duas colunas, então todo card da mesma coluna divide o mesmo
+  intervalo de `x` e o coração da linha de baixo passava na checagem. Resultado seria ler o
+  nome de uma camisa e favoritar outra. Agora compara `x` e `y`.
+
+**Não confundir com falha de código:** no `CI iOS Run #7` o iPhone 14 falhou com
+`tab-categories still not displayed` usando a conta `marciorocha@maildrop.cc`, que no CI
+respondeu "email ou senha incorreto". No run local a mesma conta logou normalmente. Em
+observação.
 
 ### Outras
 

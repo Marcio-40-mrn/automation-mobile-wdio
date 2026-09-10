@@ -1,5 +1,5 @@
 import { BasePage, timewhait } from "./BasePage";
-import { driver, $ } from '@wdio/globals'
+import { driver, $, $$ } from '@wdio/globals'
 
 export class CategoriasPage extends BasePage {
 
@@ -122,8 +122,44 @@ export class CategoriasPage extends BasePage {
     //    (mudou a ordem da grade, mudou o alvo), conferimos que o coração escolhido cai dentro
     //    do card cujo nome acabamos de ler, e falhamos explícito se não cair.
     private async favoritarPrimeiroProdutoIOS(): Promise<string> {
-        const card = await $('-ios class chain:**/XCUIElementTypeOther[`name BEGINSWITH "Camisa" AND name CONTAINS "R$"`][1]');
-        await card.waitForDisplayed({ timeout: 40000 });
+        const seletorCard = '-ios predicate string:name BEGINSWITH "Camisa" AND name CONTAINS "R$"';
+
+        // Espera a grade montar antes de medir qualquer coisa (a lista tem 150 itens).
+        await (await $(seletorCard)).waitForDisplayed({ timeout: 40000 });
+
+        // O card NAO pode ser pego pelo indice [1] da class chain. O primeiro match na ordem do
+        // documento e o WRAPPER DA TELA, cujo `name` agrega os labels dos filhos e por isso
+        // satisfaz os dois criterios: comeca com "Camisa" (do titulo "Camisas") e contem "R$"
+        // (dos cards la dentro). Foi o que produziu, no CI iOS Run #7,
+        //   "Camisas Filter and sort 152 products Camisa Manga Longa Slim..."
+        // como nome do produto, quebrando a validacao em Favoritos.
+        //
+        // O discriminador e a LARGURA (draft 14): o card mede 185pt numa janela de 402pt,
+        // enquanto o wrapper ocupa a largura inteira. Predicate do XCUITest nao aceita
+        // geometria (registrado no draft e no voltarIOS), entao a filtragem e feita aqui.
+        const { width: larguraJanela } = await driver.getWindowRect();
+        const larguraMaxima = larguraJanela * 0.6;
+
+        const candidatos = await $$(seletorCard);
+        const medidos: { largura: number; nome: string }[] = [];
+        let card: WebdriverIO.Element | undefined;
+
+        for (const candidato of candidatos) {
+            const { width } = await candidato.getSize().catch(() => ({ width: Number.MAX_SAFE_INTEGER }));
+            const nomeBruto = (await candidato.getAttribute('name').catch(() => '')) ?? '';
+            medidos.push({ largura: width, nome: nomeBruto.slice(0, 60) });
+            if (width < larguraMaxima) { card = candidato; break; }
+        }
+
+        if (!card) {
+            throw new Error(
+                `Nenhum card de produto encontrado na listagem: os ${medidos.length} nós que casaram ` +
+                `com o seletor são todos largos demais para serem um card (limite ${Math.round(larguraMaxima)}pt ` +
+                `numa janela de ${larguraJanela}pt). Medidos: ` +
+                medidos.map((m) => `${m.largura}pt "${m.nome}"`).join(' | ') +
+                '. Se o layout da grade mudou, recapturar a tela com o mobile-ui-inspector.'
+            );
+        }
 
         const bruto = (await card.getAttribute('name')) ?? '';
         const nome = bruto.replace(/\s*R\$[\s\S]*$/, '').trim();
@@ -138,15 +174,24 @@ export class CategoriasPage extends BasePage {
         const posicaoCoracao = await coracao.getLocation();
         const posicaoCard = await card.getLocation();
         const tamanhoCard = await card.getSize();
+        // A guarda compara as DUAS coordenadas. Comparar só o x era um furo: os cards da grade
+        // ficam em duas colunas, então todo card de uma mesma coluna divide o mesmo intervalo
+        // de x — o coração da linha DE BAIXO passava na checagem sem problema. O resultado
+        // seria ler o nome de uma camisa e favoritar outra, com a validação em Favoritos
+        // falhando depois sem dizer o porquê.
         const dentroDoCard =
             posicaoCoracao.x >= posicaoCard.x &&
-            posicaoCoracao.x <= posicaoCard.x + tamanhoCard.width;
+            posicaoCoracao.x <= posicaoCard.x + tamanhoCard.width &&
+            posicaoCoracao.y >= posicaoCard.y &&
+            posicaoCoracao.y <= posicaoCard.y + tamanhoCard.height;
 
         if (!dentroDoCard) {
             throw new Error(
-                `O primeiro action-button (x=${posicaoCoracao.x}) está fora do primeiro card ` +
-                `(x=${posicaoCard.x}..${posicaoCard.x + tamanhoCard.width}): a ordem da grade mudou e o ` +
-                `índice não aponta mais para o produto lido ("${nome}")`
+                `O action-button escolhido (x=${Math.round(posicaoCoracao.x)}, y=${Math.round(posicaoCoracao.y)}) ` +
+                `está fora do card lido ` +
+                `[${Math.round(posicaoCard.x)},${Math.round(posicaoCard.y)} ${tamanhoCard.width}x${tamanhoCard.height}]: ` +
+                `a ordem da grade mudou e o índice não aponta mais para o produto lido ("${nome}"). ` +
+                'Favoritar assim marcaria uma camisa diferente da que o teste vai validar.'
             );
         }
 
