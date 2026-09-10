@@ -38,7 +38,7 @@ describe('Teste Login e Perfil', () => {
         const perfilPage = new PerfilPage();
         const favoritosPage = new FavoritosPage();
 
-        const { user, password } = getCredentials();
+        const { user, password } = await getCredentials();
 
         // O nome sai da tela em runtime: o teste favorita a primeira camisa que a lista
         // mostrar, e a validação nos favoritos precisa procurar exatamente esse item.
@@ -49,7 +49,7 @@ describe('Teste Login e Perfil', () => {
 
         // Rotula a execução por aparelho para o relatório Allure juntar TODOS os devices
         // num só e permitir navegar por aparelho (aba Suites) mostrando a conta usada.
-        const device = friendlyDeviceName();
+        const device = await friendlyDeviceName();
         // historyId/testCaseId DISTINTO por aparelho: o Allure agrupa resultados pelo historyId;
         // sem isso os N devices (mesmo título de teste) colapsam num só, aparecendo como "retries"
         // e mostrando apenas um device. Chave estável por modelo → cada aparelho mantém seu

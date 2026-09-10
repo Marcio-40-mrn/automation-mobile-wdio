@@ -331,6 +331,99 @@ jobs:
           done
           echo "Timeout aguardando upload do IPA"; exit 1
 
+      # --- Credenciais e mapa de devices para o host iOS ---
+      # O host iOS NAO recebe as environmentVariables do run. O script que o Device Farm gera
+      # (artefato "Test spec shell script") monta o proprio ambiente e exporta so as
+      # DEVICEFARM_*: nao existe um "export CLIENT_USERS_EMAILS" nele. No Android o script
+      # herda o ambiente do agente, e por isso la a variavel tem valor. Resultado no iOS: o
+      # echo "CLIENT_USERS_EMAILS=$CLIENT_USERS_EMAILS" do testspec expandia vazio, o
+      # getCredentials caia no fallback local (CLIENT_USER, que so existe na maquina do dev) e
+      # o login ia com user=undefined nos 5 aparelhos (CI iOS Run #5, 5/5 FAILED, LoginPage:47).
+      #
+      # Por isso o .env e gravado AQUI, onde o secret existe, e viaja dentro do ZIP do test
+      # package. O dotenv.config() do wdio.conf.ts ja le esse arquivo do cwd no host.
+      #
+      # O .env leva tambem o IOS_DEVICE_MAP: a conta de cada aparelho. No iOS nao da para
+      # mapear conta por modelo (o XCUITest nao devolve deviceModel) nem por UDID (muda a cada
+      # run). O que identifica cada um dos 5 e o par (versao de OS, resolucao em pontos), e o
+      # CI consegue montar esse mapa antes do run porque cada ARN de device do Device Farm fixa
+      # modelo + versao de OS. Gerar aqui, e nao hardcodar, evita que o mapa apodreca: se o
+      # pool mudar, o run novo regera; se duas chaves colidirem, falha ANTES de gastar device.
+      #
+      # SO estas chaves no .env: um REMOTE_HOST aqui ligaria o isRemote do wdio.conf.ts dentro
+      # do Device Farm e mandaria a sessao para o endpoint de Remote Access.
+      - name: Gerar .env do test package (iOS)
+        env:
+          CLIENT_USERS_EMAILS: ${{ secrets.CLIENT_USERS_IOS_EMAILS }}
+          CLIENT_PASSWORD: ${{ secrets.CLIENT_PASSWORD }}
+          POOL_ARN: ${{ secrets.DEVICE_FARM_IOS_DEVICE_POOL_ARN }}
+        run: |
+          set -euo pipefail
+          # Mesmo tr do Schedule iOS run: o valor tem que ser byte a byte igual nos dois caminhos.
+          USERS=$(printf '%s' "$CLIENT_USERS_EMAILS" | tr -d '[:space:]')
+          for v in CLIENT_PASSWORD USERS; do
+            [ -n "${!v}" ] || { echo "::error::Variavel $v esta vazia — verifique os secrets do repositorio"; exit 1; }
+          done
+
+          # ARNs do pool. A regra tem que ser por ARN (pool PRIVATE com lista fixa): e o que
+          # garante modelo + versao de OS conhecidos antes do run.
+          ARNS_JSON=$(aws devicefarm get-device-pool --arn "$POOL_ARN" --region us-west-2 \
+            --query "devicePool.rules[?attribute=='ARN'].value | [0]" --output text)
+          if [ -z "$ARNS_JSON" ] || [ "$ARNS_JSON" = "None" ]; then
+            echo "::error::O pool iOS nao tem regra por ARN. O mapa de contas depende disso — ajuste o pool para uma lista fixa de devices."
+            exit 1
+          fi
+
+          : > devices.tsv
+          for A in $(printf '%s' "$ARNS_JSON" | jq -r '.[]'); do
+            aws devicefarm get-device --arn "$A" --region us-west-2 \
+              --query 'device.[name,os,resolution.width,resolution.height]' --output text >> devices.tsv
+          done
+          echo "Devices do pool iOS:"; cat devices.tsv
+
+          # Chave = "<os>|<largura>x<altura>" em PONTOS (pixels/3), a mesma unidade do
+          # driver.getWindowRect(). Ordenado por nome, para cada aparelho manter a mesma conta
+          # entre runs (o Trend do Allure depende dessa estabilidade).
+          MAP=$(sort -t "$(printf '\t')" -k1,1 devices.tsv | awk -F'\t' '
+            BEGIN { ok = 1; n = 0 }
+            {
+              if ($3 % 3 != 0 || $4 % 3 != 0) {
+                printf "::error::%s tem resolucao %sx%s, que nao e @3x: a chave os|pontos nao serve para ele\n", $1, $3, $4 > "/dev/stderr"
+                ok = 0; next
+              }
+              key = $2 "|" ($3 / 3) "x" ($4 / 3)
+              if (key in dono) {
+                printf "::error::Chave duplicada \"%s\": %s e %s cairiam na MESMA conta\n", key, dono[key], $1 > "/dev/stderr"
+                ok = 0
+              }
+              dono[key] = $1
+              entries[n] = sprintf("{\"key\":\"%s\",\"index\":%d,\"name\":\"%s\"}", key, n, $1)
+              n++
+            }
+            END {
+              if (!ok || n == 0) exit 1
+              printf "["
+              for (i = 0; i < n; i++) printf "%s%s", (i ? "," : ""), entries[i]
+              printf "]"
+            }')
+
+          DEVICES=$(printf '%s' "$MAP" | jq 'length')
+          CONTAS=$(printf '%s' "$USERS" | awk -F, '{print NF}')
+          if [ "$DEVICES" -gt "$CONTAS" ]; then
+            echo "::error::O pool iOS tem $DEVICES devices e o secret CLIENT_USERS_IOS_EMAILS traz $CONTAS conta(s). Faltam contas — devices repetiriam conta e brigariam pelos favoritos."
+            exit 1
+          fi
+
+          {
+            echo "CLIENT_PASSWORD=$CLIENT_PASSWORD"
+            echo "CLIENT_USERS_EMAILS=$USERS"
+            echo "IOS_DEVICE_MAP=$MAP"
+          } > .env
+          rm -f devices.tsv
+          # Sem imprimir credencial: so as contagens e o mapa, que nao e secreto.
+          echo ".env gerado: $CONTAS conta(s) para $DEVICES device(s)"
+          printf '%s' "$MAP" | jq -r '.[] | "  conta[\(.index)] -> \(.name)  [\(.key)]"'
+
       # --- Criar ZIP do test package ---
       - name: Create test package ZIP
         run: |
@@ -344,6 +437,11 @@ jobs:
             --exclude "app.ipa" \
             --exclude "test-package.zip"
           echo "ZIP criado: $(du -sh test-package.zip | cut -f1)"
+          # O "zip -r ." inclui dotfiles, entao o .env gerado acima entra no pacote. Ele NAO
+          # esta na lista de --exclude de proposito. Falhar aqui e melhor que descobrir no
+          # aparelho: sem o .env, os 5 devices morrem no login.
+          unzip -l test-package.zip | grep -qE ' \.env$' || { echo "::error::.env nao entrou no ZIP do test package"; exit 1; }
+          echo ".env presente no ZIP"
 
       - name: Create test package upload on Device Farm
         id: test_upload_ios

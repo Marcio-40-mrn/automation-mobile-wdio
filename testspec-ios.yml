@@ -39,8 +39,30 @@ phases:
           if [ $n -ge 3 ]; then echo "npm install falhou após 3 tentativas"; exit 1; fi
           echo "npm install falhou (tentativa $n) — nova tentativa em 10s"; sleep 10
         done
-      - 'echo "CLIENT_PASSWORD=$CLIENT_PASSWORD" > .env'
-      - 'echo "CLIENT_USERS_EMAILS=$CLIENT_USERS_EMAILS" >> .env'
+      # O .env deste pacote vem PRONTO do workflow (step "Gerar .env do test package (iOS)"),
+      # com as credenciais E o IOS_DEVICE_MAP (a conta de cada aparelho).
+      # Motivo: o host iOS nao recebe as environmentVariables do run — o script que o Device
+      # Farm gera para o iOS monta o proprio ambiente e exporta so as DEVICEFARM_* (conferido
+      # no artefato "Test spec shell script"). No host Android o ambiente e herdado do agente e
+      # a variavel tem valor; aqui nao. Sobrescrever este arquivo as cegas zerava justamente as
+      # credenciais, e o login ia com user=undefined nos 5 aparelhos (run #5).
+      # Por isso: se o .env do pacote ja traz as credenciais, ele e PRESERVADO — reescrever
+      # apagaria o IOS_DEVICE_MAP junto. O ambiente do host so entra como complemento, se um
+      # dia a AWS passar a repassar as variaveis e o pacote vier sem elas.
+      # O diagnostico imprime o COMPRIMENTO das variaveis, nunca o conteudo.
+      - |
+        echo "[diag] host env: CLIENT_USERS_EMAILS len=${#CLIENT_USERS_EMAILS} CLIENT_PASSWORD len=${#CLIENT_PASSWORD}"
+        if grep -q '^CLIENT_USERS_EMAILS=.' .env 2>/dev/null; then
+          echo "[diag] .env do test package ja traz as credenciais - preservando"
+        elif [ -n "$CLIENT_USERS_EMAILS" ] && [ -n "$CLIENT_PASSWORD" ]; then
+          { echo "CLIENT_PASSWORD=$CLIENT_PASSWORD"; echo "CLIENT_USERS_EMAILS=$CLIENT_USERS_EMAILS"; } >> .env
+          echo "[diag] credenciais do ambiente do host anexadas ao .env"
+        else
+          echo "ERRO: sem credenciais no .env do test package e sem elas no ambiente do host - ver o step 'Gerar .env do test package (iOS)' no workflow"
+          exit 1
+        fi
+        grep -q '^IOS_DEVICE_MAP=.' .env || { echo "ERRO: IOS_DEVICE_MAP ausente no .env - sem ele os aparelhos cairiam na mesma conta"; exit 1; }
+        echo "[diag] .env final: $(wc -l < .env) linha(s)"
       # Ambiente customizado nao sobe o Appium sozinho: inicia em background com base path /wd/hub
       - >-
         appium --base-path=/wd/hub --log-timestamp --relaxed-security

@@ -3,6 +3,12 @@ import { driver, $ } from '@wdio/globals'
 
 export class CategoriasPage extends BasePage {
 
+    // Título da subcategoria aberta, guardado por quem abriu a tela. O voltarIOS() precisa dele
+    // para chegar no chevron do cabeçalho: na listagem de produtos o chevron não tem nó próprio
+    // na árvore — ele vive dentro do nó do título, e o seletor é uma class chain indexada pelo
+    // name desse título. Ver o comentário do voltarIOS() no BasePage.
+    private tituloListagem?: string;
+
     async selecionarMangaCurta() {
         const element = await $('-android uiautomator:new UiSelector().text("Manga curta ")');
         await this.waitForElement(element);
@@ -38,6 +44,7 @@ export class CategoriasPage extends BasePage {
             await this.waitForElement(element);
             await element.click();
             await driver.pause(timewhait);
+            this.tituloListagem = 'Camisas';
             return;
         }
 
@@ -47,6 +54,7 @@ export class CategoriasPage extends BasePage {
         await element.scrollIntoView();
         await element.click();
         await driver.pause(timewhait);
+        this.tituloListagem = 'Camisas';
     }
 
     async selecionarProduto(texto: string) {
@@ -177,8 +185,14 @@ export class CategoriasPage extends BasePage {
     // ÁRVORE (instância 0 de uma classe de ícone SVG — quebra se a ordem dos ícones mudar) e o
     // iOS, da posição na TELA, porque a listagem de produtos é a única tela do fluxo sem
     // botão de voltar identificável. Ver voltarIOS() no BasePage.
+    //
+    // O tituloListagem é obrigatório no iOS: sem ele o voltarIOS() pula o caminho do chevron —
+    // o ÚNICO que funciona nesta tela — e cai em Back/driver.back()/swipe, que não mexem um byte
+    // na árvore aqui. Era assim que o passo morria com `titulo="—"` depois de favoritar.
+    // Saindo de Favoritos (a outra chamada do spec) o título é ignorado na prática: aquela tela
+    // tem `accessibility id:Back`, que é o primeiro caminho da cascata e retorna antes.
     async voltar() {
-        if (process.env.PLATFORM === 'ios') return this.voltarIOS();
+        if (process.env.PLATFORM === 'ios') return this.voltarIOS(this.tituloListagem);
 
         const element = await $("-android uiautomator:new UiSelector().className(\"com.horcrux.svg.PathView\").instance(0)");
         await this.waitForElement(element);
