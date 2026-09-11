@@ -153,35 +153,40 @@ aparecer `Profile : development` no log com os secrets preenchidos, é esse desc
 
 ### Conta distinta por device (multiusuário no Device Farm)
 
-No Device Farm o pool roda vários devices em paralelo. Se todos logarem com a mesma
-conta, eles disputam o mesmo produto na tela de Favoritos (um adiciona / outro remove)
-e o teste falha de forma intermitente. Para evitar isso, **cada device usa uma conta
-distinta**, escolhida em runtime pelo modelo do aparelho:
+No Device Farm vários devices rodam em paralelo. Se todos logarem com a mesma conta, eles
+disputam o mesmo produto na tela de Favoritos (um adiciona / outro remove) e o teste falha de
+forma intermitente. Por isso **cada device usa uma conta distinta** — mas as duas plataformas
+chegam nisso por caminhos diferentes, porque o Device Farm as trata de forma diferente:
 
-- As variáveis de ambiente do Device Farm são globais ao run (todos os devices recebem
-  as mesmas), então a lista de contas viaja num CSV único por plataforma
-  (`CLIENT_USERS_EMAILS`), com a **senha comum** em `CLIENT_PASSWORD`.
-- `test/utils/device-index.ts` mapeia o **modelo** do device (`browser.capabilities.deviceModel`,
-  ex.: `SM-S918U1`) → índice na lista. `test/utils/credentials.ts` casa por prefixo e
-  devolve `emails[index]`. Log em runtime: `🔑 Device model "…" -> conta[N] = email`.
-- O CSV é transportado em **texto puro** (não base64): o Device Farm limita cada env var
-  a 256 caracteres e o base64 do JSON das contas estourava esse limite.
+**Android — um run com N devices, conta escolhida em runtime.** As variáveis de ambiente do
+Device Farm são do *run*, não do *job*: os 6 aparelhos recebem a mesma lista de contas
+(`CLIENT_USERS_EMAILS`, CSV em texto puro — o limite de 256 caracteres por variável não
+comporta base64). Cada um escolhe seu índice pelo **modelo** do aparelho
+(`browser.capabilities.deviceModel`, ex.: `SM-S918U1`), via `test/utils/device-index.ts`
+(prefixo do modelo → índice) e `test/utils/credentials.ts`. Log em runtime:
+`🔑 Device model "…" -> conta[N] = email`.
 
-Os secrets `CLIENT_USERS_ANDROID_EMAILS` / `CLIENT_USERS_IOS_EMAILS` recebem apenas o CSV
-de emails. **A ordem dos emails define o índice da conta e precisa casar com `device-index.ts`:**
+| Índice | Android (`device-index.ts`) |
+|---|---|
+| 0 | Galaxy S23 Ultra (`SM-S918`) |
+| 1 | Galaxy S23+ (`SM-S916`) |
+| 2 | Galaxy S24 Ultra (`SM-S928`) |
+| 3 | Galaxy S24+ (`SM-S926`) |
+| 4 | Galaxy S25 Ultra (`SM-S938`) |
+| 5 | Galaxy S26 Ultra (`SM-S948`) |
 
-| Índice | Android (`device-index.ts`) | iOS (`device-index.ts`) |
-|---|---|---|
-| 0 | Galaxy S23 Ultra (`SM-S918`) | iPhone 13 (`A2482`) |
-| 1 | Galaxy S23+ (`SM-S916`) | iPhone 14 (`A2649`) |
-| 2 | Galaxy S24 Ultra (`SM-S928`) | iPhone 14 Pro Max (`A2651`) |
-| 3 | Galaxy S24+ (`SM-S926`) | iPhone 15 (`A2846`) |
-| 4 | Galaxy S25 Ultra (`SM-S938`) | iPhone 15 Pro Max (`A2849`) |
-| 5 | Galaxy S26 Ultra (`SM-S948`) | — |
+> Se um device não casar nenhum prefixo, cai em `conta[0]` (com `warn` no log) — ajuste o
+> mapa antes de confiar na unicidade.
 
-> Se um device não casar nenhum prefixo, cai em `conta[0]` (com `warn` no log) — ajuste
-> o mapa antes de confiar na unicidade. O mapeamento iOS é best-effort e ainda não foi
-> verificado em runtime.
+**iOS — um run POR device, conta decidida pelo CI.** O host iOS não recebe as variáveis de
+ambiente do run, e o XCUITest não devolve `deviceModel` (o UDID muda a cada run). Então o
+workflow lê os ARNs do pool iOS, ordena os aparelhos por nome (`LC_ALL=C sort`, para a conta
+de cada um ser estável entre runs e o Trend do Allure não quebrar), e agenda **um run por
+aparelho** (`schedule-run --device-selection-configuration` mirando o ARN), injetando o email
+daquele device no `testspec-ios.yml` do run (linha `__CREDENCIAIS_DO_RUN__`) junto com
+`DEVICE_LABEL`. Nenhum mapa em runtime; nenhum aparelho fica de fora por não ser reconhecido.
+A ordem dos emails em `CLIENT_USERS_IOS_EMAILS` é a ordem alfabética (byte a byte) dos nomes
+dos devices do pool. Detalhes e histórico da decisão em `.planning/STATE.md`.
 
 ---
 
@@ -225,8 +230,9 @@ scripts/
   ROADMAP.md          — marcos: o que está feito e o que vem a seguir
   STATE.md            — estado atual e pendências abertas
   plans/              — um arquivo por iniciativa
-.claude/agents/       — sub-agents especializados
-  android-ui-inspector.md — inspeção de elementos Android via adb
+.claude/agents/       — sub-agents especializados (fora do git: .claude está no .gitignore)
+  mobile-ui-inspector.md  — inspeção de elementos: Android via adb, iOS via Appium/XCUITest
+  mobile-draft-writer.md  — escreve os drafts de tela a partir das capturas (não toca no device)
 ```
 
 ### Flags de detecção de ambiente (`wdio.conf.ts`)

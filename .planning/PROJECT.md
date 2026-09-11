@@ -13,11 +13,11 @@ TypeScript com WebdriverIO + Appium.
 | Relatórios | Allure (`@wdio/allure-reporter`) + CTRF (`wdio-ctrf-json-reporter`) |
 | Distribuição do app | EAS / Expo, baixado por `scripts/install-apk.mjs` |
 | CI | GitHub Actions + AWS Device Farm |
-| Catálogo | Backstage (`catalog-info.yml`, TechDocs via `mkdocs.yml` + `docs/`) |
+| Catálogo | Backstage (`catalog-info.yml`, TechDocs via `mkdocs.yml` + `docs/`) — só no repositório principal; neste backup esses arquivos estão no `.gitignore` e não existem |
 
 ## Ambientes de execução
 
-São três, e o `wdio.conf.ts` decide qual é por variável de ambiente:
+São quatro, e o `wdio.conf.ts` decide qual é por variável de ambiente:
 
 | Ambiente | Como ativa | Appium | Observação |
 |---|---|---|---|
@@ -47,5 +47,5 @@ test/
 scripts/               download/instalação do app e geração do índice de relatórios
 .claude/agents/        sub-agents especializados
 .planning/             memória persistente do projeto (este diretório)
-docs/                  TechDocs publicado no Backstage
+docs/                  TechDocs publicado no Backstage (ausente neste backup, ver tabela acima)
 ```
