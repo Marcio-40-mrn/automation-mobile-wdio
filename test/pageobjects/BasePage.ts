@@ -101,82 +101,77 @@ export class BasePage {
     }
   }
 
-  // No iOS não existe equivalente confiável ao insiderLayout. O candidato observado (a Window
-  // "InsiderTemplateWindow") apareceu uma única vez em 8 sessões de inspeção, na tela de
-  // boas-vindas, e nunca mais — amostra pequena demais para virar marcador de presença. Por
-  // isso aqui o gatilho é o próprio "Close", idêntico nas duas plataformas (o criativo é a
-  // mesma WebView do Insider). Custo: uma consulta por step, igual ao Android.
+  // Mesmo desenho do Android, com o marcador de presença certo para o iOS.
+  //
+  // O que NÃO serve como marcador: o próprio "Close" e o "Open App". Os dois respondem
+  // displayed=true com a tela limpa — o nó sobrevive na árvore depois que o banner some e o
+  // isElementDisplayed do WDA mente sobre ele. Foi isso que, no CI iOS Run #7, fez o teste
+  // clicar num "Close" inexistente (centro (330,298), dentro do card "My Orders") e derrubar
+  // 3 de 5 aparelhos com "Banner do Insider não fechou" numa tela sem banner.
+  //
+  // O que serve, medido no CI iOS Run #9 (iPhone 14 Pro Max, mesma sessão, os dois estados):
+  //
+  //   tela limpa (4 amostras):   Close=true  WebView=false  Window=false  OpenApp=true
+  //   banner na tela (1 amostra): Close=true  WebView=TRUE   Window=TRUE   OpenApp=true
+  //
+  // A WebView "Insider WebView Content" e a Window "Inapp Window" só reportam displayed=true
+  // com o criativo visível — são o insiderLayout do iOS. O ciclo abaixo é o do Android:
+  // presença -> esperar o "Close" (a WebView publica a árvore com atraso) -> clicar -> confirmar
+  // que a WebView sumiu -> repetir (pode haver um segundo criativo enfileirado) -> lançar se
+  // ainda estiver lá depois de 3 ciclos.
   //
   // Atenção: no iOS o banner pode aparecer JÁ na tela de boas-vindas, antes de qualquer login
   // — diferente do Android, onde só foi visto depois dele.
-  // NAO CLICA. Isto e deliberado, e custou um diagnostico inteiro.
-  //
-  // O no do "Close" SOBREVIVE na arvore depois que o banner some — o draft 01 ja registrava
-  // metade disso ("banner Insider presente na arvore mas visible=false") — e o
-  // isElementDisplayed do WDA MENTE sobre ele, devolvendo true com a tela limpa. No
-  // CI iOS Run #7 isso derrubou 3 dos 5 aparelhos, e o dano nao foi so o erro:
-  //
-  //   rect do Close (draft 01):        [318,286 24x24]  -> centro (330, 298)
-  //   menu-card "My Orders" (draft 06): [205,222 181x105]
-  //
-  // (330,298) cai DENTRO do card "My Orders", e de nenhum outro. Ou seja, o elementClick no no
-  // fantasma tocava aquela coordenada e NAVEGAVA O APP PARA "Meus Pedidos" — confirmado no
-  // video, com a tela entrando por cima do Account Menu — tres vezes, antes de lancar um erro
-  // que apontava para o lugar errado ("Banner nao fechou").
-  //
-  // Geometria nao serve para discriminar: o fantasma carrega o rect do banner real. Enquanto
-  // nao houver um marcador de presenca confiavel (o InsiderTemplateWindow foi visto UMA vez em
-  // 8 sessoes de inspecao — amostra pequena demais), o certo e nao tocar: o banner real e raro,
-  // o falso positivo era sistematico. Se um banner real aparecer e bloquear, o proprio step
-  // seguinte falha — no lugar certo e com a mensagem certa.
-  //
-  // O log abaixo existe para fechar essa lacuna: e ele que vai trazer, de um run real, o rect
-  // do fantasma e o estado dos nos do Insider. Com esse dado da para escrever a checagem de
-  // presenca de verdade e voltar a fechar o banner.
-  //
-  // O ramo ANDROID de fechaBanner() continua clicando e continua lancando: la existe o
-  // insiderLayout como marcador de presenca de verdade, e a suite esta 18/18.
   private async fechaBannerIOS() {
-    const close = await $("accessibility id:Close");
-    if (!(await close.isDisplayed().catch(() => false))) return;
+    const webview = '-ios predicate string:label == "Insider WebView Content"';
+    const botaoFechar = "accessibility id:Close";
 
-    const loc = await close.getLocation().catch(() => null);
-    const size = await close.getSize().catch(() => null);
-    const insider = await this.estadoDosNosInsider();
+    for (let tentativa = 1; tentativa <= 3; tentativa++) {
+      // Sem banner na tela o método custa uma consulta e retorna: roda antes de todo step.
+      if (!(await this.bannerNaTela(webview))) return;
 
-    console.log(
-      `🔎 [diag banner] "Close" reportou displayed=true — NAO foi clicado. ` +
-      `rect=${loc && size ? `[${Math.round(loc.x)},${Math.round(loc.y)} ${size.width}x${size.height}]` : '?'} ` +
-      `| ${insider}`
-    );
-  }
+      const close = await $(botaoFechar);
+      const apareceu = await close
+        .waitForDisplayed({ timeout: 10000 })
+        .then(() => true)
+        .catch(() => false);
 
-  // Candidatos a marcador de presenca do banner, para o diagnostico acima. Nenhum deles e
-  // usado para decidir nada ainda — primeiro precisamos ver o que reportam num run real.
-  private async estadoDosNosInsider(): Promise<string> {
-    const alvos: [string, string][] = [
-      ['WebView', '-ios predicate string:label == "Insider WebView Content"'],
-      ['Window', '-ios predicate string:label == "Inapp Window"'],
-      ['OpenApp', 'accessibility id:Open App'],
-    ];
-
-    const partes: string[] = [];
-    for (const [rotulo, seletor] of alvos) {
-      try {
-        const achados = await $$(seletor);
-        if (!achados.length) { partes.push(`${rotulo}=0`); continue; }
-        const visiveis: boolean[] = [];
-        for (const el of achados) visiveis.push(await el.isDisplayed().catch(() => false));
-        partes.push(`${rotulo}=${achados.length}(displayed:${visiveis.join(',')})`);
-      } catch {
-        partes.push(`${rotulo}=erro`);
+      if (!apareceu) {
+        console.log(`⏳ Banner na tela mas o "Close" não apareceu (tentativa ${tentativa}/3)`);
+        continue;
       }
+
+      await close.click();
+
+      const fechou = await driver
+        .waitUntil(async () => !(await this.bannerNaTela(webview)), { timeout: 5000, interval: 500 })
+        .then(() => true)
+        .catch(() => false);
+
+      if (fechou) {
+        console.log(`✅ Banner fechado (tentativa ${tentativa}/3)`);
+        await driver.pause(timewhait);
+        // Não retorna: pode haver um segundo criativo enfileirado atrás do primeiro.
+        continue;
+      }
+
+      console.log(`⚠ Clique no "Close" não fechou o banner (tentativa ${tentativa}/3)`);
     }
-    return partes.join(' ');
+
+    if (await this.bannerNaTela(webview)) {
+      const loc = await $(botaoFechar).getLocation().catch(() => null);
+      const size = await $(botaoFechar).getSize().catch(() => null);
+      throw new Error(
+        'Banner do Insider não fechou após 3 tentativas de clicar em "Close" ' +
+        `(WebView "Insider WebView Content" continua displayed=true; Close em ` +
+        `${loc && size ? `[${Math.round(loc.x)},${Math.round(loc.y)} ${size.width}x${size.height}]` : '?'})`
+      );
+    }
   }
 
-  // Presença do banner pelo insiderLayout: o htmlView some do dump em alguns momentos mesmo
-  // com o banner visível na tela, então ele não serve de marcador.
+  // Presença do banner pelo marcador de cada plataforma: insiderLayout no Android (o htmlView
+  // some do dump em alguns momentos mesmo com o banner visível, então não serve) e a WebView
+  // "Insider WebView Content" no iOS (o "Close" mente, ver fechaBannerIOS).
   private async bannerNaTela(overlay: string): Promise<boolean> {
     const el = await $(overlay);
     return el.isDisplayed().catch(() => false);
