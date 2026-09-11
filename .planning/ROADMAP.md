@@ -30,7 +30,9 @@ por plataforma, foram criados dois agentes por **papel**:
 **O `ios-ui-inspector` não existe e não será criado.** A divisão que se mostrou útil é por
 papel (inspecionar × redigir), não por sistema operacional.
 
-## M3 — Rodar a MESMA suíte no iOS 🔄
+## M3 — Rodar a MESMA suíte no iOS ✅
+
+Concluído em 2026-09-11 — `CI Run #14`: Android 18/18 e iOS 5/5 no mesmo run.
 
 **Regra que define este marco: não existe uma suíte iOS.** É a mesma suíte, o mesmo
 `test/specs/test.spec.ts`, os mesmos page objects, os mesmos nomes de método. Cada método
@@ -52,7 +54,7 @@ Passos:
 4. ✅ Ramo iOS preenchido em `test/pageobjects/` (2026-09-08) — 14 ramificações em 6
    arquivos, `tsc --noEmit` limpo. **Escrito a partir dos drafts, ainda não exercitado
    contra device**: o que valida é o passo 5.
-5. 🔄 A suíte roda no iOS ponta a ponta. **Passou pela primeira vez** no `CI iOS Run #8`
+5. ✅ A suíte roda no iOS ponta a ponta. **Passou pela primeira vez** no `CI iOS Run #8`
    (2026-09-10), no iPhone 15 — os 17 steps, de `ativarApp` a `confirmarLogout`. No `CI iOS Run #9`,
    **4/5** — o login (caractere perdido na digitação) está corrigido e validado; o 14 Pro Max
    caiu porque o banner do Insider não era fechado no iOS (fechamento reativado com o marcador
@@ -60,8 +62,8 @@ Passos:
    herdada do #12, 15 Pro Max por tap perdido no `Back` + falso positivo do `telaMudou`) e o
    **Android caiu para 16/18** pelo banner novo "Só no APP: 20% OFF" — correção dos 4 pontos
    (validar desfavoritar, `voltar()` por tab bar, guarda de conta suja, limpeza em falha) no
-   working tree, aguardando run. O passo fecha quando os 5
-   aparelhos passarem no mesmo run.
+   `c367423`. **`CI Run #14` (2026-09-11 15:49): Android 18/18 e iOS 5/5** — os 5 aparelhos
+   passaram no mesmo run. Passo fechado.
 
 O bloqueio original deste marco — 19 dos 31 seletores eram Android-only e os 12
 `accessibility id:` não podiam ser presumidos — **está resolvido**: o valor iOS de cada um

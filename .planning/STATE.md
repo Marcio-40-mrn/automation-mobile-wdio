@@ -1,6 +1,6 @@
 # STATE
 
-Atualizado em **2026-09-11** (tarde — diagnóstico do `CI Run #13` e correção dos 4 pontos).
+Atualizado em **2026-09-11** (fim do dia — `CI Run #14` verde nas duas plataformas).
 
 > Este arquivo foi mesclado nesta data. A cópia do `.planning/` trazida de outra pasta em
 > 2026-09-10 sobrescreveu a versão de 09-09 com a de 09-08 — os drafts e o relatório de
@@ -10,18 +10,19 @@ Atualizado em **2026-09-11** (tarde — diagnóstico do `CI Run #13` e correçã
 
 ## Onde o projeto está
 
-**Android: verde.** `CI Run #6` (2026-09-09) fechou **18/18 PASSED** no pool de 6 devices.
-É a referência, e o desenho do Android não deve ser alterado.
-**Quebrou no `CI Run #13` (2026-09-11 14:18): 16/18**, por um banner novo do Insider que nasce
-depois de desfavoritar — sem mudança de código Android. Correção nos 4 pontos no working tree
-(pendência "CI Run #13").
+**Verde nas duas plataformas.** `CI Run #14` (2026-09-11 15:49, commit `c367423`):
+**Android 18/18** no pool de 6 devices e **iOS 5/5** — iPhone 13, 14, 14 Pro Max, 15 e
+15 Pro Max, cada um no seu run de 1 device, ponta a ponta. É a primeira vez que os 5 iPhones
+passam no mesmo run: **o passo 5 do M3 está fechado** e o M3 concluído. O `CI Run #14` passa a
+ser a referência das duas plataformas.
 
-**Marco atual: M3, passo 5** — a mesma suíte rodando no iOS. **Primeiro iOS verde:** no
-`CI iOS Run #8` (2026-09-10 18:31, 5 runs de 1 device) o **iPhone 15 passou ponta a ponta**
-— onboarding, login, favoritar, validar em Favoritos, desfavoritar (coração de maior x = 155),
-logout. Os outros quatro falharam por duas causas distintas, ambas medidas nos artefatos
-(ver Pendências): três por **caractere perdido na digitação do login** e um (14 Pro Max) em
-`abrirFavoritos()`.
+O que levou até aqui, no mesmo dia: o `CI Run #13` (14:18) caiu para 16/18 no Android e 3/5 no
+iOS por um banner novo do Insider, um tap perdido e uma conta suja (pendência "CI Run #13"
+abaixo); a correção dos 4 pontos (validar desfavoritar, `voltar()` por tab bar, guarda de conta
+suja, limpeza em falha) entrou em `c367423` e o Run #14 validou tudo.
+
+**Próximo marco: M4** — o job iOS já existe e agora o fluxo passa; falta consolidar (ver
+`ROADMAP.md`). Depois, M5, bloqueado pelo ReCAPTCHA.
 
 Lembrete do que o M3 é, porque é fácil de distorcer: **uma suíte só**. O
 `test/specs/test.spec.ts` não muda, nenhum page object novo é criado, e o `if` de
@@ -29,12 +30,11 @@ plataforma mora dentro do método — como o `ativarApp()` de `HomePage.ts` já 
 
 ## Working tree
 
-Branch `main`, HEAD em **`d2e770b`**. O banner iOS "antes de cada clique" (`79ac648`) e o registro
-(`d2e770b`) estão commitados e mergeados (PR #1). Os drafts, o `RELATORIO-ANOMALIAS-IOS.md` e os
-planos continuam fora do git por `.gitignore`.
+Branch `main`, HEAD em **`c367423`** (`fix`, 2026-09-11 15:47) — a correção dos 4 pontos do
+Run #13 mais este registro, **tudo commitado, working tree limpo**. Os drafts, o
+`RELATORIO-ANOMALIAS-IOS.md` e os planos continuam fora do git por `.gitignore`.
 
-Não commitado (2026-09-11, tarde — correção dos 4 pontos do `CI Run #13`; ver a pendência
-"CI Run #13" abaixo para o diagnóstico):
+O que `c367423` contém (validado no `CI Run #14`):
 
 | Arquivo | O que mudou |
 |---|---|
@@ -42,11 +42,11 @@ Não commitado (2026-09-11, tarde — correção dos 4 pontos do `CI Run #13`; v
 | `test/pageobjects/CategoriasPage.ts` | **(2)** `voltar()` Android: `aguardarTelaEstavel()` → `fechaBanner()` **imediatamente antes** do clique → clique → **espera a tab bar** (`Categorias`/`Menu`/`Perfil`, 15s) → 2 taps antes de falhar com erro explícito. **(3)** Guarda em `favoritarPrimeiroProdutoIOS`: mede o `action-button-icon` do coração; largura < 26 (preenchido = 20x21, contorno = 32x33, draft 15) → erro "conta suja" **antes** de tocar. |
 | `test/pageobjects/BasePage.ts` | **(2)** `voltarIOS()`: critério de sucesso passou de "árvore mudou" (`telaMudou`, removido) para **`tab-menu` visível** (15s); `aguardarTelaEstavel()` antes; cada caminho (Back, chevron) tenta 2 taps. Novo `aguardarTelaEstavel(timeout=15s)`: duas leituras iguais de `getPageSource` com 1s de intervalo; se não estabilizar só loga. |
 | `test/specs/test.spec.ts` | **(4)** `tirarSelecaoItem(produtoFavoritado)` (passa o nome); flag `desfavoritado`; `try/catch` em volta dos steps: se falhou com produto favoritado e não desfavoritado, `limparFavoritoOrfao()` — `mobile: terminateApp` + `activateApp`, `abrirPerfil` → `abrirFavoritos` → `tirarSelecaoItem(produto)`, tudo melhor-esforço; se não conseguir, anexo `Favorito órfão na conta` no Allure com conta + produto. O erro original é sempre relançado. |
-| `.planning/STATE.md`, `.planning/ROADMAP.md` | este registro |
 
-`tsc --noEmit` limpo nesses 4 arquivos (os 73 erros de `test/Draft.ts` já existiam). **Não
-exercitado contra device** — o que valida é o próximo run. Não testado: se `mobile: activateApp`
-devolve o app na Home logado no iOS (no Android, sessão `noReset`, é o esperado).
+Ainda **não exercitado** (o Run #14 não falhou, logo não passou por aqui): a limpeza
+`limparFavoritoOrfao()` — em especial se `mobile: activateApp` devolve o app na Home logado no
+iOS — e o ramo de erro "Conta suja" da guarda do coração. São caminhos de falha; só um run que
+quebre entre favoritar e desfavoritar vai validá-los.
 
 ## O levantamento iOS (2026-09-04)
 
@@ -203,7 +203,7 @@ O `abrirFavoritos()` do 14 Pro Max no Run #8 (`flatlist-favorites` não apareceu
 era o mesmo banner num passo diferente; não há diag naquele run para provar. Reavaliar se
 reaparecer com o fechamento ativo.
 
-### CI Run #13 (2026-09-11 14:18) — 2 Android + 2 iOS, três causas, correção no working tree
+### CI Run #13 (2026-09-11 14:18) — 2 Android + 2 iOS, três causas — CORRIGIDO e VALIDADO no `CI Run #14`
 
 Medido em log (`Test spec output`) + vídeo, frame a frame, dos 4 jobs. **O código Android não
 tinha mudado desde o Run #6** (diff `56810d6..d2e770b` só toca ramos iOS).
@@ -230,7 +230,9 @@ tinha mudado desde o Run #6** (diff `56810d6..d2e770b` só toca ramos iOS).
   `flatlist-favorites`. **Efeito em cadeia entre runs.** Desfavoritar manualmente nessa conta
   antes do próximo run.
 
-Próximo run, conferir: Android `💔 "<produto>" removido de Favoritos` e `↩ voltar: seta`;
+**Resultado:** `CI Run #14` (15:49), mesmo dia, com a campanha do banner ainda ativa: Android
+18/18, iOS 5/5. Registro do que se conferiu no próximo run, mantido como checklist para
+regressões: Android `💔 "<produto>" removido de Favoritos` e `↩ voltar: seta`;
 iOS `↩ voltar: accessibility id:Back`; `🤍 Coração de "<produto>" sem preenchimento (icone 32x33)`;
 nenhum `Conta suja`. Se um teste falhar entre favoritar e desfavoritar, procurar `🧹` no log e
 o anexo `Favorito órfão na conta` no Allure.
@@ -287,7 +289,9 @@ registro do diagnóstico; o resultado está na pendência "Correções de fluxo 
   de backend um allowlist/bypass para QA/Device Farm. Bloqueia o M5; não afeta M1/M3.
 - **App sem `accessibilityIdentifier` em pelo menos 5 pontos do fluxo iOS.** O caminho
   estruturalmente correto é pedir os identificadores ao time do app.
-- **Segundo banner do Insider.** No Android o Marcio relatou dois criativos e só o
-  "INTERLÚDIO" foi capturado. Registrar como "não observado depois", não como "não aparece".
+- **Segundo banner do Insider — OBSERVADO em 2026-09-11 (Run #13):** "Só no APP: 20% OFF pra
+  você! Raspe aqui e descubra" (raspadinha), disparado ~2,5–3s depois da interação com o
+  coração, nas duas plataformas. Fecha pelo mesmo `Close`/backdrop; o que o neutralizou foi
+  checar o banner imediatamente antes de cada clique e validar cada navegação pelo destino.
 - **Uma camisa ficou favoritada na conta** durante a investigação manual (Camisa Manga Longa
   Slim em Tricoline Stretch Liso Branco). Desfavoritar antes de um run limpo.
