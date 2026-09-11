@@ -1,0 +1,1 @@
+[{"values":["iOS"],"name":"Platform"},{"values":["Apple iPhone 14"],"name":"Device"},{"values":["com.aramis.ecomm"],"name":"App"},{"values":["1.14.2"],"name":"AppVersion"},{"values":["305"],"name":"AppBuildVersion"},{"values":["XCUITest"],"name":"Automation"},{"values":["WebdriverIO + Appium"],"name":"Framework"},{"values":["AWS Device Farm"],"name":"Environment"}]
