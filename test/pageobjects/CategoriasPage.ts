@@ -24,6 +24,7 @@ export class CategoriasPage extends BasePage {
         if (process.env.PLATFORM === 'ios') {
             const element = await $('-ios predicate string:name == "category-button" AND label == "Roupas"');
             await this.waitForElement(element);
+            await this.fechaBanner();
             await element.click();
             await driver.pause(timewhait);
             return;
@@ -42,6 +43,7 @@ export class CategoriasPage extends BasePage {
         if (process.env.PLATFORM === 'ios') {
             const element = await $('-ios predicate string:name == "sub-categories-button" AND label == "Camisas"');
             await this.waitForElement(element);
+            await this.fechaBanner();
             await element.click();
             await driver.pause(timewhait);
             this.tituloListagem = 'Camisas';
@@ -195,6 +197,7 @@ export class CategoriasPage extends BasePage {
             );
         }
 
+        await this.fechaBanner();
         await coracao.click();
         await driver.pause(timewhait);
 

@@ -39,6 +39,7 @@ export class HomePage extends BasePage {
             // por isso copiar SELETORES_PERFIL para cá não casaria com nada.
             const element = await $("accessibility id:tab-menu");
             await this.waitForElement(element);
+            await this.fechaBanner();
             await element.click();
             await driver.pause(timewhait);
             return;
@@ -85,6 +86,7 @@ export class HomePage extends BasePage {
             );
         }
 
+        await this.fechaBanner();
         await element.click();
         await driver.pause(timewhait);
 

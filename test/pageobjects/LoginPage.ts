@@ -52,6 +52,7 @@ export class LoginPage extends BasePage {
         // exigiria scroll — são dois nós distintos, não o mesmo elemento duplicado.
         const btnLogin = await $("accessibility id:Register or login");
         await this.waitForElement(btnLogin);
+        await this.fechaBanner();
         await btnLogin.click();
         await driver.pause(timewhait);
 
@@ -62,6 +63,7 @@ export class LoginPage extends BasePage {
         await driver.pause(2500);
 
         for (let tentativa = 1; tentativa <= 2; tentativa++) {
+            await this.fechaBanner();
             await (await $(btnSignIn)).click();
 
             // Duas saídas possíveis depois do tap, e é preciso distinguir as duas:
@@ -126,6 +128,7 @@ export class LoginPage extends BasePage {
     private async digitarIOS(seletor: string, texto: string, rotulo: string) {
         const campo = await $(seletor);
         await this.waitForElement(campo);
+        await this.fechaBanner();
         await campo.click();
 
         const tecladoAbriu = await driver

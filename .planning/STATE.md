@@ -1,6 +1,6 @@
 # STATE
 
-Atualizado em **2026-09-10** (noite, após o `CI iOS Run #9`).
+Atualizado em **2026-09-11** (após a medição do banner em Remote Access).
 
 > Este arquivo foi mesclado nesta data. A cópia do `.planning/` trazida de outra pasta em
 > 2026-09-10 sobrescreveu a versão de 09-09 com a de 09-08 — os drafts e o relatório de
@@ -26,18 +26,16 @@ plataforma mora dentro do método — como o `ativarApp()` de `HomePage.ts` já 
 
 ## Working tree
 
-Branch `main`, HEAD em **`a53c6b6`**. Tudo que a versão anterior deste arquivo listava como
-"não commitado" (um email por device, `a0608ba`; os quatro page objects do fluxo iOS,
-`a53c6b6`) **está commitado e foi exercitado no `CI iOS Run #8`**. Os drafts, o
-`RELATORIO-ANOMALIAS-IOS.md` e o plano de 09-08 continuam fora do git por `.gitignore`.
+Branch `test`, HEAD em **`581de84`** (1 commit à frente de `main` = `9c14b0a`). O `digitarIOS()`
+está em `9c14b0a` e o `fechaBannerIOS()` que clica em `581de84` — ambos commitados. Os drafts,
+o `RELATORIO-ANOMALIAS-IOS.md` e o plano de 09-08 continuam fora do git por `.gitignore`.
 
-Não commitado (mudança de 2026-09-10, noite — "digitação perde caracteres"):
+Não commitado (2026-09-11 — banner do Insider no iOS, 4ª tentativa; Android intocado):
 
 | Arquivo | O que mudou |
 |---|---|
-| `test/pageobjects/LoginPage.ts` | ramo iOS: novo `digitarIOS()` — clica no campo, espera `isKeyboardShown()` + 1s de reflow, digita com `maxTypingFrequency: 20` (setting do WDA, restaurado para 60 depois); `logarIOS()` passa a detectar o modal `Incorrect username and/or password` e falha **no passo de login**, em vez de ler "botão sumiu = logou". **Ramo Android byte a byte idêntico.** |
-| `test/pageobjects/BasePage.ts` | `fechaBannerIOS()` **volta a fechar o banner**. A versão de `a53c6b6` não clicava — decisão errada: o pedido era corrigir a checagem de presença, não desligar o fechamento, e no Run #9 isso deixou o banner INTERLÚDIO aberto sobre o `voltar()` do 14 Pro Max. Marcador de presença agora é a WebView `label == "Insider WebView Content"` com `displayed=true` (medido no Run #9: `false` nas 4 amostras de tela limpa, `true` na única com banner; o `Close` respondeu `true` nas 5). Ciclo idêntico ao Android: presença → espera `Close` → clica → confirma WebView sumiu → até 3x → lança. Ramo Android intocado. |
-| `.planning/RELATORIO-ANOMALIAS-IOS.md` | nova seção 4.4 (digitação perde caracteres; vídeo não mostra senha; senha em texto puro no `appium.log` do host) |
+| `test/pageobjects/BasePage.ts` | `fechaBannerIOS()`: **3s** entre detectar a WebView e clicar no `Close` (antes clicava na hora); **3s** depois do clique e então valida que a WebView sumiu (antes poll de 5s); log com o rect do `Close` antes do clique e o estado depois; **screenshot anexado ao Allure** quando não fechar. Helper privado `rectDe()` para o rect no log. Chamada de `fechaBanner()` antes do tap das boas-vindas, do aceite do onboarding e dos dois cliques do `voltarIOS`. |
+| `HomePage.ts`, `LoginPage.ts`, `CategoriasPage.ts`, `PerfilPage.ts`, `FavoritosPage.ts` | `await this.fechaBanner();` **imediatamente antes de cada clique do ramo iOS** (15 pontos no total, incluindo o coração em `favoritarPrimeiroProdutoIOS`). Hoje só o `step()` do spec chamava, uma vez por passo. |
 | `.planning/STATE.md`, `.planning/ROADMAP.md` | este registro |
 
 ## O levantamento iOS (2026-09-04)
@@ -163,7 +161,25 @@ do vídeo com os 5 emails íntegros; nenhum `Login efetivado` seguido de `tab-ca
 aparecer o novo erro `o app recusou as credenciais`, o frame diz se ainda falta letra (baixar
 mais o `maxTypingFrequency`) ou se é outra coisa.
 
-### Banner do Insider no iOS — fechamento REATIVADO em 2026-09-10, aguardando run
+### Banner do Insider no iOS — MEDIDO em 2026-09-11, correção no working tree, aguardando run
+
+Run na empresa (mesma versão `581de84`): o banner abriu logo depois de favoritar e o teste morreu
+por baixo dele. Medição em Remote Access, 2 ocorrências (Account Menu e Categorias), iPhone iOS 18.0:
+
+- `Close` em `[313,273 25x25]`, centro = o "X" do print (1178px ÷ 3). `element click` **fechou** as
+  duas vezes; ≤1s depois `find` de `Close`/WebView/`InsiderTemplateWindow` → `no such element`.
+  Sem fantasma neste aparelho. Só existe contexto `NATIVE_APP`.
+- Com o banner na tela, `tab-categories` (por baixo) respondeu `displayed=true`, `hittable=true`:
+  o WDA não vê o banner como obstrução, o toque é engolido em silêncio. Enquanto o banner está
+  aberto, a `Window` principal do app fica `visible=false` (segundo discriminador possível).
+- Conclusão: o método fecha; o furo é ser chamado só no início do step — o banner que nasce
+  durante os 40s de espera da grade engole o clique no coração. Correção: chamada antes de cada
+  clique do ramo iOS + 3s/3s + evidência no log/Allure (tabela do Working tree).
+- Próximo run: com banner, esperar `🟡 ... aguardando 3s` → `👆 Clicando no "Close" em [...]` →
+  `✅ Banner fechado e confirmado fora da tela`; se falhar, o erro traz o rect e um screenshot.
+
+Registro anterior (Run #9), mantido:
+
 
 No Run #9 o 14 Pro Max favoritou, o banner INTERLÚDIO abriu em cima da listagem (frame t=159s,
 `Close` em `[332,313 24x25]`) e o `voltar()` morreu por baixo dele. O `fechaBannerIOS()` rodou

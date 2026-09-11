@@ -109,6 +109,12 @@ tela limpa. O equivalente ao `insiderLayout` é a WebView `label == "Insider Web
 `Close`, confirmação pela WebView sumir — o mesmo ciclo do Android. Nunca desligar o
 fechamento por causa de falso positivo do `Close`; corrigir a checagem.
 
+**2026-09-11 — medido com banner real (2x, Remote Access):** o `Close` é o "X" e o `element click`
+fecha; a árvore fica sem nenhum nó Insider. Mas um elemento por baixo do banner responde
+`displayed=true`/`hittable=true`, então a única checagem no início do step não basta: o
+`fechaBanner()` passou a ser chamado **antes de cada clique do ramo iOS**, com 3s antes do
+clique no `Close`, 3s depois e validação, e screenshot no Allure se não fechar. Aguardando run.
+
 ## M4 — Paridade em CI 🔄
 
 O job `run-ios-on-device-farm` **já existe** em `.github/workflows/mobile_test.yml`, com

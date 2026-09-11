@@ -1,4 +1,5 @@
 import type { ChainablePromiseElement } from 'webdriverio';
+import allure from '@wdio/allure-reporter';
 
 
 export class BasePage {
@@ -120,6 +121,24 @@ export class BasePage {
   // que a WebView sumiu -> repetir (pode haver um segundo criativo enfileirado) -> lançar se
   // ainda estiver lá depois de 3 ciclos.
   //
+  // Medido em 2026-09-11 (Remote Access, iPhone iOS 18.0, 2 ocorrências em telas diferentes):
+  // o `Close` estava em [313,273 25x25] e o centro desse rect é o "X" do print; o element
+  // click nele fechou o banner as duas vezes, e em <=1s TODOS os nós Insider sumiram da árvore
+  // (find -> "no such element"). Ou seja, o elemento e a validação pela WebView estão certos.
+  // O que também se mediu: com o banner na tela, um elemento POR BAIXO dele (tab-categories)
+  // responde displayed=true e hittable=true — o WDA não enxerga o banner como obstrução, o
+  // toque vai para a janela do Insider e é engolido em silêncio. Por isso este método é chamado
+  // imediatamente antes de cada clique do ramo iOS, e não só no início do step: um banner que
+  // nasce durante os 40s de espera da grade de produtos passaria batido pela checagem do step.
+  //
+  // Tempos (definidos pelo Marcio): 3s entre detectar o banner e clicar — o "Close" pode entrar
+  // na árvore antes de a WebView terminar de desenhar (o caso do htmlView vazio no Android) —
+  // e 3s depois do clique antes de validar que a WebView sumiu.
+  //
+  // Evidência no log a cada ciclo (rect do "Close" antes do clique, estado da WebView depois) e
+  // screenshot anexado ao Allure quando não fechar: se falhar de novo, o relatório diz sozinho
+  // se o clique saiu cedo, se saiu no lugar errado ou se o banner nem foi visto.
+  //
   // Atenção: no iOS o banner pode aparecer JÁ na tela de boas-vindas, antes de qualquer login
   // — diferente do Android, onde só foi visto depois dele.
   private async fechaBannerIOS() {
@@ -127,8 +146,13 @@ export class BasePage {
     const botaoFechar = "accessibility id:Close";
 
     for (let tentativa = 1; tentativa <= 3; tentativa++) {
-      // Sem banner na tela o método custa uma consulta e retorna: roda antes de todo step.
+      // Sem banner na tela o método custa uma consulta e retorna: roda antes de todo clique.
       if (!(await this.bannerNaTela(webview))) return;
+
+      // 3s com o banner detectado antes de tocar: garante que ele está na tela de verdade, não
+      // ainda carregando.
+      console.log(`🟡 Banner do Insider na tela — aguardando 3s antes de fechar (tentativa ${tentativa}/3)`);
+      await driver.pause(3000);
 
       const close = await $(botaoFechar);
       const apareceu = await close
@@ -141,32 +165,50 @@ export class BasePage {
         continue;
       }
 
+      console.log(`👆 Clicando no "Close" em ${await this.rectDe(botaoFechar)} (tentativa ${tentativa}/3)`);
       await close.click();
 
-      const fechou = await driver
-        .waitUntil(async () => !(await this.bannerNaTela(webview)), { timeout: 5000, interval: 500 })
-        .then(() => true)
-        .catch(() => false);
+      // 3s depois do clique para o banner sumir; só então a validação.
+      await driver.pause(3000);
 
-      if (fechou) {
-        console.log(`✅ Banner fechado (tentativa ${tentativa}/3)`);
-        await driver.pause(timewhait);
+      if (!(await this.bannerNaTela(webview))) {
+        console.log(`✅ Banner fechado e confirmado fora da tela (tentativa ${tentativa}/3)`);
         // Não retorna: pode haver um segundo criativo enfileirado atrás do primeiro.
         continue;
       }
 
-      console.log(`⚠ Clique no "Close" não fechou o banner (tentativa ${tentativa}/3)`);
+      console.log(
+        `⚠ Clique no "Close" não fechou o banner (tentativa ${tentativa}/3): ` +
+        `WebView continua displayed=true; Close agora em ${await this.rectDe(botaoFechar)}`
+      );
     }
 
     if (await this.bannerNaTela(webview)) {
-      const loc = await $(botaoFechar).getLocation().catch(() => null);
-      const size = await $(botaoFechar).getSize().catch(() => null);
+      const rect = await this.rectDe(botaoFechar);
+      try {
+        allure.addAttachment(
+          'Banner do Insider não fechou',
+          Buffer.from(await driver.takeScreenshot(), 'base64'),
+          'image/png'
+        );
+      } catch (err) {
+        console.warn('Não foi possível anexar o screenshot do banner:', err);
+      }
       throw new Error(
         'Banner do Insider não fechou após 3 tentativas de clicar em "Close" ' +
-        `(WebView "Insider WebView Content" continua displayed=true; Close em ` +
-        `${loc && size ? `[${Math.round(loc.x)},${Math.round(loc.y)} ${size.width}x${size.height}]` : '?'})`
+        `(WebView "Insider WebView Content" continua displayed=true; Close em ${rect}). ` +
+        'Screenshot anexado ao relatório.'
       );
     }
+  }
+
+  // Rect "[x,y wxh]" de um seletor, para o log — ou "?" se o nó não existir/mudar no meio.
+  private async rectDe(seletor: string): Promise<string> {
+    const loc = await $(seletor).getLocation().catch(() => null);
+    const size = await $(seletor).getSize().catch(() => null);
+    return loc && size
+      ? `[${Math.round(loc.x)},${Math.round(loc.y)} ${size.width}x${size.height}]`
+      : '?';
   }
 
   // Presença do banner pelo marcador de cada plataforma: insiderLayout no Android (o htmlView
@@ -295,6 +337,7 @@ export class BasePage {
   // nem visível, nem oculto. Confirmado por busca no XML bruto: zero ocorrências de "Toque" e
   // um único Button na árvore inteira (o "Close" do banner). Só coordenada resolve.
   async iniciaAppIOS() {
+    await this.fechaBanner();
     await this.tapProporcional(205 / 402, 780 / 874, 'CTA "Toque para começar"');
     await driver.pause(timewhait);
   }
@@ -398,6 +441,7 @@ export class BasePage {
         continue;
       }
 
+      await this.fechaBanner();
       await $(aceite).click();
 
       // O botão sair da viewport é o único sinal de que a tela trocou. Aqui havia um .catch()
@@ -449,6 +493,7 @@ export class BasePage {
 
     const back = await $("accessibility id:Back");
     if (await back.isDisplayed().catch(() => false)) {
+      await this.fechaBanner();
       await back.click();
       await driver.pause(timewhait);
       if (await this.telaMudou(antes)) {
@@ -461,6 +506,7 @@ export class BasePage {
       const cabecalho = `-ios class chain:**/XCUIElementTypeOther[\`name == "${titulo}"\`][2]`;
       const grupo = await $(cabecalho);
       if (await grupo.isDisplayed().catch(() => false)) {
+        await this.fechaBanner();
         await grupo.click();
         await driver.pause(timewhait);
         if (await this.telaMudou(antes)) {

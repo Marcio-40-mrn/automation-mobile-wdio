@@ -31,6 +31,7 @@ export class FavoritosPage extends BasePage {
         const antes = (await $(lista).getAttribute('label').catch(() => '')) ?? '';
 
         const coracao = await this.coracaoDoCardIOS(produto);
+        await this.fechaBanner();
         await coracao.click();
 
         // Antes havia `pause(timewhait)` e UMA leitura. Desfavoritar é chamada de backend (os

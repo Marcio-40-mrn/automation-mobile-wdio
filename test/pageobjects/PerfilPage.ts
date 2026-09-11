@@ -13,6 +13,7 @@ export class PerfilPage extends BasePage {
                 : "accessibility id:Favorites, Manage your interests"
         );
         await this.waitForElement(element);
+        if (process.env.PLATFORM === 'ios') await this.fechaBanner();
         await element.click();
         await driver.pause(timewhait);
     }
@@ -27,6 +28,7 @@ export class PerfilPage extends BasePage {
 
             const element = await $(seletor);
             await this.waitForElement(element);
+            await this.fechaBanner();
             await element.click();
             await driver.pause(timewhait);
             return;

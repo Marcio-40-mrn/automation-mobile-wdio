@@ -3,6 +3,23 @@
 Repositório de automação de testes mobile (WebdriverIO + Appium) do app Aramis,
 executado localmente contra o AVD-S24 e no CI via AWS Device Farm.
 
+# Regras deste projeto
+
+Este repo usa GSD. A fonte da intenção está em `.planning/`.
+Não invente requisito, fase ou decisão que não esteja lá.
+
+Antes de planejar ou editar código:
+1. Leia o estado e o mapa abaixo.
+2. Diga quais arquivos de código vai abrir.
+3. Só então proponha mudança.
+
+Se algo não estiver nos arquivos, diga "não está escrito" — não complete o buraco.
+
+@./.planning/PROJECT.md
+@./.planning/REQUIREMENTS.md
+@./.planning/STATE.md
+@./.planning/ROADMAP.md
+
 ## Memória do projeto: `.planning/`
 
 Antes de planejar qualquer coisa, leia `.planning/`. É a memória persistente do projeto, no
