@@ -1,6 +1,6 @@
 # STATE
 
-Atualizado em **2026-09-10** (noite).
+Atualizado em **2026-09-10** (noite, após o `CI iOS Run #9`).
 
 > Este arquivo foi mesclado nesta data. A cópia do `.planning/` trazida de outra pasta em
 > 2026-09-10 sobrescreveu a versão de 09-09 com a de 09-08 — os drafts e o relatório de
@@ -36,6 +36,7 @@ Não commitado (mudança de 2026-09-10, noite — "digitação perde caracteres"
 | Arquivo | O que mudou |
 |---|---|
 | `test/pageobjects/LoginPage.ts` | ramo iOS: novo `digitarIOS()` — clica no campo, espera `isKeyboardShown()` + 1s de reflow, digita com `maxTypingFrequency: 20` (setting do WDA, restaurado para 60 depois); `logarIOS()` passa a detectar o modal `Incorrect username and/or password` e falha **no passo de login**, em vez de ler "botão sumiu = logou". **Ramo Android byte a byte idêntico.** |
+| `test/pageobjects/BasePage.ts` | `fechaBannerIOS()` **volta a fechar o banner**. A versão de `a53c6b6` não clicava — decisão errada: o pedido era corrigir a checagem de presença, não desligar o fechamento, e no Run #9 isso deixou o banner INTERLÚDIO aberto sobre o `voltar()` do 14 Pro Max. Marcador de presença agora é a WebView `label == "Insider WebView Content"` com `displayed=true` (medido no Run #9: `false` nas 4 amostras de tela limpa, `true` na única com banner; o `Close` respondeu `true` nas 5). Ciclo idêntico ao Android: presença → espera `Close` → clica → confirma WebView sumiu → até 3x → lança. Ramo Android intocado. |
 | `.planning/RELATORIO-ANOMALIAS-IOS.md` | nova seção 4.4 (digitação perde caracteres; vídeo não mostra senha; senha em texto puro no `appium.log` do host) |
 | `.planning/STATE.md`, `.planning/ROADMAP.md` | este registro |
 
@@ -132,7 +133,12 @@ em Tricoline Stretch Liso Branco` só com o nome; `💔 Desfavoritar: 2 action-b
 `logout` e `confirmarLogout` exercitados pela primeira vez e passaram
 (`✅ Logout confirmado pelo estado da tela`).
 
-### Login iOS perde caracteres na digitação — CORRIGIDO em 2026-09-10, aguardando run
+### Login iOS perde caracteres na digitação — CORRIGIDO e VALIDADO no `CI iOS Run #9`
+
+Run #9 (2026-09-10, noite): `⌨ Email: N caracteres digitados com o teclado aberto` nos 5
+aparelhos, **5/5 logins**, 4/5 PASSED (13, 14, 15, 15 Pro Max). O único FAILED (14 Pro Max)
+foi o banner, abaixo. Diagnóstico original mantido a seguir para registro.
+
 
 Causa dos "email ou senha incorreto" do Run #7 (`marciorocha`, "em observação") e do Run #8
 (iPhones 13, 14 e 15 Pro Max). **Medido nos artefatos, não deduzido** — detalhe completo na
@@ -157,11 +163,19 @@ do vídeo com os 5 emails íntegros; nenhum `Login efetivado` seguido de `tab-ca
 aparecer o novo erro `o app recusou as credenciais`, o frame diz se ainda falta letra (baixar
 mais o `maxTypingFrequency`) ou se é outra coisa.
 
-### `abrirFavoritos()` não abriu a lista no iPhone 14 Pro Max — NÃO investigado
+### Banner do Insider no iOS — fechamento REATIVADO em 2026-09-10, aguardando run
 
-`Favoritos: a lista "flatlist-favorites" nao apareceu em 30s` depois de logar e favoritar
-normalmente. Único aparelho com esse sintoma no Run #8; log e vídeo estão nos artefatos do run
-(`CI iOS Run #8 - Apple iPhone 14 Pro Max`). Investigar antes de tratar como flaky.
+No Run #9 o 14 Pro Max favoritou, o banner INTERLÚDIO abriu em cima da listagem (frame t=159s,
+`Close` em `[332,313 24x25]`) e o `voltar()` morreu por baixo dele. O `fechaBannerIOS()` rodou
+antes do passo e **viu** o banner — mas não clicou, pela decisão de `a53c6b6`. Essa decisão
+foi errada e está revertida: o marcador de presença certo (WebView `Insider WebView Content`
+displayed=true) saiu do próprio diagnóstico do Run #9 e agora o ciclo de fechar é o mesmo do
+Android. No próximo run conferir `✅ Banner fechado (tentativa 1/3)` quando o banner aparecer e
+**nenhum** fechamento com a tela limpa.
+
+O `abrirFavoritos()` do 14 Pro Max no Run #8 (`flatlist-favorites` não apareceu) provavelmente
+era o mesmo banner num passo diferente; não há diag naquele run para provar. Reavaliar se
+reaparecer com o fechamento ativo.
 
 ### Sessões de Remote Access: o que não fazer
 

@@ -53,11 +53,11 @@ Passos:
    arquivos, `tsc --noEmit` limpo. **Escrito a partir dos drafts, ainda não exercitado
    contra device**: o que valida é o passo 5.
 5. 🔄 A suíte roda no iOS ponta a ponta. **Passou pela primeira vez** no `CI iOS Run #8`
-   (2026-09-10), no iPhone 15 — os 17 steps, de `ativarApp` a `confirmarLogout`. Os outros
-   quatro aparelhos falharam por duas causas medidas nos artefatos: três por **caractere
-   perdido na digitação do login** (corrigido em `LoginPage.ts`, aguardando run) e um em
-   `abrirFavoritos()` (14 Pro Max, não investigado). Detalhes no `STATE.md`. O passo fecha
-   quando os 5 aparelhos passarem no mesmo run.
+   (2026-09-10), no iPhone 15 — os 17 steps, de `ativarApp` a `confirmarLogout`. No `CI iOS Run #9`,
+   **4/5** — o login (caractere perdido na digitação) está corrigido e validado; o 14 Pro Max
+   caiu porque o banner do Insider não era fechado no iOS (fechamento reativado com o marcador
+   de presença certo, aguardando run). Detalhes no `STATE.md`. O passo fecha quando os 5
+   aparelhos passarem no mesmo run.
 
 O bloqueio original deste marco — 19 dos 31 seletores eram Android-only e os 12
 `accessibility id:` não podiam ser presumidos — **está resolvido**: o valor iOS de cada um
@@ -101,11 +101,13 @@ draft `34`. `driver.back()` e o gesto de borda foram testados e **não** funcion
 
 ### Sobre o banner do Insider no iOS
 
-O `Close` do criativo é `accessibility id:Close` nas duas plataformas. O que **não** existe
-no iOS é o equivalente ao `insiderLayout` como marcador de presença: o candidato observado
-(`InsiderTemplateWindow`) apareceu uma única vez em 8 sessões, na tela de boas-vindas, e
-nunca mais. Registrar como "observado uma vez, não observado depois" — não como ausência
-confirmada, e não escrever page object que assuma que o banner não volta.
+O `Close` do criativo é `accessibility id:Close` nas duas plataformas — mas no iOS ele **não
+serve como marcador de presença**: o nó sobrevive na árvore e responde `displayed=true` com a
+tela limpa. O equivalente ao `insiderLayout` é a WebView `label == "Insider WebView Content"`
+(e a Window `Inapp Window`): `displayed=true` só com o criativo visível. Medido no
+`CI iOS Run #9` nos dois estados, no mesmo aparelho. Regra: presença pela WebView, clique no
+`Close`, confirmação pela WebView sumir — o mesmo ciclo do Android. Nunca desligar o
+fechamento por causa de falso positivo do `Close`; corrigir a checagem.
 
 ## M4 — Paridade em CI 🔄
 
