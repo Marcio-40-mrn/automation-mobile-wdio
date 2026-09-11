@@ -1,6 +1,6 @@
 # STATE
 
-Atualizado em **2026-09-11** (após a medição do banner em Remote Access).
+Atualizado em **2026-09-11** (tarde — diagnóstico do `CI Run #13` e correção dos 4 pontos).
 
 > Este arquivo foi mesclado nesta data. A cópia do `.planning/` trazida de outra pasta em
 > 2026-09-10 sobrescreveu a versão de 09-09 com a de 09-08 — os drafts e o relatório de
@@ -12,6 +12,9 @@ Atualizado em **2026-09-11** (após a medição do banner em Remote Access).
 
 **Android: verde.** `CI Run #6` (2026-09-09) fechou **18/18 PASSED** no pool de 6 devices.
 É a referência, e o desenho do Android não deve ser alterado.
+**Quebrou no `CI Run #13` (2026-09-11 14:18): 16/18**, por um banner novo do Insider que nasce
+depois de desfavoritar — sem mudança de código Android. Correção nos 4 pontos no working tree
+(pendência "CI Run #13").
 
 **Marco atual: M3, passo 5** — a mesma suíte rodando no iOS. **Primeiro iOS verde:** no
 `CI iOS Run #8` (2026-09-10 18:31, 5 runs de 1 device) o **iPhone 15 passou ponta a ponta**
@@ -26,17 +29,24 @@ plataforma mora dentro do método — como o `ativarApp()` de `HomePage.ts` já 
 
 ## Working tree
 
-Branch `test`, HEAD em **`581de84`** (1 commit à frente de `main` = `9c14b0a`). O `digitarIOS()`
-está em `9c14b0a` e o `fechaBannerIOS()` que clica em `581de84` — ambos commitados. Os drafts,
-o `RELATORIO-ANOMALIAS-IOS.md` e o plano de 09-08 continuam fora do git por `.gitignore`.
+Branch `main`, HEAD em **`d2e770b`**. O banner iOS "antes de cada clique" (`79ac648`) e o registro
+(`d2e770b`) estão commitados e mergeados (PR #1). Os drafts, o `RELATORIO-ANOMALIAS-IOS.md` e os
+planos continuam fora do git por `.gitignore`.
 
-Não commitado (2026-09-11 — banner do Insider no iOS, 4ª tentativa; Android intocado):
+Não commitado (2026-09-11, tarde — correção dos 4 pontos do `CI Run #13`; ver a pendência
+"CI Run #13" abaixo para o diagnóstico):
 
 | Arquivo | O que mudou |
 |---|---|
-| `test/pageobjects/BasePage.ts` | `fechaBannerIOS()`: **3s** entre detectar a WebView e clicar no `Close` (antes clicava na hora); **3s** depois do clique e então valida que a WebView sumiu (antes poll de 5s); log com o rect do `Close` antes do clique e o estado depois; **screenshot anexado ao Allure** quando não fechar. Helper privado `rectDe()` para o rect no log. Chamada de `fechaBanner()` antes do tap das boas-vindas, do aceite do onboarding e dos dois cliques do `voltarIOS`. |
-| `HomePage.ts`, `LoginPage.ts`, `CategoriasPage.ts`, `PerfilPage.ts`, `FavoritosPage.ts` | `await this.fechaBanner();` **imediatamente antes de cada clique do ramo iOS** (15 pontos no total, incluindo o coração em `favoritarPrimeiroProdutoIOS`). Hoje só o `step()` do spec chamava, uma vez por passo. |
+| `test/pageobjects/FavoritosPage.ts` | **(1)** `tirarSelecaoItem()` Android: `fechaBanner()` antes do clique e **poll de 30s até o produto sumir** da lista (antes era clique + `pause(3000)` sem asserção). Nas duas plataformas, `aguardarTelaEstavel()` ao final (a lista recarrega skeleton → vazia por ~6s). **(3)** `validaElememnto()` (Android e iOS): se o produto não está e a tela mostra `You don't have any favorite products yet!`, erro nomeado **"conta suja"** — o toque na listagem desfavoritou um item que já estava lá. Android passou de `expect` (3s) para `waitForDisplayed` 30s. |
+| `test/pageobjects/CategoriasPage.ts` | **(2)** `voltar()` Android: `aguardarTelaEstavel()` → `fechaBanner()` **imediatamente antes** do clique → clique → **espera a tab bar** (`Categorias`/`Menu`/`Perfil`, 15s) → 2 taps antes de falhar com erro explícito. **(3)** Guarda em `favoritarPrimeiroProdutoIOS`: mede o `action-button-icon` do coração; largura < 26 (preenchido = 20x21, contorno = 32x33, draft 15) → erro "conta suja" **antes** de tocar. |
+| `test/pageobjects/BasePage.ts` | **(2)** `voltarIOS()`: critério de sucesso passou de "árvore mudou" (`telaMudou`, removido) para **`tab-menu` visível** (15s); `aguardarTelaEstavel()` antes; cada caminho (Back, chevron) tenta 2 taps. Novo `aguardarTelaEstavel(timeout=15s)`: duas leituras iguais de `getPageSource` com 1s de intervalo; se não estabilizar só loga. |
+| `test/specs/test.spec.ts` | **(4)** `tirarSelecaoItem(produtoFavoritado)` (passa o nome); flag `desfavoritado`; `try/catch` em volta dos steps: se falhou com produto favoritado e não desfavoritado, `limparFavoritoOrfao()` — `mobile: terminateApp` + `activateApp`, `abrirPerfil` → `abrirFavoritos` → `tirarSelecaoItem(produto)`, tudo melhor-esforço; se não conseguir, anexo `Favorito órfão na conta` no Allure com conta + produto. O erro original é sempre relançado. |
 | `.planning/STATE.md`, `.planning/ROADMAP.md` | este registro |
+
+`tsc --noEmit` limpo nesses 4 arquivos (os 73 erros de `test/Draft.ts` já existiam). **Não
+exercitado contra device** — o que valida é o próximo run. Não testado: se `mobile: activateApp`
+devolve o app na Home logado no iOS (no Android, sessão `noReset`, é o esperado).
 
 ## O levantamento iOS (2026-09-04)
 
@@ -192,6 +202,38 @@ Android. No próximo run conferir `✅ Banner fechado (tentativa 1/3)` quando o 
 O `abrirFavoritos()` do 14 Pro Max no Run #8 (`flatlist-favorites` não apareceu) provavelmente
 era o mesmo banner num passo diferente; não há diag naquele run para provar. Reavaliar se
 reaparecer com o fechamento ativo.
+
+### CI Run #13 (2026-09-11 14:18) — 2 Android + 2 iOS, três causas, correção no working tree
+
+Medido em log (`Test spec output`) + vídeo, frame a frame, dos 4 jobs. **O código Android não
+tinha mudado desde o Run #6** (diff `56810d6..d2e770b` só toca ramos iOS).
+
+- **Banner NOVO do Insider: "Só no APP: 20% OFF pra você! Raspe aqui e descubra"** (raspadinha,
+  fundo azul). Dispara ~2,5–3s **depois da interação com o coração** (favoritar ou desfavoritar),
+  nas duas plataformas. Run #12 (13:02) foi 18/18 no Android; Run #13 (14:18) já pegou —
+  campanha ativada nessa janela. Não é o INTERLÚDIO.
+- **S23 Ultra / S24 Ultra** — `Nenhum dos seletores apareceu em 20000ms: Menu | Perfil` no 3º
+  `abrirPerfil`. Desfavoritar → lista vazia → banner nasce → o `elementClick` da seta Voltar cai
+  em cima dele (no S23 Ultra o click levou 1,07s; normal 0,1s) e **fecha o banner em vez de
+  voltar**. O banner dura ~1,5s; o `fechaBanner()` do step rodou 0,1s antes de ele renderizar e
+  o `insiderLayout` seguinte já não existia. App preso em Favoritos (sem tab bar). No S23+ o
+  mesmo banner apareceu e o clique ganhou a corrida: `✅ Banner fechado (tentativa 1/3)`.
+- **iPhone 15 Pro Max** — `tab-menu still not displayed` no 3º `abrirPerfil`. **Sem banner**
+  (brilho do vídeo constante). O tap no `Back` saiu com Favoritos recarregando (skeleton →
+  vazia), o WDA levou **6,7s** para entregar, o tap se perdeu; `telaMudou()` devolveu `true`
+  porque o estado vazio acabou de renderizar (diff dos dois `getPageSource`: "Favorites Back
+  Toolbar" → "You don't have any favorite products yet!"). Falso positivo de "voltou".
+- **iPhone 13** — `flatlist-favorites não apareceu`. Aos 205s do vídeo, com a listagem recém
+  aberta, o coração da 1ª camisa **já estava vermelho**: a conta `informatica.mrn+qa100@gmail.com`
+  tinha o item de um run anterior (Run #12, iPhone 13, morreu no `voltar()` da listagem logo
+  após favoritar). O toque **desfavoritou**, Favoritos abriu vazio, e a lista vazia não tem
+  `flatlist-favorites`. **Efeito em cadeia entre runs.** Desfavoritar manualmente nessa conta
+  antes do próximo run.
+
+Próximo run, conferir: Android `💔 "<produto>" removido de Favoritos` e `↩ voltar: seta`;
+iOS `↩ voltar: accessibility id:Back`; `🤍 Coração de "<produto>" sem preenchimento (icone 32x33)`;
+nenhum `Conta suja`. Se um teste falhar entre favoritar e desfavoritar, procurar `🧹` no log e
+o anexo `Favorito órfão na conta` no Allure.
 
 ### Sessões de Remote Access: o que não fazer
 

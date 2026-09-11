@@ -488,38 +488,37 @@ export class BasePage {
   // NÃO trocar a class chain por um predicate de geometria: o WDA 2.11.5 não aceita `x`, `y`
   // nem `accessible` em `-ios predicate string` — quatro variações testadas com o nó presente
   // na árvore, todas devolveram "no such element".
+  //
+  // O critério de sucesso é a TAB BAR aparecer, não "a árvore mudou". No CI iOS Run #13
+  // (iPhone 15 Pro Max) o tap no Back saiu durante o re-render de Favoritos depois de
+  // desfavoritar (skeleton -> lista vazia), não navegou, e o diff de getPageSource devolveu
+  // "mudou" porque o estado vazio acabou de renderizar — o método declarou sucesso numa tela
+  // que não tinha saído do lugar, e o abrirPerfil seguinte morreu com "tab-menu still not
+  // displayed". As duas telas de onde o spec volta (listagem e Favoritos) não têm tab bar, e as
+  // duas para onde ele volta (Categorias e Account Menu) têm: `tab-menu` presente = saiu.
+  //
+  // Antes de tocar, a tela precisa estar parada (aguardarTelaEstavel): no mesmo run o WDA levou
+  // 6,7s para entregar o tap porque a lista ainda animava. E como o primeiro tap pode se perder
+  // (mesmo padrão do "Sign in", draft 09), cada caminho tenta duas vezes antes de passar ao
+  // próximo.
   async voltarIOS(titulo?: string) {
-    const antes = await driver.getPageSource();
+    await this.aguardarTelaEstavel();
 
-    const back = await $("accessibility id:Back");
-    if (await back.isDisplayed().catch(() => false)) {
-      await this.fechaBanner();
-      await back.click();
-      await driver.pause(timewhait);
-      if (await this.telaMudou(antes)) {
-        console.log('↩ voltar: accessibility id:Back');
-        return;
-      }
+    const back = "accessibility id:Back";
+    if (await $(back).isDisplayed().catch(() => false)) {
+      if (await this.tentarVoltarIOS(back, 'accessibility id:Back')) return;
     }
 
     if (titulo) {
       const cabecalho = `-ios class chain:**/XCUIElementTypeOther[\`name == "${titulo}"\`][2]`;
-      const grupo = await $(cabecalho);
-      if (await grupo.isDisplayed().catch(() => false)) {
-        await this.fechaBanner();
-        await grupo.click();
-        await driver.pause(timewhait);
-        if (await this.telaMudou(antes)) {
-          console.log(`↩ voltar: chevron do cabeçalho ("${titulo}")`);
-          return;
-        }
+      if (await $(cabecalho).isDisplayed().catch(() => false)) {
+        if (await this.tentarVoltarIOS(cabecalho, `chevron do cabeçalho ("${titulo}")`)) return;
       }
     }
 
     try {
       await driver.back();
-      await driver.pause(timewhait);
-      if (await this.telaMudou(antes)) {
+      if (await this.chegouNaTabBarIOS()) {
         console.log('↩ voltar: driver.back()');
         return;
       }
@@ -528,21 +527,57 @@ export class BasePage {
     }
 
     await swipeBordaEsquerda();
-    await driver.pause(timewhait);
-    if (await this.telaMudou(antes)) {
+    if (await this.chegouNaTabBarIOS()) {
       console.log('↩ voltar: swipe da borda esquerda');
       return;
     }
 
     throw new Error(
-      `voltar() no iOS: nenhum caminho mudou a tela (titulo="${titulo ?? '—'}"). ` +
+      `voltar() no iOS: nenhum caminho levou a uma tela com tab bar (titulo="${titulo ?? '—'}"). ` +
       'Esta tela precisa de captura nova pelo mobile-ui-inspector — não insistir por tentativa e erro.'
     );
   }
 
-  private async telaMudou(antes: string): Promise<boolean> {
-    const depois = await driver.getPageSource();
-    return depois !== antes;
+  // Dois taps no mesmo alvo, cada um precedido da checagem do banner e seguido da espera pela
+  // tab bar. Devolve false se nenhum dos dois levou à tab bar.
+  private async tentarVoltarIOS(seletor: string, rotulo: string): Promise<boolean> {
+    for (let tentativa = 1; tentativa <= 2; tentativa++) {
+      const alvo = await $(seletor);
+      if (!(await alvo.isDisplayed().catch(() => false))) return false;
+      await this.fechaBanner();
+      await alvo.click();
+      if (await this.chegouNaTabBarIOS()) {
+        console.log(`↩ voltar: ${rotulo}${tentativa > 1 ? ` (tap ${tentativa}/2)` : ''}`);
+        return true;
+      }
+      console.log(`⚠ voltar: tap ${tentativa}/2 em ${rotulo} não levou à tab bar`);
+    }
+    return false;
+  }
+
+  private async chegouNaTabBarIOS(): Promise<boolean> {
+    const chegou = await $("accessibility id:tab-menu")
+      .waitForDisplayed({ timeout: 15000 })
+      .then(() => true)
+      .catch(() => false);
+    if (chegou) await driver.pause(timewhait);
+    return chegou;
+  }
+
+  // Espera a árvore parar de mudar: duas leituras iguais de getPageSource com 1s de intervalo.
+  // Serve para não tocar numa tela que ainda está recarregando (skeleton -> conteúdo), que é
+  // onde o tap se perde. Independe de plataforma e de texto. Se não estabilizar em `timeout`,
+  // só registra e segue — quem decide se a ação funcionou é a validação do passo.
+  async aguardarTelaEstavel(timeout = 15000) {
+    const inicio = Date.now();
+    let anterior = await driver.getPageSource();
+    while (Date.now() - inicio < timeout) {
+      await driver.pause(1000);
+      const atual = await driver.getPageSource();
+      if (atual === anterior) return;
+      anterior = atual;
+    }
+    console.log(`⚠ Tela ainda mudando após ${timeout}ms de espera — seguindo mesmo assim`);
   }
 
   async debugContextAndSource() {

@@ -197,6 +197,25 @@ export class CategoriasPage extends BasePage {
             );
         }
 
+        // Guarda de conta suja. O coração é um TOGGLE: se o item já estiver favoritado (resto de
+        // um run anterior que morreu entre favoritar e desfavoritar — CI iOS Run #12 -> #13,
+        // iPhone 13), o toque DESfavorita, Favoritos abre vazio e o erro aparece dois passos
+        // adiante como "flatlist-favorites não apareceu". O único sinal na árvore iOS é o
+        // action-button-icon: 32x33 com contorno, 20x21 preenchido (draft 15, diff byte a byte).
+        // Não é atributo de estado, é efeito da renderização — por isso o erro traz a medida,
+        // para que uma mudança de ícone no app seja reconhecida como tal e não como conta suja.
+        const icone = await coracao.$('-ios predicate string:name == "action-button-icon"');
+        const tamanhoIcone = await icone.getSize().catch(() => null);
+        if (tamanhoIcone && tamanhoIcone.width < 26) {
+            throw new Error(
+                `Conta suja: o coração de "${nome}" já está preenchido antes do toque ` +
+                `(action-button-icon ${tamanhoIcone.width}x${tamanhoIcone.height}; contorno mede 32x33, ` +
+                'preenchido 20x21 — draft 15). Um run anterior deixou o favorito na conta; tocar agora ' +
+                'DESfavoritaria. Desfavoritar manualmente nesta conta antes de rodar de novo.'
+            );
+        }
+        console.log(`🤍 Coração de "${nome}" sem preenchimento (icone ${tamanhoIcone ? `${tamanhoIcone.width}x${tamanhoIcone.height}` : 'não medido'})`);
+
         await this.fechaBanner();
         await coracao.click();
         await driver.pause(timewhait);
@@ -239,14 +258,56 @@ export class CategoriasPage extends BasePage {
     // na árvore aqui. Era assim que o passo morria com `titulo="—"` depois de favoritar.
     // Saindo de Favoritos (a outra chamada do spec) o título é ignorado na prática: aquela tela
     // tem `accessibility id:Back`, que é o primeiro caminho da cascata e retorna antes.
+    //
+    // Android — CI Run #13 (S23 Ultra e S24 Ultra), medido em log + vídeo: depois de
+    // desfavoritar, a lista de Favoritos recarrega (skeleton -> vazia) e o banner do Insider
+    // "Só no APP: 20% OFF" nasce ~2,5s depois, dura ~1,5s e some. O fechaBanner() do step rodou
+    // 0,1s ANTES de ele renderizar, e o clique na seta caiu em cima do banner: fechou o banner
+    // em vez de voltar, o app ficou em Favoritos (sem tab bar) e o abrirPerfil seguinte estourou
+    // com "Nenhum dos seletores apareceu". No S23+ o mesmo banner apareceu e o clique ganhou a
+    // corrida por 1s. Daí: esperar a tela parar, checar o banner imediatamente antes do clique
+    // e confirmar que a tab bar apareceu — as duas telas de destino (Categorias e Account Menu)
+    // têm tab bar, as duas de origem (listagem e Favoritos) não. Dois taps antes de desistir.
     async voltar() {
         if (process.env.PLATFORM === 'ios') return this.voltarIOS(this.tituloListagem);
 
-        const element = await $("-android uiautomator:new UiSelector().className(\"com.horcrux.svg.PathView\").instance(0)");
+        await this.aguardarTelaEstavel();
+
+        const seta = "-android uiautomator:new UiSelector().className(\"com.horcrux.svg.PathView\").instance(0)";
+        const element = await $(seta);
         await this.waitForElement(element);
         await element.scrollIntoView();
-        await element.click();
-        await driver.pause(timewhait);
+
+        for (let tentativa = 1; tentativa <= 2; tentativa++) {
+            await this.fechaBanner();
+            await $(seta).click();
+            if (await this.chegouNaTabBar()) {
+                console.log(`↩ voltar: seta (PathView 0)${tentativa > 1 ? ` (tap ${tentativa}/2)` : ''}`);
+                await driver.pause(timewhait);
+                return;
+            }
+            console.log(`⚠ voltar: tap ${tentativa}/2 na seta não levou à tab bar`);
+        }
+
+        throw new Error(
+            'voltar() no Android: dois toques na seta (PathView instance 0) e a tab bar ' +
+            '(Categorias/Menu/Perfil) não apareceu em 15s — o app não saiu da tela. Conferir no ' +
+            'vídeo se um banner do Insider engoliu o toque ou se a seta mudou de posição na árvore.'
+        );
+    }
+
+    // Tab bar do Android: "Categorias" existe em todas as versões; "Menu"/"Perfil" variam
+    // (ver SELETORES_PERFIL em HomePage). Basta um deles aparecer.
+    private async chegouNaTabBar(): Promise<boolean> {
+        const abas = ["accessibility id:Categorias", "accessibility id:Menu", "accessibility id:Perfil"];
+        const limite = Date.now() + 15000;
+        do {
+            for (const aba of abas) {
+                if (await $(aba).isDisplayed().catch(() => false)) return true;
+            }
+            await driver.pause(500);
+        } while (Date.now() < limite);
+        return false;
     }
 
 }

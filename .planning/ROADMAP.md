@@ -56,7 +56,11 @@ Passos:
    (2026-09-10), no iPhone 15 — os 17 steps, de `ativarApp` a `confirmarLogout`. No `CI iOS Run #9`,
    **4/5** — o login (caractere perdido na digitação) está corrigido e validado; o 14 Pro Max
    caiu porque o banner do Insider não era fechado no iOS (fechamento reativado com o marcador
-   de presença certo, aguardando run). Detalhes no `STATE.md`. O passo fecha quando os 5
+   de presença certo, aguardando run). Detalhes no `STATE.md`. `CI iOS Run #12`: 4/5; `CI iOS Run #13`: 3/5 (iPhone 13 por conta suja
+   herdada do #12, 15 Pro Max por tap perdido no `Back` + falso positivo do `telaMudou`) e o
+   **Android caiu para 16/18** pelo banner novo "Só no APP: 20% OFF" — correção dos 4 pontos
+   (validar desfavoritar, `voltar()` por tab bar, guarda de conta suja, limpeza em falha) no
+   working tree, aguardando run. O passo fecha quando os 5
    aparelhos passarem no mesmo run.
 
 O bloqueio original deste marco — 19 dos 31 seletores eram Android-only e os 12

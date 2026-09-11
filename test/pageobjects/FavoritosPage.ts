@@ -1,4 +1,4 @@
-import { BasePage, timewhait } from "./BasePage";
+import { BasePage } from "./BasePage";
 import { driver, $ } from '@wdio/globals'
 
 
@@ -7,13 +7,49 @@ export class FavoritosPage extends BasePage {
     // O parâmetro é opcional para o test.spec.ts continuar chamando sem argumento, como hoje.
     // Passando o nome do produto, o iOS escopa o toque no card certo em vez de confiar na
     // ordem da lista — vale a pena quando o cenário favorita algo que pode não ser o primeiro.
+    //
+    // Android: até o CI Run #13 este método era clique + pause(3000), sem conferir nada. Um
+    // toque que caísse na sacola ou num banner passava verde e o favorito ficava na conta —
+    // e o run seguinte daquele device herdava (o coração é toggle; ver a guarda em
+    // CategoriasPage.favoritarPrimeiroProdutoIOS). Agora vale o mesmo critério do iOS: o
+    // produto tem que SUMIR da lista, com poll de 30s porque desfavoritar é chamada de backend.
+    // Com o nome do produto o critério é exato; sem ele, sobra a ausência do card (PathView do
+    // coração) — mais fraco, e por isso o spec passa o nome.
     async tirarSelecaoItem(produto?: string) {
         if (process.env.PLATFORM === 'ios') return this.tirarSelecaoItemIOS(produto);
 
-        const element = await $("-android uiautomator:new UiSelector().className(\"com.horcrux.svg.PathView\").instance(2)");
-        await this.waitForElement(element);
-        await element.click();
-        await driver.pause(timewhait);
+        const coracao = "-android uiautomator:new UiSelector().className(\"com.horcrux.svg.PathView\").instance(2)";
+        const item = produto
+            ? `-android uiautomator:new UiSelector().text("${produto}")`
+            : coracao;
+
+        await this.waitForElement(await $(coracao));
+        if (produto) await this.waitForElement(await $(item));
+
+        await this.fechaBanner();
+        await $(coracao).click();
+
+        const sumiu = await driver
+            .waitUntil(async () => !(await $(item).isDisplayed().catch(() => false)), {
+                timeout: 30000,
+                interval: 500,
+            })
+            .then(() => true)
+            .catch(() => false);
+
+        if (!sumiu) {
+            throw new Error(
+                `Desfavoritar no Android: ${produto ? `"${produto}"` : 'o card'} continua na lista de ` +
+                'Favoritos 30s depois do toque no coração (PathView instance 2). O toque não removeu ' +
+                'nada — conferir no vídeo se caiu na sacola, num banner do Insider, ou se a ordem dos ' +
+                'PathView mudou. O favorito FICOU na conta deste device.'
+            );
+        }
+        console.log(`💔 ${produto ? `"${produto}"` : 'Item'} removido de Favoritos`);
+
+        // A lista recarrega depois da remoção (skeleton -> vazia, ~6s medidos no Run #13). Sair
+        // daqui com a tela ainda animando é o que fazia o voltar() seguinte perder o toque.
+        await this.aguardarTelaEstavel();
     }
 
     // Desfavoritar no iOS tem duas armadilhas:
@@ -60,6 +96,11 @@ export class FavoritosPage extends BasePage {
                 'action-button foi escolhido (o coração é o de MAIOR x dentro do card).'
             );
         }
+        console.log(`💔 ${produto ? `"${produto}"` : 'Item'} removido de Favoritos`);
+
+        // O label muda ainda no skeleton; a lista vazia só termina de renderizar ~3-4s depois
+        // (Run #13, dois iPhones). Voltar com a tela animando perdia o tap no Back.
+        await this.aguardarTelaEstavel();
     }
 
     // Devolve o coração do card, escolhido por POSIÇÃO.
@@ -138,11 +179,47 @@ export class FavoritosPage extends BasePage {
         return dentro[0].el;
     }
 
+    // Texto do estado vazio de Favoritos, igual nas duas plataformas (medido no CI Run #13:
+    // S23/S24 Ultra, iPhone 13 e 15 Pro Max — o app roda em inglês nos devices do Device Farm).
+    // É o discriminador entre "o produto não está na lista" e "a lista está VAZIA": o segundo
+    // caso, logo depois de favoritar, significa que o toque na listagem DESfavoritou um item
+    // que já estava lá (conta suja de um run anterior). No Android a árvore não expõe o estado
+    // do coração, então esta é a primeira chance de nomear o problema.
+    private static readonly TEXTO_LISTA_VAZIA = "You don't have any favorite products yet!";
+
+    private mensagemListaVazia(produto: string): string {
+        return (
+            `Favoritos está VAZIO logo depois de favoritar "${produto}" ("${FavoritosPage.TEXTO_LISTA_VAZIA}"). ` +
+            'O coração é um toggle: se a conta deste device já tinha o item favoritado por um run ' +
+            'anterior que morreu antes de desfavoritar, o toque na listagem o REMOVEU. Conferir no ' +
+            'vídeo se o coração já estava preenchido ao abrir a listagem e desfavoritar manualmente ' +
+            'nesta conta antes de rodar de novo.'
+        );
+    }
+
     async validaElememnto(texto: string) {
         if (process.env.PLATFORM === 'ios') return this.validaElementoIOS(texto);
 
         const element = await $(`-android uiautomator:new UiSelector().text("${texto}")`);
-        await this.elementVisible(element);
+        const achou = await element
+            .waitForDisplayed({ timeout: 30000 })
+            .then(() => true)
+            .catch(() => false);
+        if (achou) {
+            console.log(`✅ "${texto}" encontrado nos Favoritos`);
+            return;
+        }
+
+        const vazia = await $(`-android uiautomator:new UiSelector().text("${FavoritosPage.TEXTO_LISTA_VAZIA}")`)
+            .isDisplayed()
+            .catch(() => false);
+        if (vazia) throw new Error(this.mensagemListaVazia(texto));
+
+        throw new Error(
+            `Favoritos: "${texto}" não apareceu na lista em 30s e a tela não está no estado vazio. ` +
+            'Ou a tela de Favoritos não abriu (suspeitar do abrirFavoritos), ou o nome capturado na ' +
+            'listagem não bate com o exibido aqui.'
+        );
     }
 
     // A versao anterior fazia expect($('-ios predicate string:name BEGINSWITH <produto>'))
@@ -169,10 +246,20 @@ export class FavoritosPage extends BasePage {
             .catch(() => false);
 
         if (!abriu) {
+            // A lista vazia NÃO tem flatlist-favorites (CI iOS Run #13, iPhone 13): sem esta
+            // checagem o erro culpava o abrirFavoritos por uma tela que abriu, só que vazia.
+            // O nó é um StaticText com name igual ao texto (page source do Run #13); label cobre
+            // o caso de o name vir agregado.
+            const t = FavoritosPage.TEXTO_LISTA_VAZIA;
+            const vazia = await $(`-ios predicate string:name == "${t}" OR label == "${t}"`)
+                .isDisplayed()
+                .catch(() => false);
+            if (vazia) throw new Error(this.mensagemListaVazia(produto));
+
             throw new Error(
-                'Favoritos: a lista "flatlist-favorites" nao apareceu em 30s — a tela de ' +
-                'Favoritos nao chegou a abrir. Suspeitar do passo anterior (abrirFavoritos), ' +
-                'nao da assercao.'
+                'Favoritos: a lista "flatlist-favorites" nao apareceu em 30s e a tela nao esta no ' +
+                'estado vazio — a tela de Favoritos nao chegou a abrir. Suspeitar do passo anterior ' +
+                '(abrirFavoritos), nao da assercao.'
             );
         }
 
