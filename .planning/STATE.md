@@ -130,13 +130,45 @@ Cobertura: fluxo do M1 inteiro **e** o fluxo de compra do `test/Draft.ts` até o
 
 ## Pendências abertas
 
-### Levantamento do app migrado (M5) — aguardando build e sessão
+### Levantamento do app migrado (M5) — 1ª leva iOS feita em 2026-09-11, INCOMPLETA
 
-Decidido em 2026-09-11. Aguardando o Marcio: app novo instalado no iOS e sessão de Remote
-Access aberta. Quando ele avisar, passar para o `mobile-ui-inspector` com os mesmos passos
-do levantamento de 2026-09-04, capturando só os módulos que ele indicar como funcionais.
-Drafts em `.planning/drafts/app-migrado/<plataforma>/`. Identificador do app, origem do
-build e repositório de destino **não estão escritos** — registrar aqui quando chegarem.
+**Capturado:** 37 pares print + árvore (`00`–`36`) em
+`.planning/drafts/app-migrado/ios/captures-2026-09-11/`, com `NOTAS.md` (tabela por captura:
+ação, seletor, achados). **Ainda sem draft** — o `mobile-draft-writer` não rodou; o Marcio vai
+ler as capturas primeiro e conferir com o que ele sabe que funciona. Scripts de captura ao lado:
+`capture.mjs` (print + árvore, reutiliza a sessão) e `act.mjs` (comando avulso na sessão) —
+rodar num diretório com `.env` e `node_modules` (junction para o do repo).
+
+Ambiente: 3 sessões de Remote Access, iPhone iOS 18.0, janela `393x852`pt (print 1178x2556,
+escala 3), **mesmo `bundleId` `com.aramis.ecomm`**, versão **1.20.0 build 314** (o antigo era
+1.14.2/305), instalação limpa. Sessões caíram 2x por `Invalid pre-signed URL`.
+
+O que a leva cobriu, **tudo deslogado**: notificações (alerta) → boas-vindas → onboarding →
+política → termos → Home → Perfil → Login → Categorias → Roupas expandido → Camisas (listagem)
+→ tentativa de favoritar.
+
+**Bloqueio: login recusado com credenciais corretas.** `CLIENT_USER`/`CLIENT_PASSWORD` do
+`.env`, digitados à mão pelo Marcio e conferidos no print com a senha visível (`19-retomada`),
+2 taps em "Sign in" (`20`, `22`) → modal "Incorrect username and/or password". Não é digitação;
+é o backend deste build recusando a conta. **Perguntas em aberto para o Marcio:** essa conta
+deveria funcionar aqui? o app migrado aponta para outro ambiente/base? há outra conta?
+
+**Achados novos em relação ao app antigo** (detalhe em `NOTAS.md`):
+- Alerta nativo de **App Tracking Transparency** no onboarding, antes do de localização.
+- Modais RN ("Incorrect username…", "Atenção — Você precisa fazer login para adicionar
+  produtos aos favoritos") são um nó único sem filhos: `mobile: alert` falha, só coordenada.
+- `tab-bag` com label "Mochila" (era "My Bag"); bloco "DEV / Painel de controle" oculto no
+  Account Menu; `accept-button` ("Continue") fixo desde a 1ª tela do carrossel.
+- **Categorias com estrutura nova**: carrossel de campanhas + lista com chevron; "Roupas"
+  mantém `sub-categories-button`.
+- **Listagem Camisas já hidratada na 1ª captura** (151 produtos) — no antigo levava 20s+.
+- Home sem banner do Insider nas 2 capturas.
+
+**Não resolvido / pendente para a próxima sessão:** abrir a **PDP** pelo card (2 taps por
+coordenada não navegaram; `name ==` deu 0 matches, provável ` ` no preço; `CONTAINS`
+achou 17 nós e a sessão caiu antes do clique) → sacola/Mochila → checkout deslogado → Menu
+item a item → Busca. Depois do login resolvido: Perfil logado, favoritar/desfavoritar,
+Favoritos, checkout, logout. **Android: nada capturado ainda.**
 
 
 ### Um email por device — VALIDADO no `CI iOS Run #7`

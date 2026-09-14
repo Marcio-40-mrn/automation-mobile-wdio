@@ -162,8 +162,8 @@ O que está definido:
   Marcio acompanha na tela e recupera a conexão quando cair. Valem as regras de Remote
   Access do `STATE.md`: capturar primeiro, documentar depois; um `getPageSource()` por
   tela; fechar a sessão ao final.
-- **Primeira plataforma: iOS** — o Marcio avisa quando o app estiver instalado e a sessão
-  aberta.
+- **Primeira plataforma: iOS** — 1ª leva feita em 2026-09-11 (37 capturas, deslogado, sem
+  draft ainda); login bloqueado pelo backend e PDP não aberta. Ver `STATE.md`.
 - **Destino dos drafts:** `.planning/drafts/app-migrado/ios/` e
   `.planning/drafts/app-migrado/android/`, mesmo formato e mesmo `00-INDICE.md` dos drafts
   atuais. Os drafts do app atual (`.planning/drafts/ios/`) ficam como estão, como base de
