@@ -1,0 +1,43 @@
+{
+  "_comment": "Convenções GSD deste repositório. O tooling GSD (/gsd:*) NÃO está instalado; este arquivo documenta como o .planning/ é mantido à mão. Criado em 2026-09-16.",
+  "mode": "interactive",
+  "depth": "standard",
+  "language": "pt-BR",
+  "parallelization": false,
+  "commit_docs": false,
+  "model_profile": "balanced",
+  "git": {
+    "branching_strategy": "none",
+    "_comment": "Claude nunca commita, faz push, cria branch ou PR. Quem versiona é o Marcio. Ver .claude/hooks/block-github.mjs."
+  },
+  "workflow": {
+    "research": true,
+    "plan_check": true,
+    "verifier": true,
+    "_comment": "Todo plano é revisado item a item com o Marcio antes de qualquer edição (skill planejar-mudanca). Verificação = run real: AVD-S24 para Android local e AWS Device Farm para CI (obrigatório em mudança de dependência)."
+  },
+  "planning": {
+    "root": ".planning",
+    "state": "STATE.md",
+    "roadmap": "ROADMAP.md",
+    "requirements": "REQUIREMENTS.md",
+    "project": "PROJECT.md",
+    "milestones": "MILESTONES.md",
+    "phases_dir": "phases",
+    "codebase_dir": "codebase",
+    "legacy_plans_dir": "plans",
+    "drafts_dir": "drafts",
+    "_comment": "plans/ é o registro anterior (um .md por iniciativa, por data) e continua válido; phases/ mapeia os marcos M1–M7 do ROADMAP.md. drafts/ e RELATORIO-ANOMALIAS-IOS.md ficam fora do git (.gitignore)."
+  },
+  "session_start": {
+    "hook": ".claude/hooks/session-start.sh",
+    "loads": ["STATE.md", "ROADMAP.md (linhas 'em andamento')"],
+    "claude_md_imports": ["PROJECT.md", "REQUIREMENTS.md", "STATE.md", "ROADMAP.md"]
+  },
+  "agents": {
+    "inspector": ".claude/agents/mobile-ui-inspector.md",
+    "draft_writer": ".claude/agents/mobile-draft-writer.md",
+    "memory": ".claude/agents/project-memory-keeper.md",
+    "security": ".claude/agents/security-scanner.md"
+  }
+}
