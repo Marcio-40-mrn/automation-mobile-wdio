@@ -1,6 +1,6 @@
 # STATE
 
-Atualizado em **2026-09-11** (noite — M4 fechado; próximo marco é o app migrado).
+Atualizado em **2026-09-22** (M5 em andamento — 1ª leva Android capturada; ver "Pendências abertas").
 
 > Este arquivo foi mesclado nesta data. A cópia do `.planning/` trazida de outra pasta em
 > 2026-09-10 sobrescreveu a versão de 09-09 com a de 09-08 — os drafts e o relatório de
@@ -130,6 +130,19 @@ Cobertura: fluxo do M1 inteiro **e** o fluxo de compra do `test/Draft.ts` até o
 
 ## Pendências abertas
 
+### Levantamento do app migrado (M5) — 1ª leva Android feita em 2026-09-22
+
+AVD `emulator-5554`, `com.aramis.ecomm` **1.20.8 build 483**, 32 capturas (`00`–`31`) em
+`.planning/drafts/app-migrado/android/captures-2026-09-22/` com `NOTAS.md`. Sem draft ainda.
+Fluxo da suíte percorrido de ponta a ponta: onboarding → **login OK com `CLIENT_USER` no 1º tap**
+→ Categorias → Roupas → Camisas → favoritar → Favoritos → logout. **O bloqueio de login do iOS
+(09-11) está explicado:** a conta não existia para o app migrado; o Marcio a cadastrou em
+2026-09-22 e atualizou a senha no `.env`. Não está escrito se as contas por device do CI
+precisam do mesmo cadastro. **Favoritar não funciona neste
+build**: toque no coração abre modal "Falha ao carregar / Não foi possível carregar as categorias"
+(2/2) e Favoritos fica vazio — lacuna do módulo; desfavoritar não exercitado. Banner raspadinha
+do Insider apareceu em Categorias e fechou pelo `Close`. Falta: PDP, Mochila/checkout, Busca.
+
 ### Levantamento do app migrado (M5) — 1ª leva iOS feita em 2026-09-11, INCOMPLETA
 
 **Capturado:** 37 pares print + árvore (`00`–`36`) em
@@ -147,7 +160,7 @@ O que a leva cobriu, **tudo deslogado**: notificações (alerta) → boas-vindas
 política → termos → Home → Perfil → Login → Categorias → Roupas expandido → Camisas (listagem)
 → tentativa de favoritar.
 
-**Bloqueio: login recusado com credenciais corretas.** `CLIENT_USER`/`CLIENT_PASSWORD` do
+**Bloqueio (RESOLVIDO em 2026-09-22 — conta não cadastrada no app migrado; ver leva Android acima): login recusado com credenciais corretas.** `CLIENT_USER`/`CLIENT_PASSWORD` do
 `.env`, digitados à mão pelo Marcio e conferidos no print com a senha visível (`19-retomada`),
 2 taps em "Sign in" (`20`, `22`) → modal "Incorrect username and/or password". Não é digitação;
 é o backend deste build recusando a conta. **Perguntas em aberto para o Marcio:** essa conta

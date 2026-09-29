@@ -164,6 +164,10 @@ O que está definido:
   tela; fechar a sessão ao final.
 - **Primeira plataforma: iOS** — 1ª leva feita em 2026-09-11 (37 capturas, deslogado, sem
   draft ainda); login bloqueado pelo backend e PDP não aberta. Ver `STATE.md`.
+- **Android: 1ª leva feita em 2026-09-22** — AVD local via `adb`, build 1.20.8 (483), 32
+  capturas, fluxo da suíte de ponta a ponta. Login OK (a conta foi cadastrada no app migrado
+  nesse dia, o que também explica o bloqueio do iOS); favoritar falha no app ("Falha ao
+  carregar"). Sem draft ainda. Ver `STATE.md`.
 - **Destino dos drafts:** `.planning/drafts/app-migrado/ios/` e
   `.planning/drafts/app-migrado/android/`, mesmo formato e mesmo `00-INDICE.md` dos drafts
   atuais. Os drafts do app atual (`.planning/drafts/ios/`) ficam como estão, como base de
@@ -174,7 +178,7 @@ Não está escrito ainda — definir quando o build chegar:
 - Identificador do app novo (bundle id / package), versão e origem do build.
 - Se o app migrado vai viver neste repositório ou em outro. **Decisão adiada em
   2026-09-11.**
-- Como o Android será capturado (AVD local via `adb`, como no M2, ou outro caminho).
+- ~~Como o Android será capturado~~ — **AVD local via `adb`**, como no M2 (usado em 2026-09-22).
 
 ## M6 — A suíte atual rodando no app migrado ⬜
 
