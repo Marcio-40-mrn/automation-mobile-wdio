@@ -2,6 +2,7 @@
   "name": "mobile_wdio",
   "type": "module",
   "devDependencies": {
+    "@opengsd/gsd-core": "^1.10.0",
     "@wdio/allure-reporter": "^9.21.0",
     "@wdio/appium-service": "^9.20.1",
     "@wdio/cli": "^9.20.1",
