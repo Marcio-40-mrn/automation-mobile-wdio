@@ -1,7 +1,7 @@
-# Fase 06 — A suíte atual rodando no app migrado (M6)
+# Fase 07 — A suíte atual rodando no app migrado (M7)
 
 **Status:** ⬜ não iniciada. Depende da fase 05. Escrita em 2026-09-16 a partir do
-`ROADMAP.md` (M6); tudo abaixo do "Objetivo" é o que **está** escrito lá — não há mais.
+`ROADMAP.md` (então M6; renumerado para M7 e fase 07 em 2026-09-29); tudo abaixo do "Objetivo" é o que **está** escrito lá — não há mais.
 
 ## Objetivo
 

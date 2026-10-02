@@ -71,5 +71,5 @@ test/
 - `docs/`, `mkdocs.yml`, `catalog-info.yml` — só no repositório principal (Backstage); aqui
   estão no `.gitignore` e não existem.
 - Testes unitários, lint, prettier — não há. A verificação estática é `npx tsc --noEmit`.
-- `test/Draft.ts` — existe em disco (rascunho do fluxo de compra, base do M7) mas está no
+- `test/Draft.ts` — existe em disco (rascunho do fluxo de compra, base do M8) mas está no
   `.gitignore`; não entra no ZIP do CI nem no `specs` do WDIO.

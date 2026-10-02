@@ -15,6 +15,15 @@ Um único cenário, em `test/specs/test.spec.ts`, rodando por device:
 
 ## Critérios de aceite
 
+- **O teste não valida texto e ignora o idioma** (decisão do Marcio, 2026-10-01): nenhuma
+  configuração de idioma/locale, nenhuma asserção por string exibida; seletor por
+  testID/estrutura e asserção pelo destino/estado da tela. Não é assunto para perguntar.
+- **O teste segue como o APLICATIVO funciona, nunca o PDF** (decisão do Marcio, 2026-10-01):
+  onde o Gherkin do `cenarios-gherkin-2026-09-28.pdf` diverge do app (ordem de diálogos, telas a
+  mais/a menos, navegação), o teste valida o comportamento do app e só registra a diferença em
+  comentário/SUMMARY. Não é assunto para perguntar — vale para todas as etapas do M6.
+- **Onboarding não tem retorno**: cenário de "Voltar" dentro do onboarding (ONB-06) está fora
+  do escopo (decisão do Marcio, 2026-10-01). Não planejar nem perguntar.
 - O teste não pode depender de nome de produto fixo: o catálogo muda entre versões e
   ambientes.
 - O teste não pode depender de coordenada de tela: resolução e layout variam por device.
@@ -48,6 +57,26 @@ Cada uma custou um incidente. Detalhes no `CLAUDE.md`.
   plataforma (`process.env.PLATFORM === 'ios'`) e escolhe o seletor **dentro do método** —
   o padrão que o `ativarApp()` de `test/pageobjects/HomePage.ts` inaugurou. Duplicar a suíte
   dobra o custo de cada mudança de fluxo e faz as duas versões divergirem em silêncio.
+- **Nenhum passo de teste no `wdio.conf.ts`, em hipótese alguma** (decisão do Marcio,
+  2026-10-02). O `wdio.conf.ts` só configura o ambiente: conexão, device, app, reporters, timeouts.
+  Todo comportamento do teste mora no page object: aceitar ou negar diálogo/alerta, conceder
+  permissão, fechar banner, navegar. Capabilities que agem no lugar do teste são proibidas,
+  como `autoAcceptAlerts`, `autoDismissAlerts` e `autoGrantPermissions`. Elas escondem o que o
+  app faz e impedem o teste de ver e tratar o diálogo. Encontrado em 2026-10-02: o
+  `autoAcceptAlerts: true` (iOS) e o `autoGrantPermissions: true` (AVD local), que entraram no
+  `8536e92`, deixaram o onboarding sem teste no iOS. O Device Farm Android já seguia a regra.
+  **Exceção temporária (Marcio, 2026-10-02):** as três linhas que já existem
+  (`wdio.conf.ts:35`, `:70` e `:83`) **ficam como estão por enquanto**, porque retirá-las já
+  afetou os testes antes. Validar no futuro se dá para removê-las (pendência no `STATE.md`).
+  Nenhuma linha nova desse tipo entra.
+- **Nunca alterar o `.claude/settings.json`** (decisão do Marcio, 2026-10-02). Isso inclui hooks,
+  permissões e qualquer outra chave, mesmo quando houver algo aparentemente quebrado nele, como o
+  `gsd-secret-read-guard.js` registrado sem o arquivo existir. Achado ali vira registro no
+  `STATE.md` para o Marcio decidir, nunca correção.
+- **Sem impacto conhecido, não se muda o que funciona hoje** (decisão do Marcio, 2026-10-02).
+  Uma mudança em configuração, dependência, hook ou infraestrutura cujo efeito no projeto não
+  esteja medido não é feita. O que existe e funciona fica como está, e a ideia vai para as
+  pendências do `STATE.md` como "validar no futuro".
 
 ## Restrições conhecidas de ambiente
 

@@ -1,23 +1,44 @@
-import { BasePage, timewhait } from "./BasePage";
+import { BasePage, timewhait, seletorTestId } from "./BasePage";
 import { driver, $ } from '@wdio/globals'
 
-const SELETORES_PERFIL = [
-    "accessibility id:Menu",    // versão com ícone de mochila
-    "accessibility id:Perfil",  // versão com ícone de sacola/perfil
-];
+const APP_ID = 'com.aramis.ecomm';
 
 export class HomePage extends BasePage {
 
     async ativarApp() {
+        // Android: os seletores sem texto do Menu/cabeçalho usam XPath com eixo `preceding`, que o
+        // motor XPath 2 padrão do UiAutomator2 rejeita ("ArrayList$ListItr cannot be cast to
+        // NodeType" — run local de 2026-10-01). O próprio Appium indica `enforceXPath1`. É
+        // configuração da sessão (vale até o fim dela), por isso aqui, no 1º passo de todo spec.
+        if (process.env.PLATFORM !== 'ios') {
+            await driver.updateSettings({ enforceXPath1: true });
+        }
+
+        // Traz o app para a frente antes de qualquer toque — serve também depois de uma limpeza
+        // do app (terminateApp/clearApp) e quando outra janela ficou por cima. Android usa
+        // appId, iOS usa bundleId (o mesmo valor, `com.aramis.ecomm`, nas duas plataformas).
+        await driver.execute(
+            'mobile: activateApp',
+            process.env.PLATFORM === 'ios' ? { bundleId: APP_ID } : { appId: APP_ID }
+        );
+
+        // App que já passou do onboarding (noReset local): as telas de Boas-vindas a Termos não
+        // existem e esperá-las seria falha falsa. Quem confirma a chegada de verdade é o
+        // validarHome() do spec.
+        if (await this.onboardingJaConcluido()) {
+            console.log('⏭️ Onboarding já concluído (aba Home presente) — pulando Boas-vindas a Termos');
+            return;
+        }
+
         if (process.env.PLATFORM === 'ios') {
-            // Dois destes três passos não têm seletor possível — o CTA das boas-vindas não
-            // existe na árvore XCUITest e o alerta de localização é do SpringBoard, fora do
+            // Dois destes passos não têm seletor possível — o CTA das boas-vindas não existe na
+            // árvore XCUITest e os alertas de ATT/localização são do SpringBoard, fora do
             // getPageSource() do app. Ver os comentários de cada método no BasePage.
             await this.iniciaAppIOS();
             await this.permissaoLocalizacaoIOS();
             // Um método só para as três telas de aceite: todas usam o mesmo accept-button,
-            // mudando só o label. No Android são passos separados porque os ids diferem
-            // (Continue, depois "I have read and agree" duas vezes).
+            // mudando só o label. No Android são passos separados porque as telas têm
+            // peculiaridades próprias (permission-topic, scroll longo da Política e dos Termos).
             await this.aceitaOnboardingIOS();
         } else {
             await this.iniciaApp();
@@ -31,27 +52,68 @@ export class HomePage extends BasePage {
         }
     }
 
-    async abrirPerfil() {
-        if (process.env.PLATFORM === 'ios') {
-            // No iOS o accessibility id é o id INTERNO da aba (tab-menu), estável entre
-            // versões; o texto visível ("Perfil") mora no label. Por isso não existe o
-            // problema de "Menu vs Perfil" que o clickFirstPresent resolve no Android — e
-            // por isso copiar SELETORES_PERFIL para cá não casaria com nada.
-            const element = await $("accessibility id:tab-menu");
-            await this.waitForElement(element);
-            await this.fechaBanner();
-            await element.click();
-            await driver.pause(timewhait);
-            return;
-        }
+    // Confirma que o onboarding terminou na Home, com erro nomeado se não. A aba Home existe em
+    // todas as abas, então sozinha não prova que a Home está aberta: o `editorial-home-root` é
+    // o que só a Home tem (no iOS ele vem com visible=false no dump — por isso a checagem é de
+    // EXISTÊNCIA, não de visibilidade). Seletores não verificados em run: ficam "não
+    // verificados" até o run da fumaça (06-03 Tarefa 3).
+    async validarHome() {
+        // fonte: android/06-home (captures-2026-09-29/09-home.xml); ios/06-home (captures-m6-sessao-a/10-home-deslogada)
+        const aba = seletorTestId('tab-home');
+        const raiz = seletorTestId('editorial-home-root');
 
-        await this.clickFirstPresent(SELETORES_PERFIL);
+        const abaVisivel = await $(aba).waitForDisplayed({ timeout: 30000 }).then(() => true).catch(() => false);
+        const raizExiste = await $(raiz).waitForExist({ timeout: 10000 }).then(() => true).catch(() => false);
+
+        if (!abaVisivel || !raizExiste) {
+            // O app pode ter FECHADO sozinho: no run local de 2026-10-01 ele caiu logo depois do
+            // aceite dos Termos (crash do React Native no logcat: "RetryableMountingLayerException:
+            // Unable to find viewState") e o vídeo mostrou a tela inicial do Android. Nomear isso
+            // em vez de culpar a Home. queryAppState: 4 = em primeiro plano; 1 = não está rodando.
+            const estado = await driver
+                .execute('mobile: queryAppState', process.env.PLATFORM === 'ios' ? { bundleId: APP_ID } : { appId: APP_ID })
+                .catch(() => null);
+            if (estado !== null && estado !== 4) {
+                throw new Error(
+                    `O app não está em primeiro plano depois do onboarding (queryAppState=${estado}; 1 = fechado, ` +
+                    '3 = em segundo plano). Provável crash do app — no Android conferir `adb logcat -b crash -d`.'
+                );
+            }
+            throw new Error(
+                `Home não apareceu: tab-home visível=${abaVisivel}, editorial-home-root presente=${raizExiste} ` +
+                '(esperados em 30s/10s depois do onboarding). O app pode ter ficado numa tela do ' +
+                'onboarding ou com um modal por cima.'
+            );
+        }
+        console.log('🏠 Home confirmada (tab-home + editorial-home-root)');
+    }
+
+    async irParaHome() {
+        // fonte: android/06-home e ios/06-home (id tab-home nas duas plataformas)
+        const element = await $(seletorTestId('tab-home'));
+        await this.waitForElement(element);
+        await this.fechaBanner();
+        await element.click();
+        await driver.pause(timewhait);
+        await this.validarHome();
+    }
+
+    async abrirPerfil() {
+        // `tab-menu` é o testID da aba nas duas plataformas (Android: resource-id; iOS: name).
+        // O texto visível ("Menu"/"Perfil") varia por versão e idioma e nunca entra no seletor.
+        // fonte: android/06-home (captures-2026-09-29/09-home.xml); ios/06-home
+        const element = await $(seletorTestId('tab-menu'));
+        await this.waitForElement(element);
+        await this.fechaBanner();
+        await element.click();
+        await driver.pause(timewhait);
     }
 
     async abrirCategorias() {
         if (process.env.PLATFORM === 'ios') return this.abrirCategoriasIOS();
 
-        const element = await $("accessibility id:Categorias"); // Android usa o texto visível como id
+        // fonte: android/06-home (captures-2026-09-29/09-home.xml) — resource-id tab-categories
+        const element = await $(seletorTestId('tab-categories'));
         await this.waitForElement(element);
         await element.click();
         await driver.pause(timewhait);

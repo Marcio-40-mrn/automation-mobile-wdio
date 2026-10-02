@@ -7,8 +7,8 @@ draft. Escrita em 2026-09-16 a partir do `ROADMAP.md` (M5) e do `STATE.md` (pend
 ## Objetivo
 
 Capturar os elementos das telas do app migrado (versão nova, migrada por módulos, com
-`testID`) **nas duas plataformas**, pelo mesmo procedimento da fase 02, para que a fase 06
-faça a suíte atual — e os testes futuros — rodarem nesse app. **Só levantamento; nenhum
+`testID`) **nas duas plataformas**, pelo mesmo procedimento da fase 02, para que as fases 06 (cenários Gherkin) e 07
+façam os cenários do PDF, a suíte atual e os testes futuros rodarem nesse app. **Só levantamento; nenhum
 cenário de teste é criado nesta fase.**
 
 ## Escopo da captura

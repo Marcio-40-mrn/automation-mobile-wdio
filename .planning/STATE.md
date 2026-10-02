@@ -1,6 +1,6 @@
 # STATE
 
-Atualizado em **2026-09-22** (M5 em andamento — 1ª leva Android capturada; ver "Pendências abertas").
+Atualizado em **2026-10-02** (M6 em execução: 06-01 a 06-04 concluídos — POC verde local no Android e no iOS; 06-04 escrito, só verificação estática; próximo: 06-05 e o run da Etapa 1 no CI; ver "Pendências abertas").
 
 > Este arquivo foi mesclado nesta data. A cópia do `.planning/` trazida de outra pasta em
 > 2026-09-10 sobrescreveu a versão de 09-09 com a de 09-08 — os drafts e o relatório de
@@ -21,12 +21,17 @@ iOS por um banner novo do Insider, um tap perdido e uma conta suja (pendência "
 abaixo); a correção dos 4 pontos (validar desfavoritar, `voltar()` por tab bar, guarda de conta
 suja, limpeza em falha) entrou em `c367423` e o Run #14 validou tudo.
 
-**M4 concluído** (2026-09-10, ajustes nos testes em 09-11). **Próximo marco: M5 —
-Levantamento do app migrado**: o app Aramis está sendo migrado por módulos, com `testID`;
-o Marcio entrega o build, avisa com a sessão aberta (iOS primeiro), e o `mobile-ui-inspector`
-refaz a captura tela a tela nas duas plataformas, incluindo o fluxo de compra, para depois
-(M6) a suíte atual e os testes futuros rodarem nesse app. O fluxo de compra como cenário de
-teste (M7) fica **adiado** até lá. Detalhes e o que ainda não está definido: `ROADMAP.md`.
+**M4 concluído** (2026-09-10, ajustes nos testes em 09-11). **M5 — Levantamento do app
+migrado, em andamento**: o app Aramis está sendo migrado por módulos, com `testID`; Android
+com a 2ª leva capturada e drafts escritos, iOS com a 1ª leva incompleta (ver "Pendências
+abertas").
+
+**Próximo marco: M6 — Cenários Gherkin da seção 3 no app migrado** (decidido em 2026-09-29):
+os 101 cenários da seção 3 de `cenarios-gherkin-2026-09-28.pdf` (raiz do repo), escritos
+como teste WDIO + Mocha com os testIDs do M5, em 8 etapas (0 a 7). Com isso os marcos
+seguintes foram renumerados: a suíte atual no app migrado passou de M6 para **M7**, e o
+fluxo de compra (cobertura além do favoritar, adiado) de M7 para **M8**. Etapas e o que
+ainda não está definido: `ROADMAP.md`.
 
 Lembrete do que o M3 é, porque é fácil de distorcer: **uma suíte só**. O
 `test/specs/test.spec.ts` não muda, nenhum page object novo é criado, e o `if` de
@@ -34,9 +39,26 @@ plataforma mora dentro do método — como o `ativarApp()` de `HomePage.ts` já 
 
 ## Working tree
 
-Branch `main`, HEAD em **`c367423`** (`fix`, 2026-09-11 15:47) — a correção dos 4 pontos do
-Run #13 mais este registro, **tudo commitado, working tree limpo**. Os drafts, o
-`RELATORIO-ANOMALIAS-IOS.md` e os planos continuam fora do git por `.gitignore`.
+Branch `main`, HEAD em **`37857ce`** (`fix`, 2026-09-29). **Fora de commit:** `STATE.md` e
+`ROADMAP.md`, com o registro da 2ª leva Android do M5 e a entrada do M6 (cenários Gherkin) com a renumeração M6→M7, M7→M8. Commits desde o `c367423` (referência
+do `CI Run #14`, tabela abaixo) — nenhum toca em `test/` nem na configuração da suíte:
+
+- `59ea7b1`, `fadafde` (11/09, mesmo dia) — só documentação: `STATE.md`/`ROADMAP.md`;
+  `fadafde` também mexeu no `CLAUDE.md` e criou a pasta `Atualizações/`.
+- `8c5fada` (14/09) — só `STATE.md`/`ROADMAP.md`.
+- `332ab75` (16/09) — criou `.planning/codebase/`, `.planning/phases/`,
+  `.planning/config.json` e `.planning/MILESTONES.md`, à mão, no formato GSD (o tooling
+  `/gsd:*` real ainda não estava instalado — ver comentário no próprio `config.json`).
+- `4d0cf96` (29/09, manhã) — registro da 1ª leva Android do M5 (ver "Pendências abertas");
+  removeu a pasta `Atualizações/`.
+- `37857ce` (29/09) — `@opengsd/gsd-core` instalado como devDependency real, corrigindo os
+  hooks `gsd-*` que estavam referenciados em `.claude/settings.json` mas não existiam
+  (`Cannot find module .../gsd-context-monitor.js`). É configuração do Claude Code, não do
+  app nem da suíte — `.claude/` é gitignored, só `package.json`/`package-lock.json` mudaram
+  no git. Perfil de skills instalado: `core` (mínimo).
+
+Os drafts e o `RELATORIO-ANOMALIAS-IOS.md` continuam fora do git por `.gitignore`; os planos
+(`.planning/plans/`) estão versionados.
 
 O que `c367423` contém (validado no `CI Run #14`):
 
@@ -130,6 +152,87 @@ Cobertura: fluxo do M1 inteiro **e** o fluxo de compra do `test/Draft.ts` até o
 
 ## Pendências abertas
 
+### M6 — em execução desde 2026-10-01 (`/gsd-execute-phase 6`): planos 06-01 a 06-04 concluídos
+
+- **06-01:** DEC-A respondida (registrada no `06-CONTEXT.md`); **regra fixa: idioma ignorado, testes
+  não validam texto** (D-04 corrigida, `REQUIREMENTS.md`); captura iOS sessão A do app migrado
+  (1.20.10 build 335, 45 capturas, drafts em `.planning/drafts/app-migrado/ios/`); captura Android
+  em inglês cancelada por decisão do Marcio.
+- **06-02/06-03:** POC migrada para o app migrado (`test/specs/00-poc-favoritar.spec.ts`,
+  `test.spec.ts` removido) — **verde local nas duas plataformas**: Android AVD-S24 17/17
+  (2026-10-01 21:20) e iOS Remote Access 17/17 duas vezes (22:17 e 22:25). Detalhes e desvios em
+  `06-03-SUMMARY.md`. Seletores Android sem texto (XPath estrutural + `enforceXPath1`), fechaBanner
+  pelo `wrap-close-button` da raspadinha, logout validado por `menu-card enabled=false`, login
+  desloga antes se o app abrir logado.
+- **Pendente:** run do CI (Device Farm) com a POC migrada — o Marcio dispara; durações por device
+  levantadas pelo AWS CLI depois. Working tree com as mudanças de `test/`, sem commit.
+- **Bug do app (levar ao time):** crash intermitente no Android na transição Termos → Home
+  (logcat 2026-10-01 20:29: `RetryableMountingLayerException: Unable to find viewState for tag 266`).
+- **06-04 (2026-10-02):** DEC-C respondida (por-item, registrada no `06-04-SUMMARY.md`): segue o app
+  (ordem dos diálogos, Termos), ONB-06 fora do escopo (excluído, 9 excluídos no total), `wdio.conf.ts`
+  intocado com skip por plataforma no iOS, e-mail `informatica.mrn+{texto}@gmail.com` com texto único
+  por execução e por device, modal de erro iOS fechado relançando o app, ATT = Allow. Escritos
+  `01-onboarding.spec.ts` (6 its) e `02-login.spec.ts` (6 its), `OnboardingPage`, `EsqueciSenhaPage`,
+  `massa.ts`, `cobertura.check.mjs`. Verificação só estática (tsc + gate 8/8); **seletores não verificados
+  até o run**. `logar()` refatorado para `entrar()` — risco para a POC, validar no run.
+- **Pendência (Marcio, 2026-10-02):** ler a caixa do Gmail para validar o e-mail de redefinição de
+  senha (LOG-07 hoje só valida a tela) — planejar e implementar depois.
+- **Pendência (Marcio, 2026-10-02), validar no futuro:** remover do `wdio.conf.ts` o
+  `autoAcceptAlerts: true` (iOS, linhas 35 e 70) e o `autoGrantPermissions: true` (AVD, linha 83),
+  e passar o tratamento dos diálogos para os page objects (regra "Nenhum passo de teste no
+  `wdio.conf.ts`" no `REQUIREMENTS.md`). Ficam por ora porque retirá-los já afetou os testes antes.
+  Enquanto ficarem, ONB-01..04 pulam no iOS (DEC-C e) e o onboarding iOS não tem cobertura real.
+  O mesmo vale para o hook `before` (pausa fixa de 10 s) e para o reset do app no `afterTest`.
+- **Pendência — hook do Claude quebrado:** o `.claude/settings.json` registra o
+  `gsd-secret-read-guard.js` em Read/Grep/Bash, mas o arquivo não existe em `.claude/hooks/` nem
+  no `@opengsd/gsd-core` 1.10.0 instalado. O hook falha em silêncio e a proteção contra leitura
+  de segredo (`.env`) não está ativa. **Decisão do Marcio (2026-10-02): não mexer.** O impacto
+  não é conhecido, e o `.claude/settings.json` nunca é alterado (regra no `REQUIREMENTS.md`).
+  Fica só registrado.
+- **Próximo:** 06-05 (Logout OUT-01..03) e o run da Etapa 1 — AVD e Device Farm, disparados pelo Marcio.
+
+### M6 — discussão feita em 2026-09-30
+
+`.planning/phases/06-cenarios-gherkin-app-migrado/06-CONTEXT.md` (decisões D-01–D-14),
+`06-PENDENCIAS.md` (massa de dados para o Marcio decidir) e `06-DISCUSSION-LOG.md`. Resumo:
+código nos page objects atuais, suíte só no app migrado (a POC do favoritar também migra);
+device em **inglês**, valida funcionalidade e não idioma; Android + iOS juntos; CI a cada
+etapa; contas por device do CI reaproveitadas. Escopo: 101 − 8 excluídos (pt-BR 5, Seção DEV 2,
+conectividade 1) = 93, dos quais 11 pendentes de massa (cupom 6, estoque 2, frete 3) → 82 agora.
+- **Não feito ainda:** captura iOS do app migrado (sessão de Remote Access que o Marcio abre
+  depois) — pré-requisito da implementação, não do planejamento.
+- **Planejada em 2026-10-01 pelo `/gsd-plan-phase 6`** (pesquisa → planner → checker, aprovado
+  na 2ª checagem): `06-RESEARCH.md`, `06-VALIDATION.md` e **16 planos `06-01-PLAN.md`…`06-16-PLAN.md`**
+  (todos `verify plan-structure` `valid: true`; decisões D-01–D-14 cobertas 14/14). O documento da
+  fase `06-PLAN.md` (29–30/09) é o correto: foi **convertido** para o formato GSD — o texto dele
+  está, palavra por palavra, no `<context>` do `06-01-PLAN.md` — e o arquivo no formato antigo
+  saiu do diretório. Próximo comando: `/gsd-execute-phase 6`, que começa pela DEC-A (decisões do
+  Marcio) e pelas capturas Android em inglês e iOS sessão A.
+- Achado da pesquisa: as capturas `captures-2026-09-29-m6e1/` **não estão em inglês** (AVD em pt-BR);
+  a premissa da D-04 ainda não foi verificada — é a DEC-B do 06-02.
+- Trabalho de 29–30/09 ainda sem registro aqui: `captures-2026-09-29-m6e1/` (Etapa 1, sem
+  `NOTAS.md`), `captures-2026-09-30/` (parcial) e `ELEMENTOS-SEM-TESTID.md` (raiz).
+
+### Levantamento do app migrado (M5) — 2ª leva Android feita em 2026-09-29 (build "completo")
+
+AVD `emulator-5554`, `com.aramis.ecomm` **1.20.10 build 492**, capturas `00`–`51` (54 prints e
+55 dumps, contando `12b`, `13-relaunch` e o `24b-windows.xml`, só árvore) em
+`.planning/drafts/app-migrado/android/captures-2026-09-29/`, com `NOTAS.md` (tela a tela) e
+**`TESTIDS.md`** (todos os testIDs por tela + o que ainda não tem id). Navegação feita pelo
+Claude via `adb`, a pedido do Marcio. A captura `14` é da Home, não do Menu (o Menu logado é a
+`45`). Drafts escritos (ver abaixo).
+- **Fluxo da suíte inteiro funciona**, inclusive favoritar e desfavoritar (quebrados no 1.20.8).
+- **App em pt-BR**: todo seletor por texto/desc da suíte atual quebra ("Continuar", "Li e concordo",
+  "Fazer login", "Sair", "SAIR", "Você ainda não tem produtos favoritados!"). Ids seguem valendo.
+- Estado favoritado agora visível na árvore: `action-button-icon` 84x84 → 52x53.
+- 28 drafts escritos em `.planning/drafts/app-migrado/android/` (índice `00-INDICE.md`).
+- Encerramento: `adb shell pm clear com.aramis.ecomm` + `adb kill-server`.
+- Login: 1º tap em "Fazer login" com teclado aberto só fecha o teclado; o 2º loga.
+- Compra percorrida até a escolha de pagamento; parado no formulário de cartão (sem cartão de
+  teste escrito). Campos de endereço e cartão **não têm testID**.
+- Conta ao final: sem favoritos, Mochila vazia, **um endereço salvo** (Av. Paulista, 1000), deslogada.
+- Banner do Insider não apareceu nesta sessão.
+
 ### Levantamento do app migrado (M5) — 1ª leva Android feita em 2026-09-22
 
 AVD `emulator-5554`, `com.aramis.ecomm` **1.20.8 build 483**, 32 capturas (`00`–`31`) em
@@ -141,7 +244,8 @@ Fluxo da suíte percorrido de ponta a ponta: onboarding → **login OK com `CLIE
 precisam do mesmo cadastro. **Favoritar não funciona neste
 build**: toque no coração abre modal "Falha ao carregar / Não foi possível carregar as categorias"
 (2/2) e Favoritos fica vazio — lacuna do módulo; desfavoritar não exercitado. Banner raspadinha
-do Insider apareceu em Categorias e fechou pelo `Close`. Falta: PDP, Mochila/checkout, Busca.
+do Insider apareceu em Categorias e fechou pelo `Close`. Falta: PDP, Mochila/checkout, Busca —
+capturados na 2ª leva (build 1.20.10, acima).
 
 ### Levantamento do app migrado (M5) — 1ª leva iOS feita em 2026-09-11, INCOMPLETA
 
@@ -344,7 +448,7 @@ registro do diagnóstico; o resultado está na pendência "Correções de fluxo 
 ### Outras
 
 - **ReCAPTCHA bloqueia o `Finalize purchase`** (draft `33`), 2/2 tentativas. Escalar ao time
-  de backend um allowlist/bypass para QA/Device Farm. Bloqueia o M7; não afeta M1/M3.
+  de backend um allowlist/bypass para QA/Device Farm. Bloqueia o M8; não afeta M1/M3.
 - **App sem `accessibilityIdentifier` em pelo menos 5 pontos do fluxo iOS.** O caminho
   estruturalmente correto é pedir os identificadores ao time do app.
 - **Segundo banner do Insider — OBSERVADO em 2026-09-11 (Run #13):** "Só no APP: 20% OFF pra

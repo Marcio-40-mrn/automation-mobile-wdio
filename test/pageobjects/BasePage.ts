@@ -1,5 +1,20 @@
 import type { ChainablePromiseElement } from 'webdriverio';
 import allure from '@wdio/allure-reporter';
+import { texto } from '../utils/textos';
+
+// testID do app migrado -> seletor da plataforma.
+//
+// Android: o testID do React Native vira `resource-id` SEM prefixo de pacote ("tab-menu", não
+// "com.aramis.ecomm:id/tab-menu"). Por isso o seletor é o UiSelector.resourceId(), que casa o
+// valor exato — o mesmo que o CategoriasPage já usa com `action-button` e provou verde no app
+// antigo. NÃO trocar por `id:<testID>`: o locator `id` do UiAutomator2 pode prefixar o pacote e
+// não casar (não verificado neste repo; ver 06-02-SUMMARY, deviation Rule 3).
+// iOS: o testID vira o `name`, localizado por `accessibility id`.
+export function seletorTestId(id: string): string {
+  return process.env.PLATFORM === 'ios'
+    ? `accessibility id:${id}`
+    : `-android uiautomator:new UiSelector().resourceId("${id}")`;
+}
 
 
 export class BasePage {
@@ -63,24 +78,45 @@ export class BasePage {
     if (process.env.PLATFORM === 'ios') return this.fechaBannerIOS();
 
     const overlay = "id:com.aramis.ecomm:id/insiderLayout";
-    const botaoFechar = "accessibility id:Close";
+    // App migrado (raspadinha "Só no APP: 20% OFF", captures-2026-10-01-banner/24-camisas-logado-t60.xml):
+    // o "X" é um android.widget.Button com text="Close", content-desc VAZIO e resource-id
+    // `wrap-close-button-<número do criativo>`. O `accessibility id:Close` do app antigo procura
+    // pelo content-desc e por isso não acertava esse botão (run local de 2026-10-01: 3 tentativas
+    // e o banner continuou). 1º o id (independe de texto; o sufixo numérico muda por criativo),
+    // depois o text e por último o desc do app antigo. Toque no centro desse rect fechou o banner
+    // (captures 26 e 27: insiderLayout sumiu, listagem intacta) — 1 ocorrência medida.
+    const botoesFechar = [
+      '-android uiautomator:new UiSelector().resourceIdMatches(".*wrap-close-button.*")',
+      '-android uiautomator:new UiSelector().className("android.widget.Button").text("Close")',
+      'accessibility id:Close',
+    ];
 
     for (let tentativa = 1; tentativa <= 3; tentativa++) {
       // Sem banner na tela o método custa uma consulta e retorna: roda antes de todo step.
       if (!(await this.bannerNaTela(overlay))) return;
 
-      const close = await $(botaoFechar);
-      const apareceu = await close
-        .waitForDisplayed({ timeout: 10000 })
-        .then(() => true)
-        .catch(() => false);
+      // A WebView do criativo publica os filhos com atraso (aos 10s ainda sem o Close; aos 20s já
+      // presente — mesma captura), daí a espera de até 20s por qualquer um dos candidatos.
+      const seletorClose = await this.algumVisivel(botoesFechar, 20000);
 
-      if (!apareceu) {
-        console.log(`⏳ Banner na tela mas o "Close" não apareceu (tentativa ${tentativa}/3)`);
-        continue;
+      if (!seletorClose) {
+        // insiderLayout SEM criativo: no run local de 2026-10-01 (20:41) o insiderLayout respondeu
+        // presente com a tela limpa (vídeo: listagem de Camisas, nenhum banner) e o método lançava
+        // "não fechou" sem haver o que fechar. O contêiner sobra na árvore depois que um criativo
+        // é exibido. Sem nenhum botão de fechar em 20s não há banner a fechar: registra e segue —
+        // o passo seguinte valida o próprio destino (ex.: voltar() espera a tab bar).
+        console.log(`ℹ insiderLayout presente mas sem criativo (nenhum "Close" em 20s) — seguindo sem fechar`);
+        return;
       }
 
-      await close.click();
+      // 1ª tentativa: element click. Da 2ª em diante: gesto de toque no centro do MESMO elemento
+      // (`mobile: clickGesture`), que é o que o inspector fez e fechou (adb tap no centro do rect) —
+      // cobre o caso de o click do WebDriver não chegar ao botão dentro da WebView.
+      const close = await $(seletorClose);
+      const modo = tentativa === 1 ? 'click' : 'clickGesture';
+      console.log(`👆 Fechando o banner (${modo}) por ${seletorClose} em ${await this.rectDe(seletorClose)}`);
+      if (modo === 'click') await close.click();
+      else await driver.execute('mobile: clickGesture', { elementId: close.elementId });
 
       const fechou = await driver
         .waitUntil(async () => !(await this.bannerNaTela(overlay)), { timeout: 5000, interval: 500 })
@@ -97,7 +133,9 @@ export class BasePage {
       console.log(`⚠ Clique no "Close" não fechou o banner (tentativa ${tentativa}/3)`);
     }
 
-    if (await this.bannerNaTela(overlay)) {
+    // Só é falha se o criativo continua lá: contêiner E botão de fechar visíveis (o contêiner
+    // sozinho sobra na árvore com a tela limpa — ver acima).
+    if ((await this.bannerNaTela(overlay)) && (await this.algumVisivel(botoesFechar, 2000))) {
       throw new Error('Banner do Insider não fechou após 3 tentativas de clicar em "Close"');
     }
   }
@@ -220,15 +258,116 @@ export class BasePage {
   }
 
 
+  // Seletor do acesso ao Login no Menu deslogado. Compartilhado entre LoginPage (abrir o Login) e
+  // PerfilPage (validar que deslogou).
+  //
+  // Android: SEM texto. O content-desc ("Cadastre-se ou, Faça o login") quebrou no run local de
+  // 2026-10-01 (`still not displayed after 20000ms` em loginPage.logar) — o texto depende do idioma
+  // e o teste não pode depender dele. Os dois itens não têm testID, então vão pela posição na árvore:
+  //   - topo: o clicável imediatamente antes do 1º `menu-card`. ATENÇÃO: logado, a mesma posição é
+  //     o card com o nome da conta (captures-2026-09-29/45-menu-logado.xml) — serve para ABRIR o
+  //     Login com a conta deslogada, NUNCA para provar que deslogou.
+  //     fonte: captures-2026-09-29/10-menu-deslogado.xml e m6e1/14-menu-deslogado-pt.xml
+  //   - rodapé: o clicável imediatamente antes de `tab-home`, e SEM resource-id. Logado, essa
+  //     posição é o `menu-list-button` "Painel de controle" (com id) — por isso o filtro de id vazio
+  //     distingue os dois estados. fonte: captures-2026-09-29/51-pos-logout.xml × 48-menu-rolado.xml
+  // iOS: accessibility id (seletor por texto — frágil, sem testID; ver test/utils/textos.ts).
+  protected seletorAcessoLogin(chave: 'menu.acessoLogin' | 'menu.acessoLoginRodape'): string {
+    if (process.env.PLATFORM === 'ios') return `accessibility id:${texto(chave)}`;
+    return chave === 'menu.acessoLogin'
+      ? '(//*[@resource-id="menu-card"])[1]/preceding::*[@clickable="true"][1]'
+      : '(//*[@resource-id="tab-home"])[1]/preceding::*[@clickable="true"][1][@resource-id=""]';
+  }
+
+  // Espera até `timeout` por qualquer um dos seletores ficar displayed. Devolve o primeiro que
+  // apareceu, ou null. Serve para validar "cheguei no destino" quando há mais de um destino válido.
+  protected async algumVisivel(seletores: string[], timeout: number): Promise<string | null> {
+    let achado: string | null = null;
+    await driver
+      .waitUntil(
+        async () => {
+          for (const seletor of seletores) {
+            if (await $(seletor).isDisplayed().catch(() => false)) {
+              achado = seletor;
+              return true;
+            }
+          }
+          return false;
+        },
+        { timeout, interval: 500 }
+      )
+      .catch(() => false);
+    return achado;
+  }
+
+  // O app já passou do onboarding (a aba Home existe na tela)? Existe porque o app pode chegar
+  // aqui já instalado e aceito (noReset local) — nesse caso as telas de Boas-vindas a Termos não
+  // aparecem e esperá-las seria falha falsa. A aba Home só existe depois do onboarding, nas duas
+  // plataformas (fonte: android/06-home, ios/06-home). Nunca decide por texto.
+  async onboardingJaConcluido(timeout = 4000): Promise<boolean> {
+    return $(seletorTestId('tab-home'))
+      .waitForDisplayed({ timeout })
+      .then(() => true)
+      .catch(() => false);
+  }
+
+  // ---- Onboarding Android do app migrado -------------------------------------------------
+  // Seletores NÃO VERIFICADOS em run: vêm das capturas do M5 e ficam "não verificados" até o
+  // run da fumaça (06-03 Tarefa 3).
+
+  // Boas-vindas: o CTA "Toque para começar" não tem nó, mas o container inteiro é clicável
+  // (clickable=true) e é o ANCESTRAL do `first-access-item-animation`. O toque no centro do
+  // container equivale ao CTA? Assumption A5 do 06-RESEARCH: inferido, NÃO verificado — por isso
+  // o destino é validado e até 2 toques são dados antes de falhar com erro nomeado.
   async iniciaApp() {
-    await this.clickIfPresent("-android uiautomator:new UiSelector().className(\"android.view.View\").instance(0)");
+    // fonte: .planning/drafts/app-migrado/android/captures-2026-09-29/01-boasvindas.xml
+    const container = '//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]';
+    // Destinos válidos depois do toque: diálogo de permissão do sistema (Device Farm) ou a tela
+    // de Tópicos (AVD local, onde autoGrantPermissions pula os diálogos).
+    const destinos = [
+      // fonte: captures-2026-09-29/02-permissao-local.xml
+      'id:com.android.permissioncontroller:id/permission_message',
+      // fonte: captures-2026-09-29/04-topicos.xml
+      seletorTestId('permission-topic'),
+    ];
+
+    const apareceu = await $(container)
+      .waitForDisplayed({ timeout: 20000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!apareceu) {
+      throw new Error(
+        'Boas-vindas não apareceu: o container clicável (ancestral de first-access-item-animation) ' +
+        'não ficou visível em 20s. O app está limpo (adb shell pm clear com.aramis.ecomm)?'
+      );
+    }
+
+    for (let tentativa = 1; tentativa <= 2; tentativa++) {
+      await (await $(container)).click();
+      if (await this.algumVisivel(destinos, 20000)) {
+        console.log(`✅ Boas-vindas avançou (toque ${tentativa}/2)`);
+        return;
+      }
+      console.log(`⚠ Toque ${tentativa}/2 no container das Boas-vindas não avançou`);
+    }
+
+    throw new Error(
+      'Boas-vindas não avançou: depois de 2 toques no container, nem o diálogo de permissão nem ' +
+      'a tela de Tópicos (permission-topic) apareceram em 20s. Se o toque no centro do container ' +
+      'não equivale ao CTA (Assumption A5), capturar de novo com o inspector.'
+    );
   }
 
+  // Localização: "Durante o uso do app". Opcional de propósito: no AVD local o
+  // autoGrantPermissions já concede e o diálogo não aparece (DEC-A, 06-01-SUMMARY).
   async ativaGps() {
-    await this.clickIfPresent("id:com.android.permissioncontroller:id/permission_allow_one_time_button");
+    // fonte: captures-2026-09-29/02-permissao-local.xml (draft android/02)
+    await this.clickIfPresent("id:com.android.permissioncontroller:id/permission_allow_foreground_only_button");
   }
 
+  // Notificação: opcional pelo mesmo motivo da localização.
   async permiteNotificacao() {
+    // fonte: captures-2026-09-29/03-permissao-notif.xml (draft android/02)
     await this.clickIfPresent("id:com.android.permissioncontroller:id/permission_allow_button");
   }
 
@@ -236,32 +375,76 @@ export class BasePage {
     await this.clickIfPresent("id:com.android.permissioncontroller:id/permission_deny_button");
   }
 
+  // Tópicos de permissão ("Como criamos sua experiência?"): 4 `permission-topic` e o
+  // `accept-button` fixo no rodapé, sem scroll. Obrigatória: se os tópicos não aparecerem o
+  // onboarding não segue e a falha tem que apontar este passo.
   async continua() {
-    await this.clickIfPresent("accessibility id:Continue");
+    // fonte: captures-2026-09-29/04-topicos.xml (draft android/03)
+    const topico = seletorTestId('permission-topic');
+    const aceite = seletorTestId('accept-button');
+
+    const apareceu = await $(topico)
+      .waitForDisplayed({ timeout: 20000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!apareceu) {
+      throw new Error('Tópicos de permissão não apareceram: nenhum permission-topic visível em 20s.');
+    }
+
+    await this.aceitarEEsperarSair('Tópicos de permissão', aceite, topico);
   }
 
+  // Política de Privacidade: texto longo num TextView só; o `accept-button` só entra na árvore
+  // depois de rolar até o fim (NOTAS 09-29: ~30 swipes — medição não confirmada, por isso o
+  // orçamento é 45 e a parada é o isDisplayed(), nunca uma contagem fixa).
   async termo1() {
-    const element = await $("accessibility id:I have read and agree");
-    await forceScrollBeforeSearching(6);
-    const found = await scrollUntilVisible(element);
-    if (found) {
-      await element.click();
-      await driver.pause(timewhait);
-    } else {
-      console.log("⏭️ termo1 pulado (não encontrado após scrolls)");
-    }
+    // fonte: captures-2026-09-29/05-politica.xml e 06-politica-fim.xml (draft android/04)
+    await this.aceitarTelaLongaAndroid('Política de Privacidade');
   }
 
+  // Termos e condições de compra e uso: mesmo desenho; o nº de swipes não foi capturado.
   async termos2() {
-    const element = await $("accessibility id:I have read and agree");
-    await forceScrollBeforeSearching(5);
-    const found = await scrollUntilVisible(element);
-    if (found) {
-      await element.click();
-      await driver.pause(timewhait);
-    } else {
-      console.log("⏭️ termos2 pulado (não encontrado após scrolls)");
+    // fonte: captures-2026-09-29/07-termos.xml e 08-termos-fim.xml (draft android/05)
+    await this.aceitarTelaLongaAndroid('Termos e condições');
+  }
+
+  // As três telas de aceite usam o MESMO resource-id (`accept-button`), então depois de cada
+  // clique a única prova de que a tela trocou é o botão sair da tela. Falha nomeada se não sair.
+  private async aceitarTelaLongaAndroid(tela: string) {
+    const maxSwipes = 45;
+    const aceite = seletorTestId('accept-button');
+    const element = await $(aceite);
+
+    const achou = await scrollUntilVisible(element, maxSwipes);
+    if (!achou) {
+      throw new Error(`aceite da ${tela} não apareceu após ${maxSwipes} swipes (accept-button não ficou visível)`);
     }
+
+    await this.aceitarEEsperarSair(tela, aceite, aceite);
+  }
+
+  // Clica o aceite e espera `sinalDeSaida` sair da tela (15s). Sem isso o laço seguinte poderia
+  // enxergar o botão da tela anterior (mesmo id) e clicar duas vezes na mesma tela.
+  private async aceitarEEsperarSair(tela: string, aceite: string, sinalDeSaida: string) {
+    await (await $(aceite)).click();
+
+    const saiu = await driver
+      .waitUntil(async () => !(await $(sinalDeSaida).isDisplayed().catch(() => false)), {
+        timeout: 15000,
+        interval: 500,
+      })
+      .then(() => true)
+      .catch(() => false);
+
+    if (!saiu) {
+      throw new Error(
+        `Onboarding Android travado em "${tela}": o aceite continuou visível 15s depois do clique, ` +
+        'ou seja, a tela não trocou.'
+      );
+    }
+
+    console.log(`✅ Aceite (${tela})`);
+    await driver.pause(timewhait);
   }
 
   // ---------------------------------------------------------------------------
@@ -325,72 +508,138 @@ export class BasePage {
   // Este caminho também cobre o nó que ainda não está montado na árvore (lista virtualizada,
   // caso do "Logout" no Account Menu — PerfilPage.ts): isDisplayed() num elemento inexistente
   // cai no .catch(() => false) do scrollUntilVisible e o laço simplesmente rola de novo.
-  async rolaAteVisivelIOS(seletor: string): Promise<boolean> {
+  //
+  // `maxScrolls` existe porque a Política de Privacidade do app migrado exige ~21 swipes e os
+  // Termos ~9 (06-01 sessão A, ACOES.md capturas 07 e 09): o padrão de 14 não chega.
+  async rolaAteVisivelIOS(seletor: string, maxScrolls = 14): Promise<boolean> {
     const el = await $(seletor);
     if (await el.isDisplayed().catch(() => false)) return true;
 
     await forceScrollBeforeSearching(6);
-    return scrollUntilVisible(await $(seletor));
+    return scrollUntilVisible(await $(seletor), maxScrolls);
   }
 
-  // O CTA "Toque para começar" da tela de boas-vindas NÃO gera nó algum na árvore XCUITest —
-  // nem visível, nem oculto. Confirmado por busca no XML bruto: zero ocorrências de "Toque" e
-  // um único Button na árvore inteira (o "Close" do banner). Só coordenada resolve.
+  // Boas-vindas do app migrado. Ordem real medida na sessão A (06-01, ACOES.md capturas 00-05):
+  // alerta de NOTIFICAÇÃO -> toque no CTA -> alerta de ATT -> alerta de LOCALIZAÇÃO -> carrossel.
+  // Os três alertas são do SpringBoard e nenhum foi aceito sozinho (a sessão não usou
+  // autoAcceptAlerts); só `mobile: alert` com buttonLabel resolve.
+  //
+  // O CTA "Toque para começar" NÃO gera nó algum na árvore XCUITest — só coordenada, guardada
+  // como FRAÇÃO da janela (REQUIREMENTS.md: exceção obrigatória no iOS) e multiplicada pelo
+  // getWindowRect() do device real. fonte: ACOES.md captura 02 — (205,780)pt numa janela de
+  // 402x874 = fração (0.510, 0.892); 1 tap bastou, não é slider. Dívida a cobrar do time do app:
+  // um accessibilityIdentifier no CTA.
+  //
+  // O destino do toque é validado (alerta de ATT OU `permission-topic`): sem isso, um toque
+  // perdido só afloraria três telas adiante. Não verificado em run: confirmar no 06-03 Tarefa 3.
   async iniciaAppIOS() {
+    // Alerta de notificação: aparece antes das boas-vindas. Opcional — pode não vir (já
+    // respondido, ou aceito por autoAcceptAlerts no Device Farm).
+    await this.aceitarAlertasSistemaIOS('notificação', 1, 10000);
     await this.fechaBanner();
-    await this.tapProporcional(205 / 402, 780 / 874, 'CTA "Toque para começar"');
-    await driver.pause(timewhait);
+
+    const topico = seletorTestId('permission-topic'); // fonte: ACOES.md captura 02 (4x permission-topic)
+
+    for (let tentativa = 1; tentativa <= 2; tentativa++) {
+      await this.tapProporcional(0.510, 0.892, 'CTA "Toque para começar"');
+
+      const avancou = await driver
+        .waitUntil(
+          async () => (await this.existeAlertaIOS()) || (await $(topico).isDisplayed().catch(() => false)),
+          { timeout: 20000, interval: 500 }
+        )
+        .then(() => true)
+        .catch(() => false);
+
+      if (avancou) {
+        console.log(`✅ Boas-vindas avançou (toque ${tentativa}/2)`);
+        await driver.pause(timewhait);
+        return;
+      }
+      console.log(`⚠ Toque ${tentativa}/2 no CTA das Boas-vindas não avançou`);
+    }
+
+    throw new Error(
+      'Boas-vindas não avançou: depois de 2 toques no CTA (fração 0.510, 0.892 da janela) nem o ' +
+      'alerta de ATT nem a tela de Tópicos (permission-topic) apareceram em 20s. Conferir se um ' +
+      'alerta do sistema ficou de pé por cima do app ou se a janela do device difere muito de 402x874.'
+    );
   }
 
-  // O alerta de permissão de localização é do SpringBoard: não aparece no getPageSource() do
-  // app (zero ocorrências de "Allow"/"Alert" na árvore), então não há seletor possível. Quem
-  // o enxerga é o XCUITest, por `mobile: alert` — foi assim que os rótulos foram levantados
-  // numa sessão de Remote Access:
-  //   ["Precise: On","Precise: On","Allow Once","Allow While Using App","Don't Allow"]
+  // Alertas de ATT (App Tracking Transparency) e de localização, do SpringBoard: não aparecem no
+  // getPageSource() do app, então não há seletor — quem os enxerga é o XCUITest, por
+  // `mobile: alert`. O ATT é NOVO no app migrado (ACOES.md captura 03/04).
   //
-  // NÃO voltar a fechá-lo por coordenada. A versão anterior tocava em (200/402, 663/874) —
-  // fração da janela, medida num iPhone 402x874. Alerta do SpringBoard é diálogo de altura
-  // fixa centralizado: não escala com a tela. Em 390-393x844-852 a fração cai dentro do botão;
-  // em 430x932 (14 Pro Max, 15 Pro Max) não cai, o alerta fica de pé e, sendo modal, engole
-  // todo clique seguinte. Era isso que travava o onboarding nesses dois aparelhos no run #27.
+  // NÃO voltar a fechá-los por coordenada: alerta do SpringBoard é diálogo de altura fixa
+  // centralizado e não escala com a tela (travou o 14 Pro Max e o 15 Pro Max no run #27).
+  // acceptAlert() também não serve: retorna sucesso com o alerta ainda na tela.
   //
-  // acceptAlert() também não serve: retorna sucesso com o alerta ainda na tela (3 ocorrências
-  // nos drafts), e a capability autoAcceptAlerts:true não o dispensa.
+  // Não se presume a ordem: cada alerta tem os botões lidos por getButtons e o rótulo certo é
+  // escolhido entre os capturados (aceitarAlertasSistemaIOS).
   async permissaoLocalizacaoIOS() {
-    // Os rótulos vêm do idioma do iOS, não do app: nos aparelhos do pool o alerta está em
-    // inglês, mesmo com a mensagem do app em português. O undefined final é o accept sem
-    // rótulo, último recurso.
-    const rotulos: (string | undefined)[] = ['Allow While Using App', 'Permitir Ao Usar o App', undefined];
-
-    const texto = await this.esperaAlertaIOS();
-    if (texto === null) {
-      console.log('🔔 Nenhum alerta de localização apareceu — seguindo.');
+    const aceitos = await this.aceitarAlertasSistemaIOS('ATT e localização', 3, 15000);
+    if (aceitos === 0) {
+      console.log('🔔 Nenhum alerta de ATT/localização apareceu — seguindo.');
       return;
     }
-    console.log(`🔔 Alerta de localização na tela: ${texto}`);
-
-    for (const buttonLabel of rotulos) {
-      const descricao = buttonLabel ?? 'accept sem rótulo';
-      try {
-        await driver.execute('mobile: alert', buttonLabel ? { action: 'accept', buttonLabel } : { action: 'accept' });
-        console.log(`✅ Alerta de localização aceito por "${descricao}"`);
-        break;
-      } catch (erro) {
-        console.log(`⚠ "${descricao}" não serviu: ${erro}`);
-      }
-    }
-
-    await driver.pause(timewhait);
 
     // Confirmação obrigatória: o acceptAlert() antigo já reportava sucesso com o alerta na
     // tela, então "o comando não deu erro" não vale como prova de que fechou.
     if ((await this.esperaAlertaIOS(5000)) !== null) {
       throw new Error(
-        'Alerta de localização do iOS não fechou. Ele é modal: enquanto estiver de pé, todo ' +
-        'clique no app é engolido e o onboarding não avança. Levantar os rótulos com ' +
+        'Alerta do sistema do iOS (ATT/localização) não fechou. Ele é modal: enquanto estiver de ' +
+        'pé, todo clique no app é engolido e o onboarding não avança. Levantar os rótulos com ' +
         '`mobile: alert` action "getButtons" numa sessão de Remote Access antes de mexer aqui.'
       );
     }
+  }
+
+  // Aceita até `maximo` alertas do sistema em sequência. Devolve quantos aceitou (0 se nenhum
+  // apareceu em `primeiroTimeout`). Entre um alerta e o próximo espera só 6s: depois de aceitar
+  // o ATT a localização já está a caminho (ACOES.md captura 04 -> 05).
+  //
+  // Rótulos de aceitar, na ordem de preferência — seletor por texto do SO, frágil (sem id):
+  //   "Allow While Using App"  localização (botões: Precise: On, Allow Once, Allow While Using
+  //                            App, Don’t Allow — ACOES.md captura 04)
+  //   "Allow"                  notificação (Don’t Allow, Allow — captura 00) e ATT (Ask App Not
+  //                            to Track, Allow — captura 03)
+  // A ordem importa: na localização existe "Allow Once", e "Allow" sozinho não casa com ele
+  // porque a comparação é por igualdade. Sem nenhum dos dois, cai no accept sem rótulo (último
+  // recurso, já existente no código anterior).
+  private async aceitarAlertasSistemaIOS(contexto: string, maximo: number, primeiroTimeout: number): Promise<number> {
+    const rotulosAceitar = ['Allow While Using App', 'Allow'];
+    let aceitos = 0;
+
+    for (let i = 0; i < maximo; i++) {
+      const mensagem = await this.esperaAlertaIOS(i === 0 ? primeiroTimeout : 6000);
+      if (mensagem === null) break;
+      console.log(`🔔 Alerta do sistema (${contexto}): ${mensagem}`);
+
+      let botoes: string[] = [];
+      try {
+        botoes = (await driver.execute('mobile: alert', { action: 'getButtons' })) as string[];
+      } catch (erro) {
+        console.log(`⚠ getButtons falhou: ${erro}`);
+      }
+
+      const buttonLabel = rotulosAceitar.find((rotulo) => botoes.includes(rotulo));
+      try {
+        await driver.execute('mobile: alert', buttonLabel ? { action: 'accept', buttonLabel } : { action: 'accept' });
+        console.log(`✅ Alerta aceito por "${buttonLabel ?? 'accept sem rótulo'}" (botões: ${botoes.join(' | ') || '?'})`);
+      } catch (erro) {
+        console.log(`⚠ "${buttonLabel ?? 'accept sem rótulo'}" não serviu: ${erro}`);
+      }
+
+      aceitos++;
+      await driver.pause(timewhait);
+    }
+
+    return aceitos;
+  }
+
+  // Pergunta rápida "tem alerta do sistema agora?" — getAlertText() lança quando não há.
+  private async existeAlertaIOS(): Promise<boolean> {
+    return driver.getAlertText().then(() => true).catch(() => false);
   }
 
   // getAlertText() lança quando não há alerta — é o jeito de perguntar "tem alerta?" ao WDA.
@@ -417,28 +666,32 @@ export class BasePage {
 
   // Carrossel de permissões -> Política de Privacidade -> Termos e Condições de Compra e Uso.
   //
-  // As TRÊS telas usam o mesmo name (accept-button), variando só o label ("Continue" na
-  // primeira, "I have read and agree" nas outras duas). Elas aparecem uma de cada vez, então o
-  // seletor não é ambíguo — mas um laço ingênuo tocaria duas vezes na mesma tela.
+  // As TRÊS telas usam o mesmo name (accept-button), variando só o label. Elas aparecem uma de
+  // cada vez, então o seletor não é ambíguo — mas um laço ingênuo tocaria duas vezes na mesma
+  // tela. Medido na sessão A (06-01, ACOES.md capturas 06-10): o carrossel tem o botão visível
+  // de imediato; a Política exige ~21 swipes (~48s) e os Termos ~9 (~21s) — o orçamento abaixo
+  // é 45 swipes por tela, e a parada é o isDisplayed(), nunca uma contagem fixa.
   //
   // O sinal de transição é o botão SAIR da viewport: a tela seguinte entra rolada no topo, com
   // o accept-button lá embaixo em visible="false". Uma pausa fixa não distingue "ainda na
   // mesma tela" de "já na próxima"; esperar o botão sumir, sim.
+  //
+  // Falha nomeada, nunca pulo em silêncio: o aceite que não aparece trava o onboarding e a
+  // falha tem que apontar a tela certa (antes havia um "Aceite pulado" que escondia isso).
   async aceitaOnboardingIOS() {
-    const aceite = "accessibility id:accept-button";
+    const aceite = seletorTestId('accept-button'); // fonte: ACOES.md capturas 02, 06, 08
     const telas = ['carrossel de permissões', 'política de privacidade', 'termos e condições'];
+    const maxSwipes = 45;
 
     for (const tela of telas) {
-      const existe = await $(aceite).waitForExist({ timeout: 8000 }).then(() => true).catch(() => false);
+      const existe = await $(aceite).waitForExist({ timeout: 20000 }).then(() => true).catch(() => false);
       if (!existe) {
-        console.log(`⏭️ Aceite pulado (${tela}): "${aceite}" não existe na árvore`);
-        continue;
+        throw new Error(`Onboarding iOS: "accept-button" não existe na árvore da tela "${tela}" (20s).`);
       }
 
-      const alcancou = await this.rolaAteVisivelIOS(aceite);
+      const alcancou = await this.rolaAteVisivelIOS(aceite, maxSwipes);
       if (!alcancou) {
-        console.log(`⏭️ Aceite pulado (${tela}): "${aceite}" não ficou alcançável`);
-        continue;
+        throw new Error(`aceite da ${tela} não apareceu após ${maxSwipes} swipes (accept-button não ficou visível)`);
       }
 
       await this.fechaBanner();
@@ -459,9 +712,9 @@ export class BasePage {
 
       if (!avancou) {
         throw new Error(
-          `Onboarding iOS travado em "${tela}": "${aceite}" continuou visível 15s depois do ` +
+          `Onboarding iOS travado em "${tela}": "accept-button" continuou visível 15s depois do ` +
           'clique, ou seja, a tela não trocou. Suspeitar de modal do sistema por cima do app — ' +
-          'o alerta de localização é o caso conhecido.'
+          'os alertas de ATT e de localização são o caso conhecido.'
         );
       }
 
@@ -578,6 +831,54 @@ export class BasePage {
       anterior = atual;
     }
     console.log(`⚠ Tela ainda mudando após ${timeout}ms de espera — seguindo mesmo assim`);
+  }
+
+  // Digita num campo do formulário sem deixar o WDA fazer "tap + digita" de uma vez só.
+  //
+  // O que o appium.log do Run #8 mostrou, igual nos cinco aparelhos: o addValue chega com o
+  // campo sem foco ("Neither the XCUIElementTypeOther (Email) ... have the keyboard input
+  // focus"), o WDA dá o tap ele mesmo ("Trying to tap the element to have it focused"), espera
+  // ~0,5s de "idle" e despeja a string inteira em menos de 1s (maxTypingFrequency 60, o
+  // default). Nesse meio segundo o teclado ainda está subindo e o formulário refluindo — o
+  // draft 09 mediu o container encolhendo de 923 para 615 — e a letra perdida cai sempre no
+  // 3º/4º caractere, dentro dessa janela. É a assinatura de TextInput controlado do React
+  // Native engolindo tecla quando a thread JS não acompanha a digitação.
+  //
+  // Contramedida em duas partes: (a) focar o campo NÓS MESMOS e só digitar depois que o
+  // teclado estiver de pé e o layout assentado; (b) digitar mais devagar, trocando o
+  // maxTypingFrequency do WDA só durante o preenchimento — é setting de sessão
+  // (/appium/settings), não capability, então não encosta no wdio.conf.ts nem no Android.
+  // O valor 20 é ponto de partida; a unidade do WDA não é documentada de forma confiável e o
+  // critério é empírico: os cinco emails íntegros no frame do vídeo. No app migrado a sessão
+  // A usou 20 com sucesso (login real, 23 e 9 caracteres).
+  //
+  // Não há como conferir o texto digitado pela árvore (nota 1 do logarIOS); a checagem real
+  // é o modal de erro, tratado no laço do botão de entrar. A senha nunca é logada — só o
+  // comprimento.
+  protected async digitarIOS(seletor: string, valor: string, rotulo: string) {
+    const campo = await $(seletor);
+    await this.waitForElement(campo);
+    await this.fechaBanner();
+    await campo.click();
+
+    const tecladoAbriu = await driver
+      .waitUntil(() => driver.isKeyboardShown(), { timeout: 5000, interval: 250 })
+      .then(() => true)
+      .catch(() => false);
+    if (!tecladoAbriu) {
+      console.log(`⚠ ${rotulo}: isKeyboardShown() não confirmou o teclado em 5s — digitando mesmo assim`);
+    }
+    // Espera o reflow do formulário (923 -> 615) terminar antes da primeira tecla.
+    await driver.pause(1000);
+
+    await driver.updateSettings({ maxTypingFrequency: 20 });
+    try {
+      await campo.addValue(valor);
+    } finally {
+      await driver.updateSettings({ maxTypingFrequency: 60 });
+    }
+    console.log(`⌨ ${rotulo}: ${valor.length} caracteres digitados com o teclado ${tecladoAbriu ? 'aberto' : 'não confirmado'}`);
+    await driver.pause(500);
   }
 
   async debugContextAndSource() {

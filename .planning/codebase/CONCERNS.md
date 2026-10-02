@@ -56,7 +56,7 @@ Todos medidos em aparelho (`RELATORIO-ANOMALIAS-IOS.md`, seção 3, e `STATE.md`
 
 ## Fora do controle do repo
 
-- **ReCAPTCHA** no `Finalize purchase` bloqueia o fluxo de compra (M7).
+- **ReCAPTCHA** no `Finalize purchase` bloqueia o fluxo de compra (M8).
 - **Campanhas do Insider** mudam sem aviso e alteram o timing dos banners.
 - **App migrado** (M5): mesmo `bundleId`, versão 1.20.0/314, backend recusou a conta do `.env`
   em 2026-09-11 — pode ser outro ambiente. Não está escrito.

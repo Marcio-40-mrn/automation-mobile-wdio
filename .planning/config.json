@@ -1,7 +1,6 @@
 {
   "_comment": "Convenções GSD deste repositório. O tooling GSD (/gsd:*) NÃO está instalado; este arquivo documenta como o .planning/ é mantido à mão. Criado em 2026-09-16.",
   "mode": "interactive",
-  "depth": "standard",
   "language": "pt-BR",
   "parallelization": false,
   "commit_docs": false,
@@ -27,17 +26,26 @@
     "codebase_dir": "codebase",
     "legacy_plans_dir": "plans",
     "drafts_dir": "drafts",
-    "_comment": "plans/ é o registro anterior (um .md por iniciativa, por data) e continua válido; phases/ mapeia os marcos M1–M7 do ROADMAP.md. drafts/ e RELATORIO-ANOMALIAS-IOS.md ficam fora do git (.gitignore)."
+    "_comment": "plans/ é o registro anterior (um .md por iniciativa, por data) e continua válido; phases/ mapeia os marcos M1–M8 do ROADMAP.md. drafts/ e RELATORIO-ANOMALIAS-IOS.md ficam fora do git (.gitignore)."
   },
   "session_start": {
     "hook": ".claude/hooks/session-start.sh",
-    "loads": ["STATE.md", "ROADMAP.md (linhas 'em andamento')"],
-    "claude_md_imports": ["PROJECT.md", "REQUIREMENTS.md", "STATE.md", "ROADMAP.md"]
+    "loads": [
+      "STATE.md",
+      "ROADMAP.md (linhas 'em andamento')"
+    ],
+    "claude_md_imports": [
+      "PROJECT.md",
+      "REQUIREMENTS.md",
+      "STATE.md",
+      "ROADMAP.md"
+    ]
   },
   "agents": {
     "inspector": ".claude/agents/mobile-ui-inspector.md",
     "draft_writer": ".claude/agents/mobile-draft-writer.md",
     "memory": ".claude/agents/project-memory-keeper.md",
     "security": ".claude/agents/security-scanner.md"
-  }
+  },
+  "granularity": "standard"
 }

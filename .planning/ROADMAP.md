@@ -119,7 +119,7 @@ clique no `Close`, 3s depois e validação, e screenshot no Allure se não fecha
 
 ## M4 — Paridade em CI ✅
 
-Concluído em 2026-09-10, com ajustes nos testes em 2026-09-11 (`c367423`, `59ea7b1`) —
+Concluído em 2026-09-10, com ajustes nos testes em 2026-09-11 (`c367423`) —
 `CI Run #14`: Android 18/18 e iOS 5/5, um run por iPhone, 5 contas distintas.
 
 O job `run-ios-on-device-farm` **já existe** em `.github/workflows/mobile_test.yml`, com
@@ -140,13 +140,14 @@ que segue com o mapa por modelo do `deviceIndex.android`. Ver `STATE.md`.
 Validado: `CI iOS Run #7` (5 runs, 5 contas distintas, os 5 aparelhos executaram) e
 `CI Run #14` (fluxo inteiro verde nas duas plataformas).
 
-## M5 — Levantamento do app migrado (Android e iOS) ⬜ ← próximo
+## M5 — Levantamento do app migrado (Android e iOS) 🔄 em andamento
 
 Decidido em 2026-09-11. O app Aramis está sendo **migrado por módulos** para uma versão
 nova, com `testID` nos elementos. O Marcio entrega o build; a partir dele, este marco
 captura os elementos das telas **nas duas plataformas**, pelo mesmo procedimento do M2/M3
-(`mobile-ui-inspector` captura, `mobile-draft-writer` redige), para que depois (M6) a
-suíte atual e os testes futuros rodem nesse app.
+(`mobile-ui-inspector` captura, `mobile-draft-writer` redige), para que depois os cenários
+Gherkin (M6), a suíte atual (M7) e os testes futuros rodem nesse app. Estado em 2026-09-29:
+Android com 2ª leva capturada e drafts escritos; iOS com a 1ª leva incompleta e sem draft.
 
 O que está definido:
 
@@ -168,6 +169,10 @@ O que está definido:
   capturas, fluxo da suíte de ponta a ponta. Login OK (a conta foi cadastrada no app migrado
   nesse dia, o que também explica o bloqueio do iOS); favoritar falha no app ("Falha ao
   carregar"). Sem draft ainda. Ver `STATE.md`.
+- **Android: 2ª leva feita em 2026-09-29** — build 1.20.10 (492), capturas `00`–`51`, fluxo da suíte
+  inteiro funcionando (favoritar/desfavoritar OK) + compra até a escolha de pagamento. App agora em
+  pt-BR. testIDs consolidados em `captures-2026-09-29/TESTIDS.md`. 28 drafts em
+  `.planning/drafts/app-migrado/android/` (índice `00-INDICE.md`). Ver `STATE.md`.
 - **Destino dos drafts:** `.planning/drafts/app-migrado/ios/` e
   `.planning/drafts/app-migrado/android/`, mesmo formato e mesmo `00-INDICE.md` dos drafts
   atuais. Os drafts do app atual (`.planning/drafts/ios/`) ficam como estão, como base de
@@ -180,16 +185,74 @@ Não está escrito ainda — definir quando o build chegar:
   2026-09-11.**
 - ~~Como o Android será capturado~~ — **AVD local via `adb`**, como no M2 (usado em 2026-09-22).
 
-## M6 — A suíte atual rodando no app migrado ⬜
+## M6 — Cenários Gherkin da seção 3 no app migrado 🔄 em andamento
+
+**Em execução desde 2026-10-01** (`/gsd-execute-phase 6`): 4/16 planos concluídos — 06-01 (DEC-A +
+captura iOS), 06-02 e 06-03 (POC migrada, Etapa 0) **verde local no Android e no iOS**; 06-04
+(Onboarding e Login escritos, DEC-C respondida, sem run ainda). CI do Device Farm pendente.
+Próximo: 06-05 (Logout + run da Etapa 1). Ver `STATE.md`.
+
+**Planejado em 2026-10-01** pelo `/gsd-plan-phase 6`: 16 planos
+(`.planning/phases/06-cenarios-gherkin-app-migrado/06-01-PLAN.md`…`06-16-PLAN.md`), em sequência,
+com o escopo do `06-CONTEXT.md` (82 cenários agora, 11 pendentes de massa, 8 excluídos).
+Próximo comando: `/gsd-execute-phase 6`.
+
+Decidido em 2026-09-29. **Fonte:** seção 3 ("Cenários de teste em Gherkin") de
+`cenarios-gherkin-2026-09-28.pdf`, na raiz do repositório — 15 funcionalidades, **101
+cenários**, escritos para o app migrado (pt-BR, Mochila). As seções 1, 2 e 4 do PDF (regras,
+técnicas, testes não funcionais) não fazem parte deste marco.
+
+- **O que é "escrever" aqui:** teste automatizado **WebdriverIO + Mocha** (o framework do
+  `wdio.conf.ts`), com o Gherkin do PDF como especificação de cada caso.
+- **Seletores:** os `testID` do app migrado, levantados no M5
+  (`drafts/app-migrado/android/captures-2026-09-29/TESTIDS.md` e os drafts). Onde não houver
+  testID, vale o que o draft da tela disser.
+- **Uma suíte só** continua valendo: specs por funcionalidade, nunca por sistema operacional.
+- **Em etapas**, na ordem abaixo — acesso primeiro (todo o resto depende de onboarding e
+  login), massa de dados pesada por último. Cada etapa fecha com os seus cenários verdes em
+  run real (AVD-S24, rodado pelo Marcio, e Device Farm).
+
+| Etapa | Funcionalidades do PDF (nº de cenários) | Cenários | Dependência / observação |
+|---|---|---|---|
+| 0 — Base | — | 0 | page objects e seletores por testID do app migrado, textos pt-BR, estrutura dos specs, massa de dados |
+| 1 — Acesso | Onboarding — Permissões e Acesso Inicial (7); Login — Autenticação e Recuperação de Senha (7); Menu — Logout (3) | 17 | fluxo já capturado no M5 |
+| 2 — Catálogo | Busca de Produtos por Palavra-chave (3); Filtros de Busca — Combinação, Contagem e Limpeza (7); PDP — Visualização, Seleção de Tamanho e Adição à Mochila (7) | 17 | |
+| 3 — Mochila | Mochila — Gerenciamento de Itens, Quantidade e Cupom (16) | 16 | cupons (válido, inexistente, expirado, condicional), valor mínimo do frete grátis e produto com estoque conhecido |
+| 4 — Checkout | Checkout — Cadastro de Endereço de Entrega (7) | 7 | campos de endereço **sem testID** (2ª leva Android, `STATE.md`) |
+| 5 — Criar Conta | Criar Conta — Validações da Etapa 1 (15); Criar Conta — Validações da Etapa 2 (Senha) (7) | 22 | e-mail/CPF descartáveis por execução e um e-mail/CPF já cadastrado |
+| 6 — Menu | Menu — Meus Dados (9); Menu — Configurações de Comunicação e Exclusão de Conta (4); Menu — Estado Vazio de Meus Pedidos e Favoritos (2); Menu — Visibilidade da Seção DEV por Tipo de Build (2) | 17 | simular falha de conectividade; build interna para a seção DEV |
+| 7 — pt-BR | Exibição de Conteúdo em Português do Brasil (5) | 5 | transversal; fecha depois das telas cobertas |
+
+Total: 17 + 17 + 16 + 7 + 22 + 17 + 5 = **101**.
+
+Não está escrito ainda — definir antes da etapa correspondente:
+
+- **Massa de dados:** de onde vêm cupons, CEPs, estoque, valor do frete grátis, e-mails e
+  CPFs para cadastro (etapas 3, 4 e 5).
+- **Ramo iOS:** as capturas iOS do M5 estão incompletas (sem login, sem PDP). Como as etapas
+  avançam enquanto o iOS não estiver capturado.
+- **Como simular** falha de conectividade (Meus Dados) e obter a build interna com a seção
+  DEV (etapa 6).
+- **Repositório e forma de entrada no código** (ramo nos page objects atuais, suíte nova ou
+  repositório novo) — a decisão de repositório adiada no M5.
+- Se os cenários entram no CI (Device Farm) já na etapa em que são escritos ou só ao final.
+
+## M7 — A suíte atual rodando no app migrado ⬜
+
+Era o M6 até 2026-09-29, renumerado quando os cenários Gherkin entraram como próximo passo.
 
 Depois do M5. Replicar no app novo o mesmo cenário de `test/specs/test.spec.ts` — e os
 testes que vierem depois — a partir dos drafts do M5. Como isso entra no código (mais um
 ramo nos page objects, suíte separada ou repositório novo) depende da decisão de
 repositório adiada no M5; **não está escrito**.
 
-## M7 — Cobertura além do favoritar ⬜
+## M8 — Cobertura além do favoritar ⬜
 
-**Adiado em 2026-09-11:** nenhum cenário de compra é criado antes do M5 e do M6. Os drafts
+Era o M7 até 2026-09-29. **Sobreposição com o M6:** adicionar à sacola, escolher tamanho e
+cadastrar endereço passam a ser cobertos pelas etapas 2, 3 e 4 do M6; o que sobra aqui é
+cartão → finalizar compra (e o bloqueio de ReCAPTCHA abaixo).
+
+**Adiado em 2026-09-11:** nenhum cenário de compra é criado antes do M5 e do M7. Os drafts
 `25`–`33` do app atual ficam como referência; no app migrado o fluxo de compra é
 recapturado no M5, e o teste — quando vier — corre no app migrado. Não se sabe se o app
 migrado tem o mesmo ReCAPTCHA; o bloqueio abaixo foi medido no app atual.
@@ -202,5 +265,5 @@ endereço → cartão → finalizar compra.
 anti-bot do backend funcionando como projetada. Tudo até o Summary é automatizável e está
 documentado (drafts `25`–`32`). Encaminhamento: pedir ao time de backend um allowlist ou
 bypass de ReCAPTCHA para o ambiente de QA/Device Farm; até lá, o critério de sucesso
-possível é a chegada ao Summary. **O M1, o M3 e o M6 não são afetados** — não passam por
+possível é a chegada ao Summary. **O M1, o M3 e o M7 não são afetados** — não passam por
 compra.
