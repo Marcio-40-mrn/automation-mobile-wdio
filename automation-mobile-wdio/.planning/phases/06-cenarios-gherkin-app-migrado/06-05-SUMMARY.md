@@ -24,19 +24,19 @@ key-decisions:
   - "DEC-C (f): no iOS sem diálogo observável, OUT-01 e OUT-02 pulam com motivo; OUT-03 valida o logout direto pelo estado do Menu"
   - "Sem test/utils/sessao.ts (DEC-A): cada it se prepara sozinho com os métodos existentes"
 
-requirements-completed: [ONB-01, ONB-02, ONB-03, ONB-04, ONB-05, ONB-07, LOG-01, LOG-02, LOG-03, LOG-04, LOG-05, LOG-07, OUT-01, OUT-02, OUT-03]
+requirements-completed: []
 
-status: complete-ci-pendente
+status: parcial — Tarefa 1 concluída; Tarefa 2 (run da Etapa 1) aguardando o Marcio
 
-completed: 2026-10-02
+completed: pendente (a Tarefa 2 ainda não rodou)
 
 actuals:
   tokens: 3500    # chars/4 sobre o acréscimo em PerfilPage.ts (~8,5k chars) e o spec novo (5,3k chars), medido por wc -c
-  tasks: 2
+  tasks: 1        # de 2; a Tarefa 2 é checkpoint humano e está pendente
   commits: 0      # Nenhum commit (regra do projeto): o Marcio versiona
 ---
 
-# Phase 06 Plan 05: Etapa 1 — Logout (OUT-01..03) e fechamento da etapa — Summary
+# Phase 06 Plan 05: Etapa 1 — Logout (OUT-01..03) e fechamento da etapa — Summary PARCIAL
 
 **OUT-01..03 escritos como WDIO + Mocha para as duas plataformas, com o diálogo de logout asserido pela estrutura (sem ler texto) e o ramo iOS pulado por DEC-C (f) onde o `autoAcceptAlerts` engole o diálogo. A Etapa 1 (15 cenários) está completa no código; NADA disto foi exercitado contra device. O run da Etapa 1 (Tarefa 2) é do Marcio e está pendente.**
 
@@ -47,32 +47,7 @@ Nenhum commit (regra do projeto). Nenhum comando de device foi executado: só `t
 | Tarefa | Situação |
 |---|---|
 | 1 — Logout OUT-01..03 nas duas plataformas | **Concluída** (código + verificações estáticas) |
-| 2 — Run da Etapa 1 (AVD-S24 + Device Farm Android e iOS) | **Concluída pelo Marcio no AVD-S24** ("os testes passaram 5 testes! dê como concluído e testado", 2026-10-02). Device Farm **não rodado** — pendente |
-
-**Atualização de 2026-10-02 (depois do checkpoint).** O texto abaixo descreve a Tarefa 1 como foi
-entregue (3 its de logout, 15 cenários em 13 its). Depois disso, a pedido do Marcio:
-
-1. **Espera pelas Boas-vindas de 20 s para 60 s** (`OnboardingPage.abrirApp()` e `BasePage.iniciaApp()`).
-   Run das 13:59: 9 testes falharam em "Boas-vindas não apareceu ... em 20s". O vídeo mostrou o app
-   ainda carregando (tela branca e logo animado) entre 22 e 25 s depois de limpar os dados. O tempo
-   até as Boas-vindas cresceu ao longo do run: 13,6 s, depois 14,0 s, 19,7 s e mais de 20 s.
-2. **REVERTIDO em 2026-10-03 por ordem do Marcio:** `01-onboarding`, `02-login`, `03-logout` e
-   `cobertura.check.mjs` voltaram ao último commit (15 `it`, sem situação C). O registro abaixo é
-   histórico.
-   **Cobertura mínima: a Etapa 1 passou de 13 para 5 `it` e depois para 7** (2026-10-03: ONB-02 e
-   ONB-03 restaurados como `it` próprios. O Marcio tinha decidido 4 testes de onboarding, e a
-   absorção desses dois no ONB-04 foi erro meu, sem pedido. A lista abaixo é a das 23:31) (regra nova no REQUIREMENTS.md, "um
-   teste por decisão"). Situação **C** no gate (`cobertoPor`):
-   - `[ONB-01]`;
-   - `[ONB-04] ... (cobre [ONB-02], [ONB-03], [ONB-05] e [ONB-07])`;
-   - `[LOG-05] ... (cobre [LOG-01], [LOG-02] e [LOG-04])`: os estados do botão na mesma tela, até a
-     credencial recusada; cada campo é preenchido uma vez, porque no iOS o campo perde o seletor;
-   - `[LOG-07] ... (cobre [LOG-03])`;
-   - `[OUT-03] ... (cobre [OUT-01] e [OUT-02])`: abre, cancela, abre de novo e confirma. No iOS as
-     etapas 01/02 viram aviso no relatório (DEC-C f), sem `pularNestaPlataforma`.
-3. **Adiada pelo Marcio:** a correção do `BasePage.iniciaApp()`, que hoje dá o 2º toque num container
-   que já sumiu quando o 1º toque avançou mas o destino não foi detectado. Visto 2x: ONB-02 às 16:16
-   e ONB-03 às 18:41.
+| 2 — Run da Etapa 1 (AVD-S24 + Device Farm Android e iOS) | **Aguardando o Marcio** (checkpoint:human-verify) |
 
 ## Tarefa 1 — o que foi feito
 
@@ -127,21 +102,15 @@ Nenhum foi exercitado por WDIO. O run da Etapa 1 (Tarefa 2) é a verificação.
 3. A pergunta/rótulos do PDF ("Você deseja sair da sua conta?", CANCELAR, SAIR) não são conferidos (regra fixa sem texto).
 4. Pendências herdadas do 06-04 seguem abertas: iOS sem reset de dados (ONB-05/07 podem pular), `clearApp` x `autoGrantPermissions` no AVD, LOG-05 2ª cláusula, e a leitura da caixa do Gmail (LOG-07).
 
-## Resultado do run da Etapa 1 (Tarefa 2)
-
-Medido nos `allure-results` locais, com a pasta limpa antes do run:
+## Resultado do run da Etapa 1 (Tarefa 2) — PENDENTE
 
 | Ambiente | passing | skipped | failing | Duração | Quando |
 |---|---|---|---|---|---|
-| Android AVD-S24 (Marcio), 5 `it` | **5** | 0 | 0 | 1066 s, cerca de 18 min (ONB-01 33 s, ONB-04 221 s, LOG-05 253 s, LOG-07 266 s, OUT-03 293 s) | 2026-10-02 23:31–23:49 |
-| Device Farm Android (6 devices) | **não rodado** | — | — | — | pendente |
-| Device Farm iOS (5 devices, 1 run cada) | **não rodado** | — | — | — | pendente |
+| Android AVD-S24 (Marcio) | pendente | pendente | pendente | pendente | pendente |
+| Device Farm Android (6 devices) | pendente | pendente | pendente | pendente por job | pendente |
+| Device Farm iOS (5 devices, 1 run cada) | pendente | pendente | pendente | pendente por job | pendente |
 
-Os runs locais anteriores, com 13 `it`, levavam cerca de 36 min. A POC (`00-poc-favoritar`) não estava neste run. Ela passou no run das 18:36, já com `logar()`/`logout()` refatorados.
-
-**Seletores agora verificados no Android (AVD, run verde):** `alert_title`, `android:id/message`, `android:id/button2`, `android:id/button1`, `seletorSair()`, `menu-card` `enabled` como sinal de logado/deslogado, "Sair" visível depois de cancelar, e os seletores do 06-04 exercitados pelos 5 `it`: Boas-vindas, diálogos de permissão (negar e permitir), Tópicos, Política, Termos, Home com abas, campos do Login, botão de entrar `enabled`, modal de erro, Esqueci minha senha e botão de envio. **iOS: nenhum verificado**, porque o Device Farm iOS não rodou.
-
-Pendentes pelo AWS CLI (só leitura), depois do run do CI: duração por job e tamanho do Customer Artifacts por device.
+Tamanho do Customer Artifacts por device e duração por job (AWS CLI, só leitura): **pendente**. Seletores "verificados" depois do run: **pendente**. Divergências novas observadas: **pendente**.
 
 ## Known Stubs
 

@@ -85,13 +85,13 @@ export class OnboardingPage extends BasePage {
         await driver.execute('mobile: activateApp', { appId: APP_ID });
 
         const apareceu = await $(this.boasVindasAndroid)
-            .waitForDisplayed({ timeout: 60000 })
+            .waitForDisplayed({ timeout: 20000 })
             .then(() => true)
             .catch(() => false);
         if (!apareceu) {
             throw new Error(
                 'Boas-vindas não apareceu depois de limpar e ativar o app: o container clicável ' +
-                '(ancestral de first-access-item-animation) não ficou visível em 60s. clearApp funcionou?'
+                '(ancestral de first-access-item-animation) não ficou visível em 20s. clearApp funcionou?'
             );
         }
         console.log('🆕 App limpo e Boas-vindas na tela');

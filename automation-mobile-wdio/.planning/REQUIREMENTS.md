@@ -22,20 +22,6 @@ Um único cenário, em `test/specs/test.spec.ts`, rodando por device:
   onde o Gherkin do `cenarios-gherkin-2026-09-28.pdf` diverge do app (ordem de diálogos, telas a
   mais/a menos, navegação), o teste valida o comportamento do app e só registra a diferença em
   comentário/SUMMARY. Não é assunto para perguntar — vale para todas as etapas do M6.
-- **Cobertura mínima e simples: um teste por decisão** (decisão do Marcio, 2026-10-02). Vale para
-  todas as etapas do M6 e para qualquer teste novo. Cada teste automatizado cobre uma **decisão**
-  do usuário ou do app, como permitir ou negar, campo válido ou inválido, ou confirmar ou cancelar.
-  Um cenário do PDF que repete o caminho de outro, ou que só confere o fim de um fluxo que outro
-  teste já percorre, **não ganha teste próprio**: vira asserção dentro desse outro teste, e o
-  título dele cita o ID (ex.: `[ONB-04] ... (cobre [ONB-05] e [ONB-07])`). Caso repetido ou
-  desnecessário é excluído. O motivo é que cada teste roda em todos os devices do CI e o tempo se
-  multiplica. No gate (`test/utils/cobertura.check.mjs`), o cenário coberto assim tem situação
-  **C** e `cobertoPor`.
-  **Revertido na Etapa 1 (Marcio, 2026-10-03):** as reduções de Onboarding, Login e Logout foram
-  desfeitas, e os specs e o gate voltaram ao último commit (15 testes, ONB-01..05 e 07, LOG-01..05
-  e 07, OUT-01..03). **Nenhum teste é juntado ou removido sem autorização explícita do Marcio
-  para aquele spec e aquele número.** A redução pode ser proposta, mas não pode ser aplicada por
-  conta própria.
 - **Onboarding não tem retorno**: cenário de "Voltar" dentro do onboarding (ONB-06) está fora
   do escopo (decisão do Marcio, 2026-10-01). Não planejar nem perguntar.
 - O teste não pode depender de nome de produto fixo: o catálogo muda entre versões e

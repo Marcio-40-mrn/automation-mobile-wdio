@@ -1,6 +1,6 @@
 # STATE
 
-Atualizado em **2026-10-03** (M6 em execução: 06-01 a 06-05 concluídos — **Etapa 1 verde no AVD-S24** (5/5, versão reduzida; **reduções revertidas em 2026-10-03, specs de volta aos 15 testes do último commit, não rodados nessa forma desde então**), POC verde local no Android e no iOS; Device Farm da Etapa 1 e da POC pendente; próximo: 06-06; ver "Pendências abertas").
+Atualizado em **2026-10-02** (M6 em execução: 06-01 a 06-04 concluídos — POC verde local no Android e no iOS; 06-04 escrito, só verificação estática; próximo: 06-05 e o run da Etapa 1 no CI; ver "Pendências abertas").
 
 > Este arquivo foi mesclado nesta data. A cópia do `.planning/` trazida de outra pasta em
 > 2026-09-10 sobrescreveu a versão de 09-09 com a de 09-08 — os drafts e o relatório de
@@ -152,7 +152,7 @@ Cobertura: fluxo do M1 inteiro **e** o fluxo de compra do `test/Draft.ts` até o
 
 ## Pendências abertas
 
-### M6 — em execução desde 2026-10-01 (`/gsd-execute-phase 6`): planos 06-01 a 06-05 concluídos
+### M6 — em execução desde 2026-10-01 (`/gsd-execute-phase 6`): planos 06-01 a 06-04 concluídos
 
 - **06-01:** DEC-A respondida (registrada no `06-CONTEXT.md`); **regra fixa: idioma ignorado, testes
   não validam texto** (D-04 corrigida, `REQUIREMENTS.md`); captura iOS sessão A do app migrado
@@ -189,37 +189,7 @@ Cobertura: fluxo do M1 inteiro **e** o fluxo de compra do `test/Draft.ts` até o
   de segredo (`.env`) não está ativa. **Decisão do Marcio (2026-10-02): não mexer.** O impacto
   não é conhecido, e o `.claude/settings.json` nunca é alterado (regra no `REQUIREMENTS.md`).
   Fica só registrado.
-- **06-05 (2026-10-02):** Logout OUT-01..03 escrito. Run local no AVD (16:07–17:01): POC + 14
-  cenários passaram, **só o ONB-02 falhou** em `tocarCta()`. O toque avançou e o diálogo de
-  localização ficou na tela (vídeo), mas o `iniciaApp()` não o detectou em 20 s e o 2º toque
-  clicou no container já sumido. Causa da não detecção sem prova. A correção do `iniciaApp()`
-  (não tocar de novo se o container sumiu) foi **adiada pelo Marcio**. Antes desse run, a espera
-  pelas Boas-vindas subiu de 20 s para 60 s (`OnboardingPage.abrirApp`, `BasePage.iniciaApp`):
-  o app leva de 13 a 25 s ou mais para abrir depois de limpar os dados.
-- **REVERTIDO (Marcio, 2026-10-03):** "deixar igual os testes estavam no último commit". Os arquivos
-  `01-onboarding`, `02-login`, `03-logout` e `cobertura.check.mjs` foram restaurados do HEAD e têm
-  **15 testes**. Gate com `COBERTURA_ETAPA_ATE=1 COBERTURA_PREFIXOS=ONB,LOG,OUT`: 8/8. **Os 15 ainda
-  não rodaram juntos no AVD.** Depois, as 4 suítes (`00` a `03`) foram copiadas da pasta
-  `automation-mobile-wdio/` que o Marcio entregou, igual ao último commit. Com isso o
-  `00-poc-favoritar.spec.ts` voltou a ficar ativo, com 1 teste. São 16 testes no total.
-  Histórico da redução, que não vale mais:
-- **Cobertura mínima (Marcio, 2026-10-02, regra no `REQUIREMENTS.md`):** Etapa 1 reduzida de 13
-  para **7 testes**, todos com situação C no gate (`cobertoPor`):
-  - Onboarding: **4 testes, decisão do Marcio** (ONB-01..04, um por combinação de permissão), com
-    ONB-04 cobrindo ONB-05 e 07. Por erro meu, o run das 23:31 teve só 2 (ONB-02/03 absorvidos
-    sem pedido); os testes foram restaurados em 2026-10-03.
-  - Login: LOG-05 cobre LOG-01, 02 e 04 (estados do botão na mesma tela até a credencial recusada);
-    LOG-07 cobre LOG-03.
-  - Logout: OUT-03 cobre OUT-01 e OUT-02 (abre → cancela → abre → confirma).
-  A preparação (onboarding + login) custa 120–220 s por teste no AVD, e as asserções, segundos.
-  Vale para todas as próximas etapas: um teste por decisão, sem caminho repetido.
-- **06-05 concluído (Marcio, 2026-10-02): Etapa 1 verde no AVD-S24, 5/5 em ~18 min** (23:31–23:49).
-  Esse run foi com 2 testes de onboarding. **ONB-02 e ONB-03 foram restaurados depois e não rodaram
-  na versão atual de 7 testes**; eles já tinham passado separados nos runs das 16:15 e 18:39.
-  Resultado e seletores verificados no `06-05-SUMMARY.md`. **Device Farm (Android e iOS) não rodado**:
-  fica pendente para o próximo run do CI, junto com a POC.
-- **Próximo:** 06-06 (capturas da Etapa 2/3 e DEC-D). Antes de escrever as próximas etapas, aplicar
-  a regra de cobertura mínima.
+- **Próximo:** 06-05 (Logout OUT-01..03) e o run da Etapa 1 — AVD e Device Farm, disparados pelo Marcio.
 
 ### M6 — discussão feita em 2026-09-30
 

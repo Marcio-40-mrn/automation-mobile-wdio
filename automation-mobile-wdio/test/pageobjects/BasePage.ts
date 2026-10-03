@@ -332,13 +332,13 @@ export class BasePage {
     ];
 
     const apareceu = await $(container)
-      .waitForDisplayed({ timeout: 60000 })
+      .waitForDisplayed({ timeout: 20000 })
       .then(() => true)
       .catch(() => false);
     if (!apareceu) {
       throw new Error(
         'Boas-vindas não apareceu: o container clicável (ancestral de first-access-item-animation) ' +
-        'não ficou visível em 60s. O app está limpo (adb shell pm clear com.aramis.ecomm)?'
+        'não ficou visível em 20s. O app está limpo (adb shell pm clear com.aramis.ecomm)?'
       );
     }
 
