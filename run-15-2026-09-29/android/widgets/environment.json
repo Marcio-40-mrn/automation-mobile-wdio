@@ -1,0 +1,1 @@
+[{"values":["Android"],"name":"Platform"},{"values":["R3GL10AJ4BM"],"name":"Device"},{"values":["com.aramis.ecomm"],"name":"App"},{"values":["1.14.3"],"name":"AppVersion"},{"values":["486"],"name":"AppBuildVersion"},{"values":["UiAutomator2"],"name":"Automation"},{"values":["WebdriverIO + Appium"],"name":"Framework"},{"values":["AWS Device Farm"],"name":"Environment"}]
