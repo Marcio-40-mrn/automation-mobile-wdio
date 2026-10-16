@@ -1,0 +1,2 @@
+O favorito "Camisa Manga Longa Regular Tech Flex Falso Liso Azul" FICOU na conta qatest100@maildrop.cc. O próximo run deste device vai DESfavoritar em vez de favoritar — desfavoritar manualmente antes.
+Motivo: element ("-ios predicate string:name == "menu-card" AND label CONTAINS "Favorites"") still not displayed after 20000ms

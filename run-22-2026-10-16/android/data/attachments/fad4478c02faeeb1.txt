@@ -1,0 +1,2 @@
+O favorito "Camisa Manga Longa Regular Tech Flex Falso Liso Azul" FICOU na conta jessicarochalima21+test140@gmail.com. O próximo run deste device vai DESfavoritar em vez de favoritar — desfavoritar manualmente antes.
+Motivo: element ("-android uiautomator:new UiSelector().resourceId("menu-card").instance(2)") still not displayed after 20000ms
