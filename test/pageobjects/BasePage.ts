@@ -273,9 +273,16 @@ export class BasePage {
   //     distingue os dois estados. fonte: captures-2026-09-29/51-pos-logout.xml × 48-menu-rolado.xml
   // iOS: accessibility id (seletor por texto — frágil, sem testID; ver test/utils/textos.ts).
   protected seletorAcessoLogin(chave: 'menu.acessoLogin' | 'menu.acessoLoginRodape'): string {
-    if (process.env.PLATFORM === 'ios') return `accessibility id:${texto(chave)}`;
+    // iOS, build 349: o acesso do topo ganhou testID (`menu-login-button`); o "Register or login"
+    // por texto era do build 335. O do rodapé continua por texto (Button `login`).
+    // fonte: drafts/app-migrado/ios/07-menu-deslogado.md (captures-2026-10-15-compra-pix/09 e 10)
+    if (process.env.PLATFORM === 'ios') {
+      return chave === 'menu.acessoLogin' ? seletorTestId('menu-login-button') : `accessibility id:${texto(chave)}`;
+    }
+    // Desde o build 500 o acesso ao Login tem testID próprio (`menu-login-button`); o `menu-card`
+    // usado como âncora antes não existe mais. fonte: captures-2026-10-14-compra-pix/02a-menu-deslogado.xml
     return chave === 'menu.acessoLogin'
-      ? '(//*[@resource-id="menu-card"])[1]/preceding::*[@clickable="true"][1]'
+      ? seletorTestId('menu-login-button')
       : '(//*[@resource-id="tab-home"])[1]/preceding::*[@clickable="true"][1][@resource-id=""]';
   }
 
@@ -380,8 +387,10 @@ export class BasePage {
   // onboarding não segue e a falha tem que apontar este passo.
   async continua() {
     // fonte: captures-2026-09-29/04-topicos.xml (draft android/03)
+    // Desde o build 500 cada tela do onboarding tem o seu aceite (o `accept-button` genérico sumiu).
+    // fonte: captures-2026-10-09-build500/RESULTADO.md e captures-2026-10-14-compra-pix-rodada2
     const topico = seletorTestId('permission-topic');
-    const aceite = seletorTestId('accept-button');
+    const aceite = seletorTestId('onboarding-topics-continue');
 
     const apareceu = await $(topico)
       .waitForDisplayed({ timeout: 20000 })
@@ -399,25 +408,26 @@ export class BasePage {
   // orçamento é 45 e a parada é o isDisplayed(), nunca uma contagem fixa).
   async termo1() {
     // fonte: captures-2026-09-29/05-politica.xml e 06-politica-fim.xml (draft android/04)
-    await this.aceitarTelaLongaAndroid('Política de Privacidade');
+    await this.aceitarTelaLongaAndroid('Política de Privacidade', 'privacy-accept');
   }
 
   // Termos e condições de compra e uso: mesmo desenho; o nº de swipes não foi capturado.
   async termos2() {
     // fonte: captures-2026-09-29/07-termos.xml e 08-termos-fim.xml (draft android/05)
-    await this.aceitarTelaLongaAndroid('Termos e condições');
+    await this.aceitarTelaLongaAndroid('Termos e condições', 'terms-accept');
   }
 
-  // As três telas de aceite usam o MESMO resource-id (`accept-button`), então depois de cada
-  // clique a única prova de que a tela trocou é o botão sair da tela. Falha nomeada se não sair.
-  private async aceitarTelaLongaAndroid(tela: string) {
+  // Cada tela de leitura longa tem o seu aceite (`privacy-accept`, `terms-accept`), que só entra
+  // na árvore depois de rolar até o fim (rodada 2 de 2026-10-14: 15 swipes na Política, 5 nos
+  // Termos). Depois do clique, a prova de que a tela trocou é o botão sair da tela.
+  private async aceitarTelaLongaAndroid(tela: string, idAceite: string) {
     const maxSwipes = 45;
-    const aceite = seletorTestId('accept-button');
+    const aceite = seletorTestId(idAceite);
     const element = await $(aceite);
 
     const achou = await scrollUntilVisible(element, maxSwipes);
     if (!achou) {
-      throw new Error(`aceite da ${tela} não apareceu após ${maxSwipes} swipes (accept-button não ficou visível)`);
+      throw new Error(`aceite da ${tela} não apareceu após ${maxSwipes} swipes (${idAceite} não ficou visível)`);
     }
 
     await this.aceitarEEsperarSair(tela, aceite, aceite);
@@ -532,6 +542,11 @@ export class BasePage {
   //
   // O destino do toque é validado (alerta de ATT OU `permission-topic`): sem isso, um toque
   // perdido só afloraria três telas adiante. Não verificado em run: confirmar no 06-03 Tarefa 3.
+  //
+  // Build 349 (1.21.6): o CTA ganhou testID — `welcome-start-button`, container da janela toda —
+  // e o clique nele levou aos Tópicos (drafts/app-migrado/ios/01-boas-vindas.md, captura 01 -> 02
+  // de captures-2026-10-15-compra-pix). A coordenada por fração só é usada se o id não existir
+  // (build antigo). Nos Tópicos o botão agora é `onboarding-topics-continue`.
   async iniciaAppIOS() {
     // Alerta de notificação: aparece antes das boas-vindas. Opcional — pode não vir (já
     // respondido, ou aceito por autoAcceptAlerts no Device Farm).
@@ -539,9 +554,16 @@ export class BasePage {
     await this.fechaBanner();
 
     const topico = seletorTestId('permission-topic'); // fonte: ACOES.md captura 02 (4x permission-topic)
+    const cta = seletorTestId('welcome-start-button');
+    const ctaComId = await $(cta).waitForDisplayed({ timeout: 30000 }).then(() => true).catch(() => false);
 
     for (let tentativa = 1; tentativa <= 2; tentativa++) {
-      await this.tapProporcional(0.510, 0.892, 'CTA "Toque para começar"');
+      if (ctaComId) {
+        console.log('👆 CTA das Boas-vindas por testID (welcome-start-button)');
+        await (await $(cta)).click();
+      } else {
+        await this.tapProporcional(0.510, 0.892, 'CTA "Toque para começar"');
+      }
 
       const avancou = await driver
         .waitUntil(
@@ -678,43 +700,74 @@ export class BasePage {
   //
   // Falha nomeada, nunca pulo em silêncio: o aceite que não aparece trava o onboarding e a
   // falha tem que apontar a tela certa (antes havia um "Aceite pulado" que escondia isso).
+  //
+  // BUILD 349 (1.21.6, captures-2026-10-15-compra-pix, drafts ios/02 a 05): o `accept-button`
+  // não existe mais. Cada tela tem o seu id, e a ordem dos alertas mudou:
+  //   - Tópicos: `onboarding-topics-continue`. O 1º toque dispara os alertas de ATT e de
+  //     localização e a tela FICA nos Tópicos; só o 2º toque avança (NOTAS.md 03-06). Por isso
+  //     os alertas são aceitos aqui, depois de cada toque, e não mais antes dos Tópicos.
+  //   - Política: `privacy-accept`; Termos: `terms-accept`. Os dois existem desde a abertura da
+  //     tela com visible=false, e o click rola sozinho até eles (capturas 06 -> 07 -> 08). Se o
+  //     click não trocar a tela, cai no laço de swipe + isDisplayed() de antes e tenta de novo.
+  // Prova de saída de cada tela = o id da tela seguinte presente (Termos -> `tab-home`).
   async aceitaOnboardingIOS() {
-    const aceite = seletorTestId('accept-button'); // fonte: ACOES.md capturas 02, 06, 08
-    const telas = ['carrossel de permissões', 'política de privacidade', 'termos e condições'];
+    const continuar = seletorTestId('onboarding-topics-continue');
+    const politica = seletorTestId('privacy-accept');
+    const termos = seletorTestId('terms-accept');
+    const home = seletorTestId('tab-home');
     const maxSwipes = 45;
 
-    for (const tela of telas) {
+    // Tópicos
+    const naTela = await $(continuar).waitForDisplayed({ timeout: 20000 }).then(() => true).catch(() => false);
+    if (!naTela) {
+      throw new Error('Onboarding iOS: a tela de Tópicos (onboarding-topics-continue) não apareceu em 20s depois das Boas-vindas.');
+    }
+    for (let toque = 1; toque <= 3; toque++) {
+      if (!(await $(continuar).isDisplayed().catch(() => false))) break;
+      await this.fechaBanner();
+      await (await $(continuar)).click();
+      console.log(`👆 Tópicos: Continue (toque ${toque}/3)`);
+      // ATT e localização (SpringBoard), quando vierem. Com o autoAcceptAlerts do wdio.conf.ts
+      // eles podem já ter sido aceitos: aí nenhum aparece e o laço segue.
+      await this.aceitarAlertasSistemaIOS('ATT e localização', 3, 8000);
+      const saiu = await $(politica).waitForExist({ timeout: 10000 }).then(() => true).catch(() => false);
+      if (saiu) break;
+    }
+    if (!(await $(politica).isExisting().catch(() => false))) {
+      throw new Error(
+        'Onboarding iOS travado nos Tópicos: 3 toques em onboarding-topics-continue e a Política ' +
+        '(privacy-accept) não abriu. Suspeitar de alerta do sistema por cima do app.'
+      );
+    }
+    console.log('✅ Aceite (tópicos)');
+
+    // Política e Termos
+    const telas: Array<[string, string, string]> = [
+      ['política de privacidade', politica, termos],
+      ['termos e condições', termos, home],
+    ];
+    for (const [tela, aceite, proxima] of telas) {
       const existe = await $(aceite).waitForExist({ timeout: 20000 }).then(() => true).catch(() => false);
       if (!existe) {
-        throw new Error(`Onboarding iOS: "accept-button" não existe na árvore da tela "${tela}" (20s).`);
+        throw new Error(`Onboarding iOS: o aceite da ${tela} (${aceite}) não existe na árvore (20s).`);
       }
 
-      const alcancou = await this.rolaAteVisivelIOS(aceite, maxSwipes);
-      if (!alcancou) {
-        throw new Error(`aceite da ${tela} não apareceu após ${maxSwipes} swipes (accept-button não ficou visível)`);
+      let avancou = false;
+      for (let tentativa = 1; tentativa <= 2 && !avancou; tentativa++) {
+        if (tentativa === 2) {
+          console.log(`⚠ O click no aceite da ${tela} não trocou a tela — rolando até ele`);
+          if (!(await this.rolaAteVisivelIOS(aceite, maxSwipes))) {
+            throw new Error(`Onboarding iOS: o aceite da ${tela} (${aceite}) não ficou visível após ${maxSwipes} swipes.`);
+          }
+        }
+        await this.fechaBanner();
+        await (await $(aceite)).click();
+        avancou = await $(proxima).waitForExist({ timeout: 15000 }).then(() => true).catch(() => false);
       }
-
-      await this.fechaBanner();
-      await $(aceite).click();
-
-      // O botão sair da viewport é o único sinal de que a tela trocou. Aqui havia um .catch()
-      // que só logava "continuou visível — seguindo": com o alerta de localização de pé nos
-      // Pro Max, o mesmo botão era clicado três vezes, o log imprimia três "✅ Aceite" falsos
-      // e a falha só aflorava três passos adiante, em abrirPerfil(), como "tab-menu still not
-      // displayed". Falhar aqui aponta o lugar certo.
-      const avancou = await driver
-        .waitUntil(async () => !(await $(aceite).isDisplayed().catch(() => false)), {
-          timeout: 15000,
-          interval: 500,
-        })
-        .then(() => true)
-        .catch(() => false);
-
       if (!avancou) {
         throw new Error(
-          `Onboarding iOS travado em "${tela}": "accept-button" continuou visível 15s depois do ` +
-          'clique, ou seja, a tela não trocou. Suspeitar de modal do sistema por cima do app — ' +
-          'os alertas de ATT e de localização são o caso conhecido.'
+          `Onboarding iOS travado na ${tela}: depois do aceite (${aceite}) a tela seguinte (${proxima}) ` +
+          'não apareceu em 15s. Suspeitar de modal do sistema por cima do app.'
         );
       }
 

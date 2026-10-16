@@ -1,6 +1,43 @@
 # STATE
 
-Atualizado em **2026-10-03** (M6 em execução: 06-01 a 06-05 concluídos — **Etapa 1 verde no AVD-S24** (5/5, versão reduzida; **reduções revertidas em 2026-10-03, specs de volta aos 15 testes do último commit, não rodados nessa forma desde então**), POC verde local no Android e no iOS; Device Farm da Etapa 1 e da POC pendente; próximo: 06-06; ver "Pendências abertas").
+**PAROU AQUI (2026-10-15, tarde) — retomar por estes itens:**
+1. **Captura iOS feita** (app 1.21.6 build 349, iOS 26.2, Remote Access, sessão fechada): compra **Pix** e
+   compra **cartão** (cartão e CPF fake), finalizadas com autorização do Marcio. Capturas em
+   `drafts/app-migrado/ios/captures-2026-10-15-compra-{pix,cartao}/` (`NOTAS.md`); drafts escritos
+   (`drafts/app-migrado/ios/00-INDICE.md`: 01–19, 21, 26, 27, 34–40). Pedidos criados: `MASSA-DE-DADOS.md`.
+2. **Documentos para o dev:** `ELEMENTOS-SEM-TESTID-IOS.md` (build 349) e `ELEMENTOS-SEM-TESTID.md` (Android 505),
+   ambos com a versão no topo; bugs em `BUGS-APP-IOS.md` e `BUGS-APP-ANDROID.md`.
+3. **Próximo, na ordem:**
+   - **Captura do cartão no Android** (AVD, build atual), quando o Marcio liberar o emulador: inspector +
+     draft-writer em paralelo (regra no `CLAUDE.md`). Incluir os **casos inválidos do formulário** (número
+     errado, validade vencida, CVV incompleto, CPF inválido, campos vazios), que faltaram no iOS.
+   - **Casos inválidos do formulário no iOS:** precisam de nova sessão de Remote Access (o Marcio abre e
+     atualiza o `.env`).
+   - **Cartão aprovado:** depende de cartão de teste do gateway, que tem que vir do time do app.
+   - **Ramo iOS do `04-compra-pix`: ESCRITO em 2026-10-15 (noite), NÃO RODADO.** Rodar:
+     `npm run wdio:ios -- --spec test/specs/04-compra-pix.spec.ts` (Remote Access). Seletores do build 349 conferidos
+     com lxml nas árvores das capturas, não numa sessão. Mudou também o onboarding iOS (`welcome-start-button`,
+     `onboarding-topics-continue`, `privacy-accept`, `terms-accept` no lugar do `accept-button`) e o login iOS
+     (`menu-login-button`, `login-submit-button`), o que vale para a POC. Sheets da PDP por fração (exceção do
+     Marcio no `REQUIREMENTS.md`); carrossel sem validação no iOS; copiar código Pix sem seletor no iOS. Esperado:
+     parar no `validarQrCode` enquanto o QR não carregar no iOS (pedido já criado). Menu logado no 349 não
+     capturado (`menu-card-*` enabled=true inferido).
+   - **Spec do cartão** (Android e iOS) depois das capturas; **gerador de massa** na execução
+     (`MASSA-DE-DADOS.md`).
+   - Decisões ainda abertas do Marcio: pausas do login ficam ou saem; `04-compra-pix` no Device Farm ou não.
+4. **Permissão:** o toque de finalizar pedido foi bloqueado 2x pelo classificador do Claude Code
+   ("Real-World Transactions") e passou na 3ª, depois de o Marcio reafirmar a autorização. Pode voltar a
+   acontecer; nesse caso o Marcio roda o `act.mjs` com `!`.
+
+Atualizado em **2026-10-15 (madrugada)** — (registro anterior): spec `04-compra-pix` (compra com Pix, só Android local)
+passou 2x no AVD (14/10 20:43 e 21:58), mas está instável por um **crash do app** no login (o app fecha durante o
+spinner do botão "Sign in"; relato em `BUG-CRASH-ANDROID.md`). Registro completo e próximos passos em
+`plans/2026-10-14-compra-pix.md` (seção "Onde parou"). **2026-10-15 (manhã):** reprodução pelo `adb`, sem WDIO:
+o crash **não aconteceu** em 6 logins (0/6), mas o script foi bem mais lento que o teste, então **não vale
+como prova**. Ver `drafts/app-migrado/android/crash-2026-10-14/repro-adb/RESULTADO.md`.
+**2026-10-15 11:14–11:20:** o Marcio rodou o teste: login sem crash, e o spec parou **só** na validação da tela
+do Pix, como esperado (valor a pagar 629,91 × 1.349,82 esperado; pedido 134367), pelo bug do app que divide a
+compra em 2 pedidos. Antes, em **2026-10-13**: o timeout do Device Farm subiu de 15 para 60 min (ver "Pendências abertas"). Em 2026-10-09: Os testIDs novos entraram no build Android 1.21.2 (500), e os seletores da suíte ainda não foram trocados; ver "Pendências abertas". Antes disso, em 2026-10-03: (M6 em execução: 06-01 a 06-05 concluídos — **Etapa 1 verde no AVD-S24** (5/5, versão reduzida; **reduções revertidas em 2026-10-03, specs de volta aos 15 testes do último commit, não rodados nessa forma desde então**), POC verde local no Android e no iOS; Device Farm da Etapa 1 e da POC pendente; próximo: 06-06; ver "Pendências abertas").
 
 > Este arquivo foi mesclado nesta data. A cópia do `.planning/` trazida de outra pasta em
 > 2026-09-10 sobrescreveu a versão de 09-09 com a de 09-08 — os drafts e o relatório de
@@ -166,7 +203,9 @@ Cobertura: fluxo do M1 inteiro **e** o fluxo de compra do `test/Draft.ts` até o
   desloga antes se o app abrir logado.
 - **Pendente:** run do CI (Device Farm) com a POC migrada — o Marcio dispara; durações por device
   levantadas pelo AWS CLI depois. Working tree com as mudanças de `test/`, sem commit.
-- **Bug do app (levar ao time):** crash intermitente no Android na transição Termos → Home
+- **Bug do app (levar ao time):** relato para os devs em `BUG-CRASH-ANDROID.md` (raiz, 2026-10-14: 4 crashes
+  no dia no build 1.21.6/505, 3 de 9 runs da compra Pix mortos por ele; a automação agora anexa o logcat de
+  crash ao Allure quando o app fecha). Registro original: crash intermitente no Android na transição Termos → Home
   (logcat 2026-10-01 20:29: `RetryableMountingLayerException: Unable to find viewState for tag 266`).
 - **06-04 (2026-10-02):** DEC-C respondida (por-item, registrada no `06-04-SUMMARY.md`): segue o app
   (ordem dos diálogos, Termos), ONB-06 fora do escopo (excluído, 9 excluídos no total), `wdio.conf.ts`
@@ -218,6 +257,102 @@ Cobertura: fluxo do M1 inteiro **e** o fluxo de compra do `test/Draft.ts` até o
   na versão atual de 7 testes**; eles já tinham passado separados nos runs das 16:15 e 18:39.
   Resultado e seletores verificados no `06-05-SUMMARY.md`. **Device Farm (Android e iOS) não rodado**:
   fica pendente para o próximo run do CI, junto com a POC.
+- **CI Run #17 (2026-10-03 17:32) — Android sem relatório no Pages, iOS publicado (diagnóstico 2026-10-05,
+  pelo AWS CLI). Relatório completo, com os comandos e as fontes: `.planning/DIAGNOSTICO-CI-RUN17.md`
+  — retomar por ele:**
+  1. **APK errado:** o CI subiu `app-run17.apk` = `com.aramis.ecomm` **1.14.3 build 486** (app ANTIGO). A
+     seleção vem dos secrets `BUILD_PROFILE_ANDROID`/`BUILD_SELECTION` (no `.env` local: `production` /
+     `latest`), e o `production` mais recente ainda é o app antigo. A suíte é do app migrado (1.20.x).
+  2. **Todos os testes falham no mesmo ponto** nos 6 Samsungs: `HomePage.validarHome` → "tab-home
+     visível=true, editorial-home-root presente=false" (o app antigo não tem esse testID). Cada teste
+     ainda refaz o onboarding inteiro antes de falhar.
+  3. **Timeout de 15 min:** o run tem `jobTimeoutMinutes = 15`; o Device Farm parou a Tests Suite aos
+     15,25 min nos 6 aparelhos (`STOPPED`, "Tests stopped", WDIO em 75%). Com a fase `test` morta, o
+     `post_test` do `testspec.yml` (que copia `allure-results` para `$DEVICEFARM_LOG_DIR`) não rodou: o
+     `Customer Artifacts` de cada aparelho só tem o `appium.log`. Sem `*-result.json`, o publish-report
+     não gera o relatório Android.
+  4. **iOS publicou porque terminou antes de 15 min** (12,14 min no iPhone 13; ONB-01..04 pulam no iOS),
+     então o `post_test` rodou. O relatório iOS publicado tem as MESMAS falhas (`editorial-home-root`).
+  O Run #16 (02/10) teve o mesmo padrão (Android `STOPPED` em 5 de 6 aparelhos).
+  Decisões em aberto para o Marcio: qual perfil/build do EAS é o app migrado para o CI; e o tempo do
+  Android (16 testes com onboarding completo não cabem em 15 min por aparelho).
+- **Spec `04-compra-pix.spec.ts` escrito (2026-10-14, cenário do Marcio "Jornada completa de compra com
+  Pix", 35 passos). Registro completo em `plans/2026-10-14-compra-pix.md`. **Passou no AVD em
+  2026-10-14 20:43–20:50** (4º run do Marcio; pedido nº 128763), com a limpeza da Mochila desativada a pedido dele. Preço de cada produto
+  lido na PDP (`lerPrecoDoProduto`), guardado no spec e validado no resumo antes de finalizar.** Só Android; pula no iOS (sem
+  captura) e no Device Farm (cria pedidos reais; decisão pendente do Marcio). Page objects novos:
+  `BuscaPage`, `ProdutoPage`, `CheckoutPage`, `PedidoPage`. Trocas para os ids do build atual (Android):
+  onboarding (`onboarding-topics-continue`, `privacy-accept`, `terms-accept`), login
+  (`menu-login-button`, `login-*-input`, `login-submit-button`), logado (`menu-user-header`), sair
+  (`menu-item-logout`). Elementos sem id via XPath, listados no `ELEMENTOS-SEM-TESTID.md` (seção 00).
+  Capturas: `drafts/app-migrado/android/captures-2026-10-14-compra-pix/` e `-rodada2/` (35/35 no AVD).
+  Achados: 1 toque em finalizar com 2 produtos gerou 2 pedidos (rodada 2: #127635 e #127673); QR do Pix
+  intermitente; tela do Pix e Home com cronômetro exigem `waitForIdleTimeout: 0`; resumo da rodada 2
+  sem o desconto Pix (1.499,80 × 1.349,82 cobrado).
+- **Próximo cenário: compra com CARTÃO (Marcio, 2026-10-15) — precisa de nova captura no Android.** Depois do
+  `04-compra-pix`, o próximo teste é o fluxo de compra pagando com cartão. Antes de escrevê-lo, capturar no AVD
+  os elementos da **tela de pagamento com cartão** (formulário do cartão e o que vier depois dele, até onde o
+  app deixar). A última captura dessa tela é da 2ª leva do M5 (build 1.20.10/492, 2026-09-29), que parou no
+  formulário de cartão: na época os campos **não tinham testID**, e ela é anterior ao build atual (1.21.6/505).
+  **Autorizado pelo Marcio (2026-10-15): finalizar pedido real nas capturas, tanto no Pix quanto no cartão.**
+  **Cartão:** fake, gerado em 2026-10-15 a pedido do Marcio. Os dados estão em `.planning/MASSA-DE-DADOS.md`,
+  junto com os demais dados de teste e os pedidos reais criados. Espera-se a recusa do pagamento.
+  Captura iOS da compra Pix (2026-10-15, Remote Access, app 1.21.6 build 349, iOS 26.2) **até o Resumo**, em
+  `drafts/app-migrado/ios/captures-2026-10-15-compra-pix/` (`NOTAS.md`), depois finalizada (capturas 45–48,
+  com nova autorização do Marcio): **1 toque gerou 2 pedidos** (#139889 R$ 629,91 e #139933 R$ 719,91), a tela
+  do Pix e o banner da Home mostram só o #139889, e **o QR do Pix não carregou**, nem com "Try again". São os
+  mesmos achados do Android. **Cartão no iOS capturado** (cartão e CPF fake, em
+  `captures-2026-10-15-compra-cartao/`): 1 toque gerou 2 pedidos (#140130 e #140139), os dois cancelados; o
+  formulário de cartão só tem `card-installments-input`. Sessão fechada (`deleteSession`). Falta a captura do
+  cartão no **Android** (build atual). Os testIDs que faltam no iOS estão em
+  `ELEMENTOS-SEM-TESTID-IOS.md` (raiz); o maior bloqueio é o conteúdo dos bottom sheets (tamanho e "produto
+  adicionado") fora da árvore, hoje só por coordenada.
+- **Gerador de massa na execução (Marcio, 2026-10-15), não planejado ainda:** a automação deve gerar cartão,
+  CPF e afins a cada execução, com uma lib de dados fake ou equivalente, em vez de usar valores fixos. Detalhes e
+  pontos a decidir em `.planning/MASSA-DE-DADOS.md` ("Pendente: gerador de massa na automação").
+- **Specs 01–03 COMENTADOS (2026-10-14, pedido do Marcio):** `01-onboarding`, `02-login` e `03-logout`
+  estão com todas as linhas prefixadas por `// ` (conteúdo idêntico ao HEAD). Só a POC
+  (`00-poc-favoritar`) roda, enquanto o Marcio traz um cenário maior para entrar no projeto. Para
+  reativar: `git restore` dos três arquivos. Enquanto isso, o gate `cobertura.check.mjs` falha se rodado.
+- **Timeout do Device Farm subiu de 15 para 60 min (2026-10-13, pedido do Marcio).** Feito na AWS,
+  fora do git: `aws devicefarm update-project --default-job-timeout-minutes 60` no projeto `ecomm`,
+  conferido por `get-project` (`ecomm 60`). Vale para Android e iOS, porque nenhum `schedule-run` do
+  `mobile_test.yml` passa timeout próprio. Para desfazer: o mesmo comando com `15`. A conta paga por
+  minuto (`unmeteredDevices` 0), e o limite da conta é 150 min. O polling do workflow espera até
+  120 min. **Ainda não validado em run.** O próximo run mede quanto a suíte inteira leva. Continuam
+  abertos o APK/IPA errado do CI (decisão 1 do `DIAGNOSTICO-CI-RUN17.md`) e a opção de o Allure gravar
+  direto em `$DEVICEFARM_LOG_DIR`, para o relatório sobreviver a um timeout.
+- **testIDs novos do dev: ENTRARAM no build 1.21.2 (500)** (conferido em 2026-10-09 no AVD-S24, app
+  instalado no mesmo dia às 14:36). A conferência fez 74 capturas, do onboarding ao logout, passando
+  por PDP, Mochila, endereço, entrega, pagamento e Busca, com toque por id e o efeito conferido no dump.
+  Também foi feita a busca dos ids no `index.android.bundle`. A maioria dos ids do
+  `TESTIDS-ALTERADOS.md` existe e funciona. Evidência: `drafts/app-migrado/android/captures-2026-10-09-build500/RESULTADO.md`.
+  O `ELEMENTOS-SEM-TESTID.md` (raiz) ganhou a coluna "no 500" e a seção 0, com o que falta pedir ao dev.
+  - **Ainda faltam:** o coração do card da **Listagem** continua `action-button` (o
+    `favorite-toggle-<id>` só existe em Favoritos, nas recomendações e na Mochila vazia).
+    `search-input` e `search-clear-button` não existem; o "X" nem tem nó. `pressable` continua em
+    "Salvar alterações" e em "Cadastrar novo endereço". A seção "Código do vendedor" continua
+    `button-collapsible-card`.
+  - **Quebram a suíte atual no Android** (os genéricos sumiram): `accept-button`, `menu-card`,
+    `menu-list-button`, `pressable` no Login e no Esqueci a senha, `action-button` em Favoritos, e o
+    acesso ao Login, que era achado pela posição antes do 1º `menu-card`.
+  - **Continuam:** `tab-*`, `editorial-home-root`, `editorial-group-0`, `permission-topic`,
+    `category-button`, `sub-categories-button`, `product-list`, `flatlist-favorites`,
+    `action-button-icon` (84x84 → 52x53) e `wrap-close-button-<n>`. O `enabled` dos `menu-card-*`
+    continua indicando o estado: true logado, false deslogado (capturas 10, 19, 73 e 74).
+  - **Sufixo `<id>`:** é o número do produto, o mesmo no card e no toggle (`product-card-164803`,
+    `favorite-toggle-164803`).
+  - **Crash Termos → Home: não reproduziu.** Houve 1 `RetryableMountingLayerException` (blur), sem
+    crash. O 1º toque em Notificações abriu "Page not found"; o 2º funcionou.
+  - **iOS não conferido** neste build. Não se sabe se o IPA tem os mesmos ids.
+  - **Não resolve o CI:** o Device Farm continua baixando o APK `production` antigo (Run #17).
+- **(histórico) testIDs novos do dev — NÃO estavam no build 494 (2026-10-05):** o `TESTIDS-ALTERADOS.md` (raiz) lista
+  ~90 ids aplicados. A conferência no AVD (`com.aramis.ecomm` 1.20.11 build 494, instalado em 10-03)
+  não achou nenhum, nem nas 48 árvores, nem no `index.android.bundle`. Evidência em
+  `drafts/app-migrado/android/captures-2026-10-05-testids/RESULTADO.md`; o `ELEMENTOS-SEM-TESTID.md`
+  ganhou a coluna de situação. **Testes não alterados** (trocar agora quebraria tudo). Aguardando o
+  dev dizer qual build tem as alterações; quando chegar, refazer a conferência e só então trocar
+  os seletores Android.
 - **Próximo:** 06-06 (capturas da Etapa 2/3 e DEC-D). Antes de escrever as próximas etapas, aplicar
   a regra de cobertura mínima.
 

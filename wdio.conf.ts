@@ -265,7 +265,10 @@ export const config: WebdriverIO.Config = {
                 timeLimit: 180,
             } as any);
         } else {
-            await driver.startRecordingScreen({ timeLimit: 180 });
+            // AVD local. timeLimit era 180 s e cortava o vídeo em 3 min; o teste de compra com Pix
+            // leva ~7 min. Acima de 180 s o Appium grava em pedaços de 3 min (limite do Android) e
+            // junta com ffmpeg no fim (Marcio, 2026-10-14).
+            await driver.startRecordingScreen({ timeLimit: 900 });
         }
     },
 

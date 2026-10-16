@@ -2,6 +2,7 @@ import { BasePage, timewhait, seletorTestId } from "./BasePage";
 import { PerfilPage } from "./PerfilPage";
 import { driver, $ } from '@wdio/globals'
 import { texto } from "../utils/textos";
+import allure from '@wdio/allure-reporter';
 
 export class LoginPage extends BasePage {
 
@@ -13,9 +14,11 @@ export class LoginPage extends BasePage {
     // fonte: Android captures-2026-09-29/45 (true) × 10 e 51 (false); iOS ACOES.md capturas 11
     // (false), 28 (true) e 32 (false).
     private async garantirDeslogado() {
-        const cardLogado = process.env.PLATFORM === 'ios'
-            ? '-ios predicate string:name == "menu-card" AND enabled == 1'
-            : '-android uiautomator:new UiSelector().resourceId("menu-card").enabled(true)';
+        // Android: desde o build 500 o cabeçalho do usuário (`menu-user-header`) só existe logado
+        // (captures-2026-10-14-compra-pix-rodada2/03h-menu-logado.xml × 02a-menu-deslogado.xml).
+        // iOS: o mesmo sinal desde o build 350 — `menu-user-header` só existe logado
+        // (captures-2026-10-15-build350-menu-logado/01 × 04).
+        const cardLogado = seletorTestId('menu-user-header');
 
         if (!(await $(cardLogado).waitForExist({ timeout: 5000 }).then(() => true).catch(() => false))) return;
 
@@ -52,8 +55,8 @@ export class LoginPage extends BasePage {
         await driver.pause(timewhait);
 
         // fonte: captures-2026-09-29-m6e1/15-login-vazio-pt.xml (draft android/08) — EditText 0 e 1
-        const inputEmail = await $('-android uiautomator:new UiSelector().className("android.widget.EditText").instance(0)');
-        const inputSenha = await $('-android uiautomator:new UiSelector().className("android.widget.EditText").instance(1)');
+        const inputEmail = await $(this.seletorCampoAndroid(0));
+        const inputSenha = await $(this.seletorCampoAndroid(1));
         // fonte: android/06-home — a aba Home só existe depois do login (o Menu deslogado, que
         // também tem tab bar, não entra aqui porque o Login é uma tela sem tab bar)
         const destino = seletorTestId('tab-home');
@@ -133,8 +136,80 @@ export class LoginPage extends BasePage {
     // Campos do Login no Android: sem testID e sem texto estável (o placeholder some ao digitar),
     // então a posição entre os EditText é o único critério. 0 = e-mail, 1 = senha.
     // fonte: captures-2026-09-29-m6e1/15-login-vazio-pt.xml (draft android/08)
+    // Desde o build 500 os campos têm testID (`login-email-input`, `login-password-input`).
+    // fonte: captures-2026-10-14-compra-pix-rodada2/03b-email-invalido.xml
     private seletorCampoAndroid(posicao: 0 | 1): string {
-        return `-android uiautomator:new UiSelector().className("android.widget.EditText").instance(${posicao})`;
+        return seletorTestId(posicao === 0 ? 'login-email-input' : 'login-password-input');
+    }
+
+    // Mensagem de e-mail inválido abaixo do campo. Android: TextView SEM id, logo depois do ícone
+    // SVG de alerta e antes do link de esqueci a senha (pedido de id no ELEMENTOS-SEM-TESTID.md,
+    // seção 00). Conferido nas capturas: 1 nó com o e-mail incompleto (03b/03c), 0 com o e-mail
+    // completo (03d). Não lê o texto da mensagem.
+    //
+    // iOS (build 349): StaticText SEM id. Os nós do formulário são irmãos, nesta ordem: caixa do
+    // e-mail, campo do e-mail, [ícone de alerta, mensagem], caixa da senha, campo da senha,
+    // `login-forgot-password`. A mensagem é o 3º irmão antes do `login-forgot-password`, e só
+    // quando é StaticText. Conferido: 1 nó com o e-mail incompleto (captura 12), 0 na tela vazia,
+    // com o e-mail completo e com a senha (11, 13, 14). Não lê o texto.
+    private seletorEmailInvalido(): string {
+        if (process.env.PLATFORM === 'ios') {
+            return '//*[@name="login-forgot-password"]/preceding-sibling::*[3][self::XCUIElementTypeStaticText]';
+        }
+        return '//android.widget.TextView' +
+            '[preceding-sibling::*[1][@class="com.horcrux.svg.SvgView"]]' +
+            '[following-sibling::*[@resource-id="login-forgot-password"]]';
+    }
+
+    // Completa o e-mail: grava o e-mail INTEIRO no campo (setValue substitui o conteúdo) em vez de
+    // anexar o restante. No 1º run (2026-10-14 18:47) o addValue do restante deixou a mensagem de
+    // e-mail inválido na tela; o que o campo continha não ficou no vídeo. Com o valor inteiro, o
+    // estado final do campo é o e-mail certo, seja qual for o comportamento do addValue no app.
+    async completarEmail(emailCompleto: string) {
+        if (process.env.PLATFORM === 'ios') return this.completarEmailIOS(emailCompleto);
+        const campo = await $(this.seletorCampoAndroid(0));
+        await this.waitForElement(campo);
+        // Ritmo de pessoa (Marcio, 2026-10-15): apaga o campo, espera, e só então escreve. O app caiu
+        // no toque em entrar logo depois desta sequência (BUG-CRASH-ANDROID.md); a hipótese é a
+        // animação de saída da mensagem de erro ainda rodando quando a tela é atualizada de novo.
+        await campo.clearValue();
+        await driver.pause(1000);
+        // setValue substitui o conteúdo inteiro: se o clearValue não tiver limpado, o campo fica
+        // com o e-mail certo do mesmo jeito.
+        await campo.setValue(emailCompleto);
+        console.log(`⌨ Email completo: ${emailCompleto.length} caracteres`);
+        await driver.pause(500);
+    }
+
+    // Espera a mensagem de e-mail inválido APARECER (true) ou SUMIR (false). Erro nomeado se não.
+    async validarEmailInvalido(visivel: boolean, timeout = 10000) {
+        const seletor = this.seletorEmailInvalido();
+        const ok = await driver
+            .waitUntil(async () => (await $(seletor).isDisplayed().catch(() => false)) === visivel, {
+                timeout,
+                interval: 500,
+            })
+            .then(() => true)
+            .catch(() => false);
+        if (!ok) {
+            // Evidência: o que o campo de e-mail contém e o print da tela no momento da falha.
+            const conteudo = await $(this.seletorCampoAndroid(0)).getText().catch(() => '(não lido)');
+            allure.addAttachment('Login — e-mail inválido', Buffer.from(await driver.takeScreenshot(), 'base64'), 'image/png');
+            console.log(`🔎 Campo de e-mail no momento da falha: "${conteudo}"`);
+            throw new Error(
+                `Campo de e-mail: "${conteudo}". ` +
+                visivel
+                    ? `A mensagem de e-mail inválido não apareceu em ${timeout / 1000}s com o e-mail incompleto.`
+                    : `A mensagem de e-mail inválido continuou na tela ${timeout / 1000}s depois de completar o e-mail.`
+            );
+        }
+        console.log(visivel ? '✅ Mensagem de e-mail inválido na tela' : '✅ Mensagem de e-mail inválido sumiu');
+        if (!visivel) {
+            // A checagem acima prova que a mensagem SAIU DA ÁRVORE, não que a animação de saída
+            // terminou. Espera para a animação acabar antes de mexer na tela de novo (hipótese do
+            // crash no toque em entrar — BUG-CRASH-ANDROID.md).
+            await driver.pause(2000);
+        }
     }
 
     // iOS: os campos são `Other` com name = placeholder, e perdem o name ao receber valor — o
@@ -143,12 +218,10 @@ export class LoginPage extends BasePage {
         return `accessibility id:${texto(campo === 'email' ? 'login.campoEmail' : 'login.campoSenha')}`;
     }
 
-    // Botão de entrar. Android: `pressable` é testID genérico no app, mas único na tela de Login
-    // (capturas m6e1 15, 17 e 20). iOS: `pressable` + rótulo, que só localiza (ACOES.md 12/16).
+    // Botão de entrar: `login-submit-button` nas duas plataformas — Android desde o build 500, iOS
+    // desde o build 349 (drafts/app-migrado/ios/08-login.md; o `pressable` + "Sign in" era do 335).
     private seletorBotaoEntrar(): string {
-        return process.env.PLATFORM === 'ios'
-            ? `-ios predicate string:name == "pressable" AND label == "${texto('login.botaoEntrar')}"`
-            : seletorTestId('pressable');
+        return seletorTestId('login-submit-button');
     }
 
     // Modal de credenciais recusadas.
@@ -226,6 +299,39 @@ export class LoginPage extends BasePage {
 
     private async preencherIOS(campo: 'email' | 'senha', valor: string) {
         await this.digitarIOS(this.seletorCampoIOS(campo), valor, campo === 'email' ? 'Email' : 'Senha');
+        if (campo === 'email') this.emailDigitadoIOS = valor;
+    }
+
+    // O que já foi digitado no e-mail (iOS): o completarEmailIOS() digita só o que falta.
+    private emailDigitadoIOS = '';
+
+    // iOS: o campo de e-mail PREENCHIDO perde o name ("Email"), então o `~Email` não o acha mais.
+    // A captura 13 completou o e-mail digitando o restante com o campo ainda focado
+    // (`mobile: keys` caractere a caractere, 150 ms), e é o que se faz aqui. Sem o teclado na
+    // tela, o campo é focado pela estrutura: o 2º Other depois do `aviso-nova-senha` (1 nó, vazio
+    // ou preenchido, nas capturas 11 a 14). O valor digitado não vai para a árvore; a prova é a
+    // mensagem de e-mail inválido sumir (validarEmailInvalido(false), no spec).
+    // `mobile: keys` perde acento (rodada do cartão, captura 06); e-mail não tem acento.
+    private async completarEmailIOS(emailCompleto: string) {
+        const jaDigitado = this.emailDigitadoIOS;
+        if (!emailCompleto.startsWith(jaDigitado)) {
+            throw new Error('Completar e-mail (iOS): o e-mail completo não começa com o que já foi digitado no campo.');
+        }
+        const resto = emailCompleto.slice(jaDigitado.length);
+
+        if (!(await driver.isKeyboardShown().catch(() => false))) {
+            const campo = await $('//*[@name="aviso-nova-senha"]/following-sibling::XCUIElementTypeOther[2]');
+            await this.waitForElement(campo);
+            await campo.click();
+            await driver.pause(1000);
+        }
+        for (const tecla of resto) {
+            await driver.execute('mobile: keys', { keys: [tecla] });
+            await driver.pause(150);
+        }
+        this.emailDigitadoIOS = emailCompleto;
+        console.log(`⌨ Email completo: ${resto.length} caracteres a mais (${emailCompleto.length} no total)`);
+        await driver.pause(500);
     }
 
     // Estado do botão de entrar, lido do atributo `enabled` — nunca da cor. Espera 1s antes de ler
@@ -250,6 +356,9 @@ export class LoginPage extends BasePage {
             // de novo (o 2º toque cairia no conteúdo da tela seguinte).
             if (!(await $(btnEntrar).isDisplayed().catch(() => false))) break;
 
+            // Espera a tela assentar antes de CADA toque (mesma regra do iOS, tocarEntrarIOS). Nos
+            // runs de 2026-10-14 23:46 e 2026-10-15 00:04 o app caiu 1-2 s depois deste toque.
+            await driver.pause(2500);
             await (await $(btnEntrar)).click();
 
             // Na tentativa 1 a espera é curta: o esperado é o toque só fechar o teclado.
@@ -263,6 +372,16 @@ export class LoginPage extends BasePage {
 
             if (saiu) break;
             console.log(`⚠ Toque ${tentativa}/2 em entrar não saiu da tela de Login — repetindo`);
+        }
+
+        // O botão "sumir" também acontece quando o APP FECHA (crash): sem esta checagem o entrar()
+        // passava e a falha só aparecia no step seguinte (validarHome), 30 s depois, no lugar errado.
+        const estadoApp = await driver.execute('mobile: queryAppState', { appId: 'com.aramis.ecomm' }).catch(() => null);
+        if (estadoApp !== null && estadoApp !== 4) {
+            throw new Error(
+                `O app fechou depois do toque em entrar (queryAppState=${estadoApp}; 1 = fechado, 3 = em segundo plano) — ` +
+                'crash do app, ver BUG-CRASH-ANDROID.md e o anexo "Crash do app — logcat".'
+            );
         }
 
         if (await $(btnEntrar).isDisplayed().catch(() => false)) {

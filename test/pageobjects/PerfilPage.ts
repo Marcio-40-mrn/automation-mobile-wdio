@@ -1,5 +1,6 @@
-import { BasePage, timewhait, scrollUntilVisible } from "./BasePage";
+import { BasePage, timewhait, scrollUntilVisible, seletorTestId } from "./BasePage";
 import { driver, $, $$ } from '@wdio/globals'
+import allure from '@wdio/allure-reporter';
 import { texto } from "../utils/textos";
 
 // Seletores deste arquivo NÃO VERIFICADOS em run: vêm das capturas do M5/06-01 e ficam "não
@@ -36,12 +37,14 @@ export class PerfilPage extends BasePage {
     // Android: o XPath estrutural do 06-03 (sem texto), VERBATIM do que logout() já usava e que
     // passou no AVD. iOS: menu-list-button + rótulo (texto só para LOCALIZAR, como o 06-03 fez).
     // O item só existe com a conta logada — no Menu deslogado não há "Sair" (draft android/28, 51).
+    // Android: desde o build 500 o item tem testID próprio (`menu-item-logout`); o
+    // `menu-list-button` genérico sumiu (captures-2026-10-09-build500/RESULTADO.md, capturas 20 e 72).
+    // iOS: o mesmo `menu-item-logout` desde o build 350 (Button, label "Logout"; o predicate
+    // `menu-list-button` + "Logout" do 335 devolveu 0 nós). Já está na árvore com visible=false no
+    // topo do Menu; 2 swipes o trouxeram para a tela. fonte:
+    // drafts/app-migrado/ios/captures-2026-10-15-build350-menu-logado/ (capturas 01 e 02).
     private seletorSair(): string {
-        return process.env.PLATFORM === 'ios'
-            ? `-ios predicate string:name == "menu-list-button" AND label == "${texto('menu.sair')}"`
-            : '//*[@resource-id="menu-list-button"]' +
-              '[preceding-sibling::*[1][@resource-id="menu-list-button"][preceding-sibling::*[1][not(@resource-id="menu-list-button")]]]' +
-              '[not(following-sibling::*[1][@resource-id="menu-list-button"])]';
+        return seletorTestId('menu-item-logout');
     }
 
     async logout() {
@@ -53,7 +56,7 @@ export class PerfilPage extends BasePage {
             const seletor = this.seletorSair();
             const achou = await this.rolaAteVisivelIOS(seletor, MAX_SWIPES_MENU);
             if (!achou) {
-                throw new Error(`Logout: o item de sair do Menu (menu-list-button) não apareceu após ${MAX_SWIPES_MENU} swipes.`);
+                throw new Error(`Logout: o item de sair do Menu (menu-item-logout) não apareceu após ${MAX_SWIPES_MENU} swipes.`);
             }
 
             const element = await $(seletor);
@@ -89,10 +92,14 @@ export class PerfilPage extends BasePage {
     //            com o menu-list-button. `mobile: alert accept` NÃO foi testado.
     // Depois de confirmar, o estado DESLOGADO é validado pelo destino (item de acesso ao Login
     // no Menu), com erro nomeado — nunca pelo retorno do clique.
+    //
+    // iOS, build 350 (captures-2026-10-15-build350-menu-logado, 03 e 04): o Alert "Logout" aparece
+    // no getPageSource e no `mobile: alert getButtons` (["Cancel","Logout"]); confirmado por
+    // `mobile: alert accept` com buttonLabel "Logout" e conferido na árvore (deslogou). O click no
+    // Button do Alert não foi medido, por isso o iOS confirma pelo `mobile: alert`.
     async confirmarLogout() {
-        const botao = process.env.PLATFORM === 'ios'
-            ? `-ios class chain:**/XCUIElementTypeAlert/**/XCUIElementTypeButton[\`name == "${texto('logout.confirmar')}"\`]`
-            : "id:android:id/button1";
+        const ios = process.env.PLATFORM === 'ios';
+        const botao = ios ? '-ios class chain:**/XCUIElementTypeAlert' : "id:android:id/button1";
 
         const element = await $(botao);
         const apareceu = await element
@@ -103,7 +110,10 @@ export class PerfilPage extends BasePage {
         // autoAcceptAlerts, e o diálogo de logout do app migrado é um UIAlert nativo — o Appium o
         // aceita sozinho antes de o teste vê-lo (run iOS local de 2026-10-01: 16/17 passos, parou
         // aqui com "o diálogo não apareceu"). Quem decide é o estado seguinte, validado abaixo.
-        if (apareceu) {
+        if (apareceu && ios) {
+            await driver.execute('mobile: alert', { action: 'accept', buttonLabel: texto('logout.confirmar') });
+            await driver.pause(timewhait);
+        } else if (apareceu) {
             await element.click();
             await driver.pause(timewhait);
         } else {
@@ -120,9 +130,9 @@ export class PerfilPage extends BasePage {
         const deslogou = await this.algumVisivel(
             process.env.PLATFORM === 'ios'
                 ? [
-                    // iOS: mesmo sinal sem texto do Android — menu-card enabled=false só deslogado
-                    // (ACOES.md capturas 11 e 32 = false; 28 = true).
-                    '-ios predicate string:name == "menu-card" AND enabled == 0',
+                    // iOS, build 350: `menu-card-*` enabled=false só deslogado (captura 04 = false;
+                    // 01 = true). O Menu fica rolado depois do logout, então o rodapé `login` também vale.
+                    '-ios predicate string:name BEGINSWITH "menu-card-" AND enabled == 0',
                     this.seletorAcessoLogin('menu.acessoLogin'),
                     this.seletorAcessoLogin('menu.acessoLoginRodape'),
                 ]
@@ -248,30 +258,74 @@ export class PerfilPage extends BasePage {
         await this.validarLogado();
     }
 
-    // Menu no estado LOGADO, por estrutura. Sinais: o item "Sair" visível (só existe logado) OU um
-    // `menu-card` enabled=true (logado; deslogado é enabled=false — ver confirmarLogout). Depois do
-    // cancelar o Menu fica rolado e os cards podem estar fora da árvore (lista virtualizada;
-    // m6e1 31/32 só têm menu-list-button), por isso o "Sair" entra como 1º sinal. Como contraprova,
-    // nenhum `menu-card` enabled=false pode estar na tela. Erro nomeado nos dois casos.
+    // Menu no estado LOGADO, por estrutura, nas duas plataformas (ver validarLogadoAndroid).
     async validarLogado() {
-        const cardLogado = process.env.PLATFORM === 'ios'
-            ? '-ios predicate string:name == "menu-card" AND enabled == 1'
-            : '-android uiautomator:new UiSelector().resourceId("menu-card").enabled(true)';
-        const cardDeslogado = process.env.PLATFORM === 'ios'
-            ? '-ios predicate string:name == "menu-card" AND enabled == 0'
-            : '-android uiautomator:new UiSelector().resourceId("menu-card").enabled(false)';
+        // iOS desde o build 350 usa o mesmo sinal do Android: `menu-user-header` só logado e
+        // `menu-login-button` só deslogado (captures-2026-10-15-build350-menu-logado, 01 × 04).
+        return this.validarLogadoAndroid();
+    }
 
-        const sinal = await this.algumVisivel([this.seletorSair(), cardLogado], 15000);
-        if (!sinal) {
-            throw new Error(
-                'Estado logado não confirmado: nem o item de sair do Menu nem um menu-card habilitado ' +
-                'ficaram visíveis em 15s. O Menu não está na tela ou a conta deslogou.'
-            );
+    // Android, desde o build 500: logado = `menu-user-header` presente (o cabeçalho com o nome da
+    // conta) e `menu-login-button` ausente (o "fazer login" do topo). Medido nos dois estados:
+    // captures-2026-10-14-compra-pix-rodada2/03h-menu-logado.xml × 02a-menu-deslogado.xml.
+    // O nome exibido não é comparado (regra: o teste não valida texto).
+    private async validarLogadoAndroid() {
+        const cabecalho = await $(seletorTestId('menu-user-header'))
+            .waitForDisplayed({ timeout: 15000 })
+            .then(() => true)
+            .catch(() => false);
+        if (!cabecalho) {
+            throw new Error('Estado logado não confirmado: o cabeçalho da conta (menu-user-header) não apareceu no Menu em 15s.');
         }
-        if (await $(cardDeslogado).isDisplayed().catch(() => false)) {
-            throw new Error('A conta está DESLOGADA (menu-card enabled=false na tela) quando devia continuar logada.');
+        if (await $(seletorTestId('menu-login-button')).isDisplayed().catch(() => false)) {
+            throw new Error('O Menu mostra o cabeçalho da conta E o botão de fazer login (menu-login-button): o login não refletiu no Menu.');
         }
-        console.log('✅ Conta continua logada (Menu no estado logado)');
+        console.log('✅ Menu no estado logado (menu-user-header presente, menu-login-button ausente)');
+    }
+
+    // Rola o Menu até o fim e anexa o print ao Allure: a versão e o build ficam no rodapé, num
+    // TextView sem id (captures-2026-10-14-compra-pix-rodada2/02b-menu-rodape.png). O print é a
+    // evidência pedida; o texto da versão não é lido. Depois volta ao topo, onde ficam o acesso ao
+    // Login e o cabeçalho da conta. `mobile: scrollGesture` devolve se ainda dá para rolar, então a
+    // parada é o fim real da lista, não uma contagem fixa.
+    //
+    // iOS: `mobile: scrollGesture` é só do UiAutomator2. No build 349 um swipe para cima levou o
+    // rodapé (versão e build) para a tela (captures-2026-10-15-compra-pix/10-menu-rodape); aqui
+    // são 2, com `mobile: swipe`, e depois 2 para baixo para voltar ao topo.
+    async anexarRodapeDoMenu() {
+        if (process.env.PLATFORM === 'ios') {
+            for (let i = 0; i < 2; i++) await driver.execute('mobile: swipe', { direction: 'up' });
+            await driver.pause(1000);
+            const printIOS = await driver.takeScreenshot();
+            allure.addAttachment('Menu — rodapé com versão e build', Buffer.from(printIOS, 'base64'), 'image/png');
+            console.log('📸 Print do rodapé do Menu (versão e build) anexado ao relatório');
+            for (let i = 0; i < 2; i++) await driver.execute('mobile: swipe', { direction: 'down' });
+            await driver.pause(1000);
+            return;
+        }
+
+        const { width, height } = await driver.getWindowRect();
+        const area = {
+            left: Math.round(width * 0.1),
+            top: Math.round(height * 0.2),
+            width: Math.round(width * 0.8),
+            height: Math.round(height * 0.6),
+        };
+
+        for (let i = 0; i < MAX_SWIPES_MENU; i++) {
+            const podeMais = await driver.execute('mobile: scrollGesture', { ...area, direction: 'down', percent: 0.9 });
+            if (!podeMais) break;
+        }
+        await driver.pause(1000);
+        const print = await driver.takeScreenshot();
+        allure.addAttachment('Menu — rodapé com versão e build', Buffer.from(print, 'base64'), 'image/png');
+        console.log('📸 Print do rodapé do Menu (versão e build) anexado ao relatório');
+
+        for (let i = 0; i < MAX_SWIPES_MENU; i++) {
+            const podeMais = await driver.execute('mobile: scrollGesture', { ...area, direction: 'up', percent: 0.9 });
+            if (!podeMais) break;
+        }
+        await driver.pause(1000);
     }
 
 }

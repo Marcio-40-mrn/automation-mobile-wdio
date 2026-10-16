@@ -214,6 +214,12 @@ Marcio; dois runs simultâneos invalidam os dois. Quem roda `npm run wdio:androi
 
 ### Sub-agents de inspeção
 
+> **REGRA FIXA (Marcio, reforçada em 2026-10-15): toda captura usa os DOIS subagentes, sempre, sem
+> precisar pedir.** O `mobile-ui-inspector` toca no aparelho e captura. O `mobile-draft-writer`
+> escreve os drafts **em paralelo**, disparado junto com a captura, sem esperar ela terminar e sem
+> perguntar. A sessão principal **não faz captura na mão**, nem "só um passo", e só coordena. O
+> Marcio não toca no aparelho: ele só abre a sessão e atualiza o `.env`.
+
 Os agentes são divididos por **papel**, não por sistema operacional:
 
 - `.claude/agents/mobile-ui-inspector.md` — é a ferramenta padrão para o procedimento acima,

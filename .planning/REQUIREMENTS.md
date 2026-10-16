@@ -46,6 +46,12 @@ Um único cenário, em `test/specs/test.spec.ts`, rodando por device:
   `02`). Onde não há saída, a coordenada é guardada como **fração** da janela — nunca como
   pixel absoluto — e multiplicada pelo `getWindowRect()` do device real. Cada um desses
   pontos é dívida a ser cobrada do time do app, na forma de um `accessibilityIdentifier`.
+  No build 349 o CTA ganhou id (`welcome-start-button`), e a fração ficou só como reserva.
+  **Exceção nova (Marcio, 2026-10-15), também só no iOS:** o sheet de tamanho e o de "produto
+  adicionado" da PDP (tamanhos, "Add to cart", "Continue shopping") ficam fora da árvore, então
+  são tocados por fração da janela, com o efeito validado pelo contador da Mochila
+  (`ProdutoPage`, drafts iOS 13 e 14). O carrossel de indicação desse sheet fica **sem
+  validação no iOS** até o app expor os filhos do sheet.
 - Todo passo é precedido de uma tentativa de fechar o banner do Insider, que aparece em
   qualquer tela, a qualquer momento.
 - A falha tem que ser explícita e no passo certo. Nada de seguir em silêncio e estourar
