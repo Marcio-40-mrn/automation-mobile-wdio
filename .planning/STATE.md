@@ -1,6 +1,58 @@
 # STATE
 
-**PAROU AQUI (2026-10-15, tarde) — retomar por estes itens:**
+**PAROU AQUI (2026-10-15, noite) — COMEÇAR AMANHÃ (2026-10-16) POR AQUI:**
+1. **Remover do `wdio.conf.ts` o que aceita diálogo sozinho (Marcio, 2026-10-15: "amanhã vamos atacar isso").**
+   São três linhas, que o Claude escreveu durante o M3 (commit `8536e92`, 09/09) e que ficaram por causa da
+   exceção temporária de 02/10 (`REQUIREMENTS.md`): `autoAcceptAlerts: true` no iOS (linha 35, Device Farm, e
+   linha 70, Remote Access) e `autoGrantPermissions: true` no AVD (linha 83). O Marcio não quer nada no
+   `wdio.conf.ts` aceitando diálogo. Enquanto o `autoAcceptAlerts` estiver ligado, o iOS aceita as permissões
+   antes de o teste poder negar, e o onboarding "negando tudo" do spec do cartão não funciona no iOS. Planejar
+   (skill `planejar-mudanca`): tirar as linhas, passar o tratamento dos diálogos para os page objects e medir
+   no run o efeito na POC e no `04-compra-pix` (iOS e AVD).
+2. **Spec `05-compra-cartao` (Android e iOS), pedido do Marcio em 2026-10-15. Ainda não escrito.** Decisões
+   tomadas: igual ao `04-compra-pix`, com estas diferenças:
+   - onboarding **negando** localização e notificação;
+   - login direto, **sem** o teste de e-mail inválido;
+   - **um item só, uma calça qualquer** (a 1ª de Categorias → Roupas → Calças);
+   - pagamento com **cartão** até finalizar (cartão fake do `MASSA-DE-DADOS.md`);
+   - **recusa = verde**: finalizar com um toque, fechar o modal antifraude ("Entendi") e validar o Pedido
+     Cancelado com o número e o valor igual ao total do resumo;
+   - **Android: capturar antes de escrever.**
+   **Captura Android disparada em 2026-10-15 (noite)**, no AVD com o build 506 (`mobile-ui-inspector` +
+   `mobile-draft-writer` em paralelo), em `drafts/app-migrado/android/captures-2026-10-15-compra-cartao/`
+   (`NOTAS.md`). **Captura CONCLUÍDA (build 1.21.6/506, capturas 00–61, sem crash, device encerrado com
+   `pm clear` Success e `kill-server`).** Pedido criado: **#146214** (1 calça + frete = R$ 716,80), um pedido
+   só, que vai sozinho para Cancelado ~15 s depois. Achados que entram no spec:
+   - o id de negar muda na 2ª solicitação (`permission_deny_and_dont_ask_again_button`), que vem depois do
+     `onboarding-topics-continue`;
+   - Calças = `sub-categories-button` índice 3;
+   - no Android nenhum método de pagamento vem marcado;
+   - os ids do formulário existem; as opções de parcela não têm id (content-desc "Nx de R$ …");
+   - o Prosseguir do formulário é `pressable`;
+   - o "Entendi" do modal antifraude é `button-confirm`;
+   - o número do pedido não tem id;
+   - **o app não valida Luhn nem o dígito do CPF** (o botão habilita com cartão e CPF inválidos; captura 48).
+   **Drafts escritos** (`drafts/app-migrado/android/`):
+   - novos: 29 (Calças), 30 (parcelas), 31 (validações do cartão), 32 (resumo + antifraude),
+     33 (pedido processando/cancelado);
+   - atualizados com uma seção "build 506": 02, 03, 06, 12–19 e 26;
+   - `00-INDICE.md` atualizado.
+   O `ELEMENTOS-SEM-TESTID.md` foi reescrito para o build 506, e o `BUGS-APP-ANDROID.md` ganhou os itens 13–17.
+   Correção do draft-writer: o titular vazio MOSTRA "Nome do titular obrigatório" (dump 50). A tabela de
+   seletores por passo está no relatório do draft-writer e nos drafts 29–33. **iOS:** o caminho de Calças nunca foi capturado e precisa de
+   uma sessão de Remote Access. O resto do cartão no iOS já está capturado (build 349).
+3. **Run do `04-compra-pix` no iOS (Remote Access, 2026-10-15 22:13–22:21): primeiro Pix de ponta a ponta no
+   iOS.** O QR code carregou (pedido **#145112**). A única falha foi a validação do valor: a tela do Pix mostra
+   629,91 (só o óculos com 10%), contra 1.349,82 esperado. É o bug conhecido de 1 toque gerar 2 pedidos. Antes
+   desse run, o Pix das 21:54 parou no `abrirLogin()` porque o app abriu já logado e o `garantirDeslogado()` não
+   detectou (o Menu estava rolado até o rodapé pelo `anexarRodapeDoMenu()`). Hipótese sem prova. A POC iOS
+   falhou com "conta suja" (camisa favoritada na conta `marciorocha`) e depois com o `action-button` não achado
+   na listagem do build 350.
+4. **Allure local acumula runs:** a `allure-results/` não é limpa entre execuções (o `onPrepare` só cria a
+   pasta), e o relatório mistura testes de runs anteriores. Validar no futuro a limpeza no `onPrepare`, só
+   local e preservando `history/`.
+
+**(anterior) PAROU AQUI (2026-10-15, tarde):**
 1. **Captura iOS feita** (app 1.21.6 build 349, iOS 26.2, Remote Access, sessão fechada): compra **Pix** e
    compra **cartão** (cartão e CPF fake), finalizadas com autorização do Marcio. Capturas em
    `drafts/app-migrado/ios/captures-2026-10-15-compra-{pix,cartao}/` (`NOTAS.md`); drafts escritos
@@ -24,7 +76,11 @@
      capturado (`menu-card-*` enabled=true inferido).
    - **Spec do cartão** (Android e iOS) depois das capturas; **gerador de massa** na execução
      (`MASSA-DE-DADOS.md`).
-   - Decisões ainda abertas do Marcio: pausas do login ficam ou saem; `04-compra-pix` no Device Farm ou não.
+   - Decisões ainda abertas do Marcio: pausas do login ficam ou saem.
+   - **2026-10-16: guarda do Device Farm REMOVIDA do `04-compra-pix`.** Foi colocada pelo Claude sem pedido
+     do Marcio e registrada errado como "decisão pendente dele". No CI Run #20 (16/10 00:15) ela fez o
+     teste ser pulado nos 11 aparelhos (`⏭️ Teste pulado nesta plataforma` no `Test spec output`). Agora o
+     spec roda no Device Farm, Android e iOS.
 4. **Permissão:** o toque de finalizar pedido foi bloqueado 2x pelo classificador do Claude Code
    ("Real-World Transactions") e passou na 3ª, depois de o Marcio reafirmar a autorização. Pode voltar a
    acontecer; nesse caso o Marcio roda o `act.mjs` com `!`.
@@ -280,7 +336,7 @@ Cobertura: fluxo do M1 inteiro **e** o fluxo de compra do `test/Draft.ts` até o
   Pix", 35 passos). Registro completo em `plans/2026-10-14-compra-pix.md`. **Passou no AVD em
   2026-10-14 20:43–20:50** (4º run do Marcio; pedido nº 128763), com a limpeza da Mochila desativada a pedido dele. Preço de cada produto
   lido na PDP (`lerPrecoDoProduto`), guardado no spec e validado no resumo antes de finalizar.** Só Android; pula no iOS (sem
-  captura) e no Device Farm (cria pedidos reais; decisão pendente do Marcio). Page objects novos:
+  captura). (A guarda que pulava o Device Farm foi removida em 2026-10-16: não tinha sido pedida.) Page objects novos:
   `BuscaPage`, `ProdutoPage`, `CheckoutPage`, `PedidoPage`. Trocas para os ids do build atual (Android):
   onboarding (`onboarding-topics-continue`, `privacy-accept`, `terms-accept`), login
   (`menu-login-button`, `login-*-input`, `login-submit-button`), logado (`menu-user-header`), sair

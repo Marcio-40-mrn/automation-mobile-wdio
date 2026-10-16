@@ -24,8 +24,8 @@ Não usar `npm run wdio:android -- --spec ...` no PowerShell: o `--` não chega 
 perde e a suíte inteira roda (aconteceu no 1º run, com a POC `00` falhando junto).
 
 **O teste finaliza uma compra de verdade.** Cada execução que passa do passo 29 cria pedido(s) Pix
-reais "aguardando pagamento" na conta. Por isso ele é pulado no Device Farm (12 pedidos por run)
-até o Marcio decidir; no iOS é pulado porque as telas não têm captura.
+reais "aguardando pagamento" na conta. Roda no Device Farm também: a guarda que o pulava lá foi
+colocada sem pedido do Marcio e removida em 2026-10-16.
 
 ## Arquivos
 

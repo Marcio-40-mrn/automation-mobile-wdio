@@ -259,7 +259,7 @@ migrado tem o mesmo ReCAPTCHA; o bloqueio abaixo foi medido no app atual.
 
 **2026-10-14 — cenário de compra com Pix no app migrado (Android, local):** `test/specs/04-compra-pix.spec.ts`,
 pedido do Marcio, finaliza um pedido Pix real e valida os valores do resumo pelos preços lidos na PDP.
-Pulado no Device Farm até decisão do Marcio. Registro: `plans/2026-10-14-compra-pix.md`.
+Roda no Device Farm (guarda que o pulava removida em 2026-10-16). Registro: `plans/2026-10-14-compra-pix.md`.
 
 **Próximo (Marcio, 2026-10-15): compra com cartão.** Exige capturar antes, no Android, os elementos
 da tela de pagamento com cartão no build atual (a captura de 2026-09-29 parou no formulário, sem

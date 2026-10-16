@@ -12,7 +12,6 @@ import {
     anexarCrashDoAppSeFechou,
     configurarFechadorDeBanner,
     limparLogDeCrash,
-    pularNestaPlataforma,
     // registrarAvisoNoRelatorio,   // só a limpeza da Mochila usa (desativada)
     rotularTeste,
     step,
@@ -31,9 +30,8 @@ import allure from '@wdio/allure-reporter';
 //
 // ATENÇÃO: o teste FINALIZA uma compra de verdade. Cada execução cria pedido(s) Pix reais
 // "aguardando pagamento" na conta — nas capturas de 2026-10-14, um toque em finalizar com 2
-// produtos na Mochila criou 2 pedidos. Por isso:
-//   - o toque em finalizar nunca é repetido (CheckoutPage.finalizarPedido);
-//   - no Device Farm o teste é pulado até o Marcio decidir se ele entra no CI (12 pedidos por run).
+// produtos na Mochila criou 2 pedidos. Por isso o toque em finalizar nunca é repetido
+// (CheckoutPage.finalizarPedido).
 //
 // Seletores e tempos: .planning/drafts/app-migrado/android/captures-2026-10-14-compra-pix/ e
 // captures-2026-10-14-compra-pix-rodada2/ (35 passos percorridos no AVD).
@@ -80,10 +78,6 @@ const PRODUTO_BUSCA = 'óculos';
 
 describe('Compra', () => {
     it('Jornada completa de compra com Pix', async function (this: Mocha.Context) {
-        if (process.env.DEVICEFARM_DEVICE_UDID) {
-            pularNestaPlataforma(this, 'a compra cria pedidos reais; no Device Farm só depois de decisão do Marcio');
-        }
-
         const homePage = new HomePage();
         const onboardingPage = new OnboardingPage();
         const loginPage = new LoginPage();

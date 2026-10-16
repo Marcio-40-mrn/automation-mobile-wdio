@@ -78,6 +78,8 @@ pagamento" na conta `CLIENT_USER`.
 | 2026-10-14 20:43 | #128763 | run do spec `04-compra-pix` no AVD |
 | 2026-10-15 11:14 | #134367 e #134409 | run do spec `04-compra-pix` no AVD (parou na tela do Pix); os dois já aparecem como "Pedido Cancelado" |
 | 2026-10-15 | #139889 (R$ 629,91) e #139933 (R$ 719,91) | captura iOS Pix, build 349, 1 toque em finalizar, 2 pedidos; QR do Pix não carregou |
+| 2026-10-15 22:21 | #145112 (R$ 629,91; o 2º pedido, da camisa, não aparece na tela) | run do spec `04-compra-pix` no iOS (Remote Access, build 350); QR carregou |
+| 2026-10-15 (noite) | #146214 (R$ 716,80, 1 calça + frete; cartão fake, Cancelado) | captura Android do cartão, build 506, 1 toque, 1 pedido |
 | 2026-10-15 | #140130 (R$ 699,90) e #140139 (R$ 799,90) | captura iOS cartão fake, build 349, 1 toque, 2 pedidos, os dois "Pedido Cancelado" |
 
 Os pedidos de runs não listados aqui não foram anotados. A tabela é atualizada a cada captura ou run que
