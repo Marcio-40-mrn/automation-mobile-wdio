@@ -1,5 +1,44 @@
 # STATE
 
+**PAROU AQUI (2026-10-16) — RETOMAR POR AQUI:**
+1. **Rodar o `06-criar-conta` no AVD** (o Marcio roda) e levantar o resultado: copiar o anexo "Dados do cadastro"
+   do Allure para a tabela "Contas criadas…" do `MASSA-DE-DADOS.md`. Pontos de risco se falhar: XPath da
+   mensagem de erro sob o campo (validado só nos dumps) e o `clearValue` nos campos com máscara (CPF, telefone).
+2. **CI:** o Marcio vai corrigir o secret `BUILD_PROFILE_ANDROID` para `production` e recriar as 11 contas do CI
+   (senha nova na loja nova). No próximo run, conferir pelo AWS CLI se o APK veio **506** (`get-upload`,
+   `version_code`) e se o `04-compra-pix` e a POC executaram. Nada desta sessão foi commitado (o Marcio sobe).
+3. **Captura iOS do cadastro** (Remote Access) para escrever o ramo iOS do `CadastroPage` (hoje falha explícito).
+4. Em aberto, sem ordem do Marcio: checagem do modal de login recusado (procura texto antigo e dá "Login
+   efetivado"); fallback silencioso para `development` no `install-apk.mjs`; remover `autoAcceptAlerts`/
+   `autoGrantPermissions` do `wdio.conf.ts`; spec `05-compra-cartao`.
+
+**TASK DE 2026-10-16: cenário de teste de criação/cadastro de conta no app.**
+- **Precisa de captura antes de escrever, nas duas plataformas** (inspector + draft-writer em paralelo), no
+  build atual (Android 1.21.6/506, iOS 1.21.6/350). O que existe hoje não basta:
+  - Android: só o link `login-create-account` no Login; o formulário nunca foi capturado.
+  - iOS: só a 1ª tela do formulário, no build 335 (draft `drafts/app-migrado/ios/31-criar-conta.md`): campos sem
+    testID (placeholder), só `create-account-submit`; nenhuma validação, etapa 2 (senha) nem envio capturados.
+    Provavelmente desatualizado (o 349 trocou ids genéricos).
+- Referência de escopo: Etapa 5 do M6 (Criar Conta — Etapas 1 e 2, 22 cenários do PDF) e o padrão de e-mail
+  `informatica.mrn+{texto}@gmail.com`.
+- **Captura Android FEITA (2026-10-16, build 506)**, capturas 00–30 em
+  `drafts/app-migrado/android/captures-2026-10-16-criar-conta/`, drafts 34–37; conta real criada
+  (`MASSA-DE-DADOS.md`). Todos os campos têm testID (`create-account-*`, `create-account-security-*`).
+- **Spec ESCRITO, NÃO RODADO: `test/specs/06-criar-conta.spec.ts`** + `test/pageobjects/CadastroPage.ts` +
+  `gerarDadosCadastro()`/`gerarCpf()` em `test/utils/massa.ts`. Decisões do Marcio (2026-10-16): vai até o fim
+  criando conta real; inválidos + caminho feliz no mesmo teste (e-mail, CPF, telefone com erro no campo e botão
+  desabilitado; 4 senhas fora da regra e confirmação diferente com finalizar desabilitado); dados no anexo
+  "Dados do cadastro" do Allure e no `MASSA-DE-DADOS.md`; **iOS falha explícito** no `CadastroPage` até a
+  captura iOS. Só `tsc` conferido. Rodar: `npx wdio run ./wdio.conf.ts --spec test/specs/06-criar-conta.spec.ts`.
+  Roda também no Device Farm (cria 1 conta por device por run).
+
+**Andamento de 2026-10-16:** guarda do Device Farm removida do `04-compra-pix` (ver item 3 abaixo, nota de 16/10).
+CI Run #20: Android baixou 1.20.11/494 (perfil `development` no EAS; o Marcio vai corrigir o secret
+`BUILD_PROFILE_ANDROID` para `production`, conferir no próximo run se o APK vem 506); iOS (1.21.6/350) recusou o
+login das contas do CI ("Incorrect e-mail or password ... create a new password") e o Marcio vai recriar as 11
+contas. Em aberto, sem ordem: o login dá "Login efetivado" com o modal de recusa na tela (procura o texto antigo);
+o `install-apk.mjs` cai em `development` em silêncio quando o secret vem vazio.
+
 **PAROU AQUI (2026-10-15, noite) — COMEÇAR AMANHÃ (2026-10-16) POR AQUI:**
 1. **Remover do `wdio.conf.ts` o que aceita diálogo sozinho (Marcio, 2026-10-15: "amanhã vamos atacar isso").**
    São três linhas, que o Claude escreveu durante o M3 (commit `8536e92`, 09/09) e que ficaram por causa da

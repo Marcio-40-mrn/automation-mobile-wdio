@@ -12,6 +12,26 @@ entram aqui: só o nome da variável no `.env`.
 | E-mail inexistente (LOG-05) | gerado em runtime por `gerarEmailFicticio()` em `test/utils/massa.ts`: `informatica.mrn+log05-<device>-<ts>-<rand>@gmail.com` |
 | Senha inválida (LOG-05) | `Senha-Invalida-0000` (`gerarSenhaFicticia()`, `test/utils/massa.ts`) |
 
+## Contas criadas pela automação e pelas capturas (Criar Conta)
+
+O Marcio decidiu (2026-10-16) que o cadastro vai até o fim e cria conta real. E-mail no padrão
+`informatica.mrn+{texto}@gmail.com`, com `{texto}` = `cadastro-` + device normalizado + timestamp (base 36) +
+sufixo aleatório: único por execução e por device, e nunca casa com as contas do CI (`qa`/`test` + número).
+CPF gerado na hora, válido pelos 2 dígitos verificadores. Todos os campos preenchidos ficam registrados aqui e
+no relatório Allure. **Senha registrada de propósito:** conta descartável, criada só para teste (pedido do
+Marcio de anotar todos os dados preenchidos).
+
+**No spec `test/specs/06-criar-conta.spec.ts`** os dados são gerados a cada execução por
+`gerarDadosCadastro(device)` (`test/utils/massa.ts`): nome `Teste`, sobrenome `Automacao`, CPF válido aleatório,
+nascimento aleatório entre 1970 e 1999, telefone `(11) 9xxxx-xxxx` aleatório, senha `Aramis@<4 letras><dígito>a`.
+Cada execução anexa no Allure o "Dados do cadastro" com todos os campos; a linha é copiada para a tabela abaixo
+quando o run é levantado. Inválidos usados no spec: e-mail `abc`, CPF `111.111.111-11`, telefone `1193`, senhas
+`abc`, `abcdefgh`, `Abcdefgh`, `Abcdefg1` e confirmação diferente.
+
+| Data | Origem | E-mail | Nome | Sobrenome | CPF | Nascimento | Telefone | Senha | Resultado |
+|---|---|---|---|---|---|---|---|---|---|
+| 2026-10-16 13:50 | captura Android (AVD-S24, build 506) | `informatica.mrn+cadastro-avd-s24-mvb7e8sd-xxny@gmail.com` | Teste | Automacao | `285.729.154-00` | 15/05/1990 | 11 933683272 | `Aramis@E8SD9a` | conta criada; senha aceita sem troca; cadastro concluiu e a conta ficou logada direto na Home (cap. 29), Menu mostrou "Teste Automacao" (cap. 30) |
+
 ## Compra
 
 | Dado | Valor | Origem |
