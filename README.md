@@ -107,13 +107,13 @@ Os argumentos depois do `--` vão direto para o `wdio run`:
 
 ```bash
 # um arquivo de spec (Android, AVD-S24)
-npm run wdio:android -- --spec test/specs/00-poc-favoritar.spec.ts
+npx wdio run ./wdio.conf.ts --spec test/specs/01-fluxo-favoritar.spec.ts
 
 # o mesmo no iOS (sessão de Remote Access aberta, ver acima)
-npm run wdio:ios -- --spec test/specs/00-poc-favoritar.spec.ts
+npx cross-env PLATFORM=ios wdio run ./wdio.conf.ts --spec test/specs/01-fluxo-favoritar.spec.ts
 
 # um teste só, pelo título (id) do `it`, dentro do spec escolhido
-npm run wdio:android -- --spec test/specs/00-poc-favoritar.spec.ts --mochaOpts.grep "<id>"
+npx wdio run ./wdio.conf.ts --spec test/specs/01-fluxo-favoritar.spec.ts --mochaOpts.grep "<id>"
 ```
 
 Isso vale **só para execução local**. No CI (GitHub Actions + Device Farm) não há filtro: todo

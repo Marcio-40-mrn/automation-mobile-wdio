@@ -20,6 +20,9 @@ export function configurarFechadorDeBanner(fn: (() => Promise<void>) | null): vo
 
 // Abre um step Allure, tenta fechar o banner, roda o passo e fecha o step como PASSED/FAILED.
 // A exceção do passo é sempre relançada — o step nunca engole erro.
+// Na falha, anexa o print da tela no próprio step (2026-10-18: o 03-compra-cartao iOS falhou na
+// parcela sem print, porque o print dependia de cada método lembrar de chamar anexarPrint). Se o
+// print falhar (sessão caída), só loga: nunca troca o erro do teste.
 export async function step(nome: string, fn: () => Promise<void>): Promise<void> {
     allure.startStep(nome);
     try {
@@ -29,6 +32,11 @@ export async function step(nome: string, fn: () => Promise<void>): Promise<void>
         await fn();
         allure.endStep(Status.PASSED);
     } catch (e) {
+        try {
+            await anexarPrint(`Falha — ${nome}`);
+        } catch (erroDoPrint) {
+            console.log(`ℹ Print da falha não anexado (${erroDoPrint instanceof Error ? erroDoPrint.message : erroDoPrint})`);
+        }
         allure.endStep(Status.FAILED);
         throw e;
     }
@@ -58,23 +66,6 @@ export async function rotularTeste(codigo: string): Promise<{ device: string; co
     await allure.addLabel('host', device);                // aba Timeline agrupa por aparelho
 
     return { device, conta };
-}
-
-// Skip por plataforma COM motivo visível no relatório (D-03: nunca um spec por sistema
-// operacional; quando o cenário não se aplica ou não é observável numa plataforma, ele é pulado
-// aqui, e o motivo vai para a descrição do teste e para a tag `pulado-plataforma`).
-//
-// Uso: o `it` precisa ser declarado com `function` (não arrow) para ter `this`:
-//   it('[ONB-02] ...', async function (this: Mocha.Context) {
-//       pularNestaPlataforma(this, 'DEC-C (e): ...');
-//   });
-// `ctx.skip()` interrompe o teste lançando a exceção de "pendente" do Mocha — nada depois da
-// chamada roda, então chame ANTES de mexer no app quando o estado dele importar.
-export function pularNestaPlataforma(ctx: Mocha.Context, motivo: string): never {
-    allure.addDescription(`Pulado nesta plataforma: ${motivo}`, 'text');
-    allure.addTag('pulado-plataforma');
-    console.log(`⏭️ Teste pulado nesta plataforma: ${motivo}`);
-    return ctx.skip();
 }
 
 // Aviso que precisa sobreviver ao teste: vai para o console e para um anexo text/plain do

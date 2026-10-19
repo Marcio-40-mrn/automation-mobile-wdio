@@ -32,7 +32,6 @@ function buildCapabilities(): object[] {
             "appium:automationName": "XCUITest",
             "appium:noReset": false,
             "appium:bundleId": "com.aramis.ecomm",
-            "appium:autoAcceptAlerts": true,
             // Device Farm fornece um WDA pré-compilado e pré-assinado; reusar evita
             // o build via xcodebuild (que falha com "code 70" no host self-managed).
             "appium:usePrebuiltWDA": true,
@@ -67,7 +66,6 @@ function buildCapabilities(): object[] {
             "appium:automationName": "XCUITest",
             "appium:noReset": true,
             "appium:bundleId": "com.aramis.ecomm",
-            "appium:autoAcceptAlerts": true,
         } as any];
     }
 
@@ -80,7 +78,6 @@ function buildCapabilities(): object[] {
         "appium:appActivity": "com.aramis.ecomm.MainActivity",
         "appium:uiautomator2ServerInstallTimeout": 60000,
         "appium:uiautomator2ServerLaunchTimeout": 60000,
-        "appium:autoGrantPermissions": true,
         "appium:noIncrementalInstall": true,
     } as any];
 }

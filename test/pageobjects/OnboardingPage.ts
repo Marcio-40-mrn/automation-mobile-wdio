@@ -1,85 +1,39 @@
-import { BasePage, seletorTestId, scrollUntilVisible, timewhait } from "./BasePage";
-import { HomePage } from "./HomePage";
-import { driver, $, $$ } from '@wdio/globals'
+import { BasePage, seletorTestId, timewhait } from "./BasePage";
+import { driver, $ } from '@wdio/globals'
 
-// Onboarding do app migrado, passo a passo, para os cenários ONB-01..07 (M6 Etapa 1, 06-04).
-//
-// Diferença para HomePage.ativarApp(): lá o onboarding é um caminho feliz de passos OPCIONAIS
-// (clickIfPresent) que aceita tudo e não prova que cada diálogo apareceu — serve à fumaça. Aqui
-// cada passo é exposto, os diálogos de permissão são asseridos como APARECIDOS antes de tratados
-// (erro nomeado se não vierem) e o destino de cada passo é validado.
+// Onboarding passo a passo, usado pelo 03-compra-cartao (que nega as permissões). Os specs que
+// só atravessam o onboarding aceitando tudo usam o HomePage.ativarApp().
 //
 // REGRA FIXA (Marcio, 2026-10-01, REQUIREMENTS.md): os testes NÃO validam texto e ignoram o
 // idioma. Seletores por testID/estrutura/id do sistema; asserção pelo destino ou estado.
-//
-// TODOS os seletores novos deste arquivo são NÃO VERIFICADOS em run: vêm das capturas do 06-01
-// (Android `captures-2026-09-29-m6e1/01..13`, iOS `captures-m6-sessao-a/00..10`) e ficam assim
-// até o run da Etapa 1 (06-05 Tarefa 2). Tabela no 06-04-SUMMARY.md.
 
 const APP_ID = 'com.aramis.ecomm';
 const PERM = 'com.android.permissioncontroller:id/';
 
-export type Acao = 'permitir' | 'negar';
-export type TipoDialogo = 'localizacao' | 'notificacao' | 'att';
-export type EscolhaPermissoes = { localizacao: Acao; notificacao: Acao };
-export type OpcoesPermissoes = {
-    // true (padrão): cada diálogo de permissão PRECISA aparecer, senão erro nomeado.
-    // false: diálogos opcionais — trata os que vierem e segue (cenários que só atravessam o onboarding).
-    exigir?: boolean;
-    // Quanto esperar por cada diálogo. Padrão 15 s.
-    timeoutMs?: number;
-};
-
-// Motivo único do skip por plataforma dos cenários que dependem de observar ou negar um alerta
-// no iOS. Citado no `it` pelo spec (DEC-C item e, 2026-10-02): o wdio.conf.ts NÃO muda.
-export const MOTIVO_IOS_ALERTAS =
-    'DEC-C (e): no iOS o wdio.conf.ts liga autoAcceptAlerts (linhas 35 e 70), que aceita o alerta do ' +
-    'sistema antes de o teste poder observá-lo ou negá-lo, e negar uma permissão exige reinstalação ' +
-    'limpa do app (captures-m6-sessao-a/NOTAS.md, "Lacunas"). A capability não foi alterada.';
-
 export class OnboardingPage extends BasePage {
 
     // Container clicável das Boas-vindas (ancestral do `first-access-item-animation`); o CTA
-    // "Toque para começar" não tem nó próprio. fonte: m6e1/01-boasvindas-en.xml (draft android/01).
+    // "Toque para começar" não tem nó próprio. fonte: draft android/01.
     private readonly boasVindasAndroid = '//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]';
 
-    // Diálogos de permissão do Android (pacote permissioncontroller), por resource-id — independem
-    // de idioma. O botão de negar muda de id entre a 1ª solicitação (`permission_deny_button`) e a
-    // 2ª (`permission_deny_and_dont_ask_again_button`), por isso o regex cobre as duas.
-    // fonte: m6e1/02 (localização, 1ª vez), 03 (notificação, 1ª vez), 05 e 06 (2ª vez).
+    // Marcador de cada diálogo de permissão do Android (pacote permissioncontroller), pelo id do
+    // botão de permitir — independe de idioma. fonte: drafts android/02.
     private readonly dialogoAndroid = {
-        localizacao: { marcador: `id:${PERM}permission_allow_foreground_only_button`, permitir: `id:${PERM}permission_allow_foreground_only_button` },
-        notificacao: { marcador: `id:${PERM}permission_allow_button`, permitir: `id:${PERM}permission_allow_button` },
-        negar: '-android uiautomator:new UiSelector().resourceIdMatches(".*permission_deny.*button")',
+        localizacao: { marcador: `id:${PERM}permission_allow_foreground_only_button` },
+        notificacao: { marcador: `id:${PERM}permission_allow_button` },
     };
-
-    // Os alertas do iOS só são observáveis/negáveis se o autoAcceptAlerts estiver desligado — não
-    // está (DEC-C e). Falso no iOS, verdadeiro no Android. Não toca o device.
-    alertasObservaveis(): boolean {
-        return process.env.PLATFORM !== 'ios';
-    }
-
-    // Ordem em que os diálogos aparecem NO APP (DEC-C item a: o teste segue o app, nunca o PDF).
-    // O PDF (ONB-01) diz notificação -> localização; o app mostra:
-    //   Android: localização -> notificação (m6e1/02 e 03);
-    //   iOS: notificação -> [toque no CTA] -> ATT -> localização (sessão A, NOTAS.md 00-05).
-    ordemEsperadaDosDialogos(): TipoDialogo[] {
-        return process.env.PLATFORM === 'ios'
-            ? ['notificacao', 'att', 'localizacao']
-            : ['localizacao', 'notificacao'];
-    }
 
     // Abre o app NO ESTADO LIMPO e devolve 'limpo' (Boas-vindas na tela) ou 'ja-concluido'.
     //  - Android: `mobile: clearApp` antes de ativar. O afterTest limpa DEPOIS de cada teste, mas o
     //    1º teste de um run local (noReset: true) começaria com o onboarding já feito.
     //  - iOS: não há como limpar — `mobile: clearApp` não é suportado em iPhone real e o Remote
     //    Access só dá terminateApp. O estado é DETECTADO: se a aba Home já existe, devolve
-    //    'ja-concluido' e quem chama pula o cenário com motivo visível (pularNestaPlataforma).
+    //    'ja-concluido'.
     async abrirApp(): Promise<'limpo' | 'ja-concluido'> {
         if (process.env.PLATFORM === 'ios') return this.abrirAppIOS();
 
         // Os seletores estruturais do Android usam eixos XPath que o motor 2 do UiAutomator2
-        // rejeita; HomePage.ativarApp() faz o mesmo ajuste (06-03, desvio 6).
+        // rejeita; HomePage.ativarApp() faz o mesmo ajuste.
         await driver.updateSettings({ enforceXPath1: true });
         await driver.execute('mobile: clearApp', { appId: APP_ID });
         await driver.execute('mobile: activateApp', { appId: APP_ID });
@@ -107,280 +61,148 @@ export class OnboardingPage extends BasePage {
         return 'limpo';
     }
 
-    // Toca no CTA das Boas-vindas e valida o destino (diálogo de permissão ou Tópicos).
-    // Reaproveita o que o BasePage já provou: iniciaApp() (Android, container clicável) e
-    // iniciaAppIOS() (aceita o alerta de notificação que antecede o CTA e toca por FRAÇÃO da
-    // janela — a exceção de coordenada do REQUIREMENTS.md; nenhuma coordenada nova aqui).
-    async tocarCta() {
-        if (process.env.PLATFORM === 'ios') return this.iniciaAppIOS();
-        return this.iniciaApp();
-    }
-
-    // Trata os diálogos de permissão na ordem em que o app os mostra e devolve essa ordem.
+    // ---- Onboarding NEGANDO as permissões (spec 03-compra-cartao, Marcio 2026-10-15) ----------
     //
-    // Android: para cada diálogo, ASSERE que apareceu (erro nomeado em `timeoutMs` se não vier),
-    // toca permitir ou negar, e confirma que ele fechou. O tipo do diálogo vem do id do botão
-    // (foreground_only = localização; allow sem foreground = notificação), nunca do texto.
-    // iOS: só o modo tolerante com permitir (cenários que apenas atravessam o onboarding) —
-    // aceita ATT e localização pelo caminho já provado (`mobile: alert` com buttonLabel "Allow",
-    // DEC-C item i). Observar ou negar no iOS não é suportado (DEC-C e) e lança erro.
-    async tratarPermissoes(escolha: EscolhaPermissoes, opcoes: OpcoesPermissoes = {}): Promise<TipoDialogo[]> {
-        const exigir = opcoes.exigir !== false;
-        const timeoutMs = opcoes.timeoutMs ?? 15000;
+    // Android, build 1.21.6/506. fonte: captures-2026-10-15-compra-cartao/00 a 10 (NOTAS.md) e
+    // drafts android/02 e 03 (seção "build 506"). O app pede as permissões DUAS vezes quando são
+    // negadas, sempre localização -> notificação:
+    //   1ª: logo depois do CTA das Boas-vindas, negar = `permission_deny_button` (caps. 01 e 02);
+    //   2ª: logo depois do `onboarding-topics-continue`, negar =
+    //       `permission_deny_and_dont_ask_again_button` (caps. 04 e 05). O id MUDA na 2ª vez.
+    // Negar é melhor-esforço (Marcio, 2026-10-16): se o diálogo não vier (ex.: permissão já
+    // concedida antes), ou se não der para negar, o teste
+    // NÃO quebra — registra um aviso no log e segue. O que continua sendo exigido é o destino de cada
+    // passo (Tópicos na tela; depois, saída dos Tópicos sem diálogo do sistema).
+    //
+    // iOS (o `autoAcceptAlerts` saiu do wdio.conf.ts em 2026-10-16, decisão do Marcio): os alertas
+    // são do SpringBoard e são negados por `mobile: alert` (BasePage.negarAlertasSistemaIOS). Ordem
+    // no build 352 (captures-2026-10-16-calcas-cadastro, 00–06): notificação ANTES das Boas-vindas;
+    // ATT e localização depois do `onboarding-topics-continue`. Também melhor-esforço.
 
+    private readonly negarAndroid = {
+        1: `id:${PERM}permission_deny_button`,
+        2: `id:${PERM}permission_deny_and_dont_ask_again_button`,
+    } as const;
+
+    // Boas-vindas -> 1ª solicitação: toca no CTA e NEGA localização e notificação; chega nos Tópicos.
+    // iOS: nega a notificação (que vem antes do CTA), toca no CTA e chega nos Tópicos.
+    async negarPermissoesIniciais() {
         if (process.env.PLATFORM === 'ios') {
-            if (exigir || escolha.localizacao === 'negar' || escolha.notificacao === 'negar') {
-                throw new Error(`tratarPermissoes no iOS só aceita o modo tolerante com "permitir". ${MOTIVO_IOS_ALERTAS}`);
-            }
-            await this.permissaoLocalizacaoIOS();
-            return [];
+            await this.negarAlertasSistemaIOS('notificação', 1, 10000);
+            await this.iniciaAppIOS();
+        } else {
+            await this.iniciaApp();
+            await this.negarDialogoAndroid('localizacao', 1);
+            await this.negarDialogoAndroid('notificacao', 1);
         }
 
-        const topicos = seletorTestId('permission-topic');
-        const ordem: TipoDialogo[] = [];
-
-        for (let i = 0; i < 2; i++) {
-            const tipo = await this.esperarDialogoAndroid(timeoutMs, topicos);
-            if (!tipo) break;
-            ordem.push(tipo);
-            await this.responderDialogoAndroid(tipo, escolha[tipo]);
+        // Android, build 507: a notificação pode chegar ~15-25s depois da localização, já por cima
+        // dos Tópicos (BasePage.continua); a espera nega o que aparecer no caminho.
+        const topicos = process.env.PLATFORM === 'ios'
+            ? await $(seletorTestId('onboarding-topics-continue'))
+                .waitForDisplayed({ timeout: 20000 })
+                .then(() => true)
+                .catch(() => false)
+            : await this.esperarTelaRespondendoPermissoesAndroid(seletorTestId('onboarding-topics-continue'), 'negar');
+        if (!topicos) {
+            throw new Error('Depois de negar localização e notificação, a tela de Tópicos (onboarding-topics-continue) não apareceu sem diálogo por cima.');
         }
-
-        if (exigir) {
-            for (const tipo of ['localizacao', 'notificacao'] as const) {
-                if (!ordem.includes(tipo)) {
-                    throw new Error(
-                        `diálogo de ${tipo === 'localizacao' ? 'localização' : 'notificação'} não apareceu ` +
-                        `em ${timeoutMs}ms — conferir autoGrantPermissions (AVD local, wdio.conf.ts) e se o app ` +
-                        `estava limpo (observados: ${ordem.join(' -> ') || 'nenhum'})`
-                    );
-                }
-            }
-        }
-        return ordem;
+        console.log('✅ 1ª solicitação: permissões negadas; Tópicos na tela');
     }
 
-    // Espera até `timeout` por um diálogo de permissão do Android. Devolve o tipo, ou null se a
-    // tela de Tópicos apareceu primeiro (ou o tempo acabou) — não há (mais) diálogo a tratar.
-    private async esperarDialogoAndroid(timeout: number, topicos: string): Promise<'localizacao' | 'notificacao' | null> {
-        let tipo = null as 'localizacao' | 'notificacao' | null;
-        await driver
-            .waitUntil(async () => {
-                if (await $(this.dialogoAndroid.localizacao.marcador).isDisplayed().catch(() => false)) { tipo = 'localizacao'; return true; }
-                if (await $(this.dialogoAndroid.notificacao.marcador).isDisplayed().catch(() => false)) { tipo = 'notificacao'; return true; }
-                // Tópicos na tela e nenhum diálogo: o sistema não vai mostrar mais nada agora.
-                return $(topicos).isDisplayed().catch(() => false);
-            }, { timeout, interval: 500 })
-            .catch(() => false);
-        return tipo;
-    }
-
-    private async responderDialogoAndroid(tipo: 'localizacao' | 'notificacao', acao: Acao) {
-        const alvo = acao === 'permitir' ? this.dialogoAndroid[tipo].permitir : this.dialogoAndroid.negar;
-
-        const botao = await $(alvo);
-        const apareceu = await botao.waitForDisplayed({ timeout: 10000 }).then(() => true).catch(() => false);
-        if (!apareceu) {
-            throw new Error(`Diálogo de ${tipo}: o botão de "${acao}" (${alvo}) não ficou visível em 10s.`);
-        }
-        await botao.click();
-
-        // Confirma pelo estado: o diálogo deste tipo sai da tela. "O clique não deu erro" não vale.
-        const saiu = await driver
-            .waitUntil(async () => !(await $(this.dialogoAndroid[tipo].marcador).isDisplayed().catch(() => false)), {
-                timeout: 10000,
-                interval: 500,
-            })
-            .then(() => true)
-            .catch(() => false);
-        if (!saiu) {
-            throw new Error(`Diálogo de ${tipo}: continuou na tela 10s depois de tocar em "${acao}".`);
-        }
-        console.log(`✅ Diálogo de ${tipo}: ${acao}`);
-        await driver.pause(1000);
-    }
-
-    // Tela final do onboarding ("Como criamos sua experiência?"): os três blocos informativos e a
-    // seção final são 4 `permission-topic` nas duas plataformas (m6e1/04; iOS sessão A cap. 02) —
-    // o PDF conta "três blocos + a seção". O `accept-button` fica fixo no rodapé.
-    async validarTopicos() {
-        const topico = seletorTestId('permission-topic');
-        const apareceu = await $(topico).waitForDisplayed({ timeout: 20000 }).then(() => true).catch(() => false);
-        if (!apareceu) {
-            throw new Error('Tela final do onboarding não apareceu: nenhum permission-topic visível em 20s.');
-        }
-        const total = await $$(topico).length;
-        if (total !== 4) {
-            throw new Error(`Tela final do onboarding: esperados 4 permission-topic (3 blocos + a seção), encontrados ${total}.`);
-        }
-        const aceite = await $(seletorTestId('accept-button')).isDisplayed().catch(() => false);
-        if (!aceite) {
-            throw new Error('Tela final do onboarding: o accept-button (Continue) não está visível.');
-        }
-    }
-
-    // Toca em Continue na tela final e confirma que ela saiu. No Android, permissão NEGADA volta a
-    // ser pedida depois do Continue (m6e1/05 e 06: 2ª solicitação, com o botão de negar
-    // `deny_and_dont_ask_again`): se `reSolicitacao` vier, esses diálogos são tratados (opcionais,
-    // 8 s para o primeiro) e a ordem observada é devolvida. Sem `reSolicitacao` não espera nada.
-    async continuarTopicos(reSolicitacao?: EscolhaPermissoes): Promise<TipoDialogo[]> {
-        await this.validarTopicos();
-        if (process.env.PLATFORM === 'ios') await this.fechaBanner();
-
-        const aceite = seletorTestId('accept-button');
-        await (await $(aceite)).click();
-
-        const saiu = await driver
-            .waitUntil(async () => !(await $(seletorTestId('permission-topic')).isDisplayed().catch(() => false)), {
-                timeout: 15000,
-                interval: 500,
-            })
-            .then(() => true)
-            .catch(() => false);
-        if (!saiu) {
-            throw new Error('Onboarding travado na tela final: os permission-topic continuaram visíveis 15s depois do Continue.');
-        }
-        console.log('✅ Aceite (tela final do onboarding)');
-        await driver.pause(timewhait);
-
-        if (reSolicitacao && process.env.PLATFORM !== 'ios') {
-            return this.tratarPermissoes(reSolicitacao, { exigir: false, timeoutMs: 8000 });
-        }
-        return [];
-    }
-
-    // Política de Privacidade e Termos são telas de leitura longa SEM testID e SEM texto
-    // estável: o que as caracteriza é (1) não ser a tela final (sem permission-topic), (2) não ser
-    // a Home (sem tab-home), (3) o `accept-button` só aparece depois de rolar até o fim e (4) nenhum
-    // diálogo do sistema por cima. Quem distingue Política de Termos é a ORDEM do fluxo (Política
-    // vem logo depois da tela final; Termos, logo depois da Política) — por isso os dois métodos
-    // públicos chamam a mesma checagem estrutural. NÃO VERIFICADO em run.
-    private async validarTelaDeLeitura(nome: string) {
-        const semTopicos = await driver
-            .waitUntil(async () => !(await $(seletorTestId('permission-topic')).isDisplayed().catch(() => false)), { timeout: 10000, interval: 500 })
-            .then(() => true)
-            .catch(() => false);
-        const naHome = await $(seletorTestId('tab-home')).isDisplayed().catch(() => false);
-        const aceiteJaVisivel = await $(seletorTestId('accept-button')).isDisplayed().catch(() => false);
-        const dialogo = process.env.PLATFORM === 'ios'
-            ? false
-            : await $(`id:${PERM}permission_message`).isDisplayed().catch(() => false);
-
-        if (!semTopicos || naHome || aceiteJaVisivel || dialogo) {
-            throw new Error(
-                `${nome} não está na tela: esperada uma tela de leitura longa (sem permission-topic, sem tab-home, ` +
-                `accept-button fora da viewport, sem diálogo do sistema) mas veio permission-topic ` +
-                `${semTopicos ? 'ausente' : 'PRESENTE'}, tab-home ${naHome ? 'PRESENTE' : 'ausente'}, ` +
-                `accept-button ${aceiteJaVisivel ? 'JÁ visível' : 'fora da viewport'}, diálogo do sistema ${dialogo ? 'PRESENTE' : 'ausente'}.`
-            );
-        }
-        console.log(`📜 ${nome} na tela (leitura longa, aceite ainda fora da viewport)`);
-    }
-
-    async validarPolitica() {
-        await this.validarTelaDeLeitura('Política de Privacidade');
-    }
-
-    async aceitarPolitica() {
-        await this.aceitarTelaLonga('Política de Privacidade');
-    }
-
-    async validarTermos() {
-        await this.validarTelaDeLeitura('Termos e condições');
-    }
-
-    async aceitarTermos() {
-        await this.aceitarTelaLonga('Termos e condições');
-    }
-
-    // Rola até o `accept-button`, toca e espera ele SAIR da viewport (as três telas de aceite usam o
-    // mesmo id, então o botão sumir é a única prova de que a tela trocou). Orçamento de 45
-    // swipes — a Política exige ~21 no iOS e ~30 no Android; a parada é o isDisplayed().
-    private async aceitarTelaLonga(tela: string) {
-        const maxSwipes = 45;
-        const aceite = seletorTestId('accept-button');
-
-        const alcancou = process.env.PLATFORM === 'ios'
-            ? await this.rolaAteVisivelIOS(aceite, maxSwipes)
-            : await scrollUntilVisible(await $(aceite), maxSwipes);
-        if (!alcancou) {
-            throw new Error(`aceite da ${tela} não apareceu após ${maxSwipes} swipes (accept-button não ficou visível)`);
-        }
-
-        if (process.env.PLATFORM === 'ios') await this.fechaBanner();
-        await (await $(aceite)).click();
-
-        const saiu = await driver
-            .waitUntil(async () => !(await $(aceite).isDisplayed().catch(() => false)), { timeout: 15000, interval: 500 })
-            .then(() => true)
-            .catch(() => false);
-        if (!saiu) {
-            throw new Error(
-                `Onboarding travado em "${tela}": o accept-button continuou visível 15s depois do clique, ` +
-                'ou seja, a tela não trocou.'
-            );
-        }
-        console.log(`✅ Aceite (${tela})`);
-        await driver.pause(timewhait);
-    }
-
-    // Home de chegada: aba Home + `editorial-home-root` (HomePage.validarHome, com erro nomeado se o
-    // app caiu), as QUATRO abas da barra inferior e o bloco editorial de topo (`editorial-group-0`,
-    // o "banner promocional" do PDF — existência, porque no iOS ele vem visible=false). Os ids são os
-    // das capturas m6e1/13 e iOS 10; texto das abas não entra.
-    async validarHomeComAbas() {
-        await new HomePage().validarHome();
-
-        for (const aba of ['tab-home', 'tab-categories', 'tab-bag', 'tab-menu']) {
-            const visivel = await $(seletorTestId(aba)).waitForDisplayed({ timeout: 10000 }).then(() => true).catch(() => false);
-            if (!visivel) {
-                throw new Error(`Home sem a barra de abas completa: ${aba} não ficou visível em 10s.`);
-            }
-        }
-
-        const banner = await $(seletorTestId('editorial-group-0')).waitForExist({ timeout: 10000 }).then(() => true).catch(() => false);
-        if (!banner) {
-            throw new Error('Home sem o bloco editorial de topo (editorial-group-0 não existe na árvore em 10s).');
-        }
-        console.log('🏠 Home com as 4 abas e o bloco editorial de topo');
-    }
-
-    // ONB-07: da Home não há caminho de volta ao onboarding. Duas evidências:
-    //  (1) nenhuma tela do onboarding na árvore (Boas-vindas no Android, `permission-topic`,
-    //      `accept-button`) e, no iOS, nenhum `Back` (o iOS não tem Voltar de hardware);
-    //  (2) Android: o Voltar do sistema não leva ao onboarding — se o app sair, é reativado e a
-    //      Home volta (o onboarding está concluído). Comportamento do Voltar na Home NÃO VERIFICADO.
-    async validarSemNavegacaoCircular() {
-        await this.onboardingForaDaArvore('na Home, antes do Voltar');
-
+    // Tópicos -> 2ª solicitação: toca no Continue e NEGA de novo (id `deny_and_dont_ask_again`).
+    // Destino: a Política de Privacidade (sem permission-topic e sem diálogo do sistema).
+    // iOS: o Continue dispara ATT e localização, negados aqui; a tela só sai dos Tópicos num toque
+    // seguinte (mesmo laço de até 3 toques do aceitaOnboardingIOS). Destino: `privacy-accept` existe.
+    async continuarTopicosNegandoPermissoes() {
         if (process.env.PLATFORM === 'ios') {
-            if (await $('accessibility id:Back').isDisplayed().catch(() => false)) {
-                throw new Error('Navegação circular: a Home mostra um botão Back, que levaria de volta ao onboarding.');
+            const continuarIOS = seletorTestId('onboarding-topics-continue');
+            const politica = seletorTestId('privacy-accept');
+            for (let toque = 1; toque <= 3; toque++) {
+                if (!(await $(continuarIOS).isDisplayed().catch(() => false))) break;
+                await this.fechaBanner();
+                await (await $(continuarIOS)).click();
+                console.log(`👆 Tópicos: Continue (toque ${toque}/3)`);
+                await this.negarAlertasSistemaIOS('ATT e localização', 3, 8000);
+                if (await $(politica).waitForExist({ timeout: 10000 }).then(() => true).catch(() => false)) break;
             }
+            if (!(await $(politica).isExisting().catch(() => false))) {
+                throw new Error(
+                    'Onboarding iOS travado nos Tópicos: 3 toques em onboarding-topics-continue e a Política ' +
+                    '(privacy-accept) não abriu. Suspeitar de alerta do sistema por cima do app.'
+                );
+            }
+            console.log('✅ ATT e localização negados; Política na tela');
+            await driver.pause(timewhait);
             return;
         }
 
-        await driver.back();
-        await driver.pause(2000);
-        const estado = await driver.execute('mobile: queryAppState', { appId: APP_ID }).catch(() => null);
-        if (estado !== 4) {
-            console.log(`↩ O Voltar da Home tirou o app do primeiro plano (queryAppState=${estado}) — reativando`);
-            await driver.execute('mobile: activateApp', { appId: APP_ID });
+        const continuar = await $(seletorTestId('onboarding-topics-continue'));
+        await this.waitForElement(continuar);
+        await continuar.click();
+        console.log('👆 Tópicos: Continue');
+
+        await this.negarDialogoAndroid('localizacao', 2);
+        await this.negarDialogoAndroid('notificacao', 2);
+
+        const saiu = await driver
+            .waitUntil(async () => {
+                // Diálogo que chegar atrasado (build 507) também é negado aqui.
+                await this.responderDialogosPermissaoAndroid('negar');
+                const topico = await $(seletorTestId('permission-topic')).isDisplayed().catch(() => false);
+                const dialogo = await this.dialogoPermissaoAndroidNaTela();
+                return !topico && !dialogo;
+            }, { timeout: 30000, interval: 500 })
+            .then(() => true)
+            .catch(() => false);
+        if (!saiu) {
+            throw new Error('Depois da 2ª negação, o app não saiu dos Tópicos (permission-topic ou diálogo do sistema ainda na tela em 15s).');
         }
-        await new HomePage().validarHome();
-        await this.onboardingForaDaArvore('depois do Voltar da Home');
+        console.log('✅ 2ª solicitação: localização e notificação negadas; Política na tela');
+        await driver.pause(timewhait);
     }
 
-    private async onboardingForaDaArvore(quando: string) {
-        const resquicios: string[] = [];
-        if (process.env.PLATFORM !== 'ios' && (await $(this.boasVindasAndroid).isDisplayed().catch(() => false))) {
-            resquicios.push('Boas-vindas');
-        }
-        if (await $(seletorTestId('permission-topic')).isDisplayed().catch(() => false)) resquicios.push('permission-topic');
-        if (await $(seletorTestId('accept-button')).isDisplayed().catch(() => false)) resquicios.push('accept-button');
+    // Política (`privacy-accept`) e Termos (`terms-accept`): os mesmos passos que o ativarApp() do
+    // 02-compra-pix usa (BasePage.termo1/termos2); no iOS, os do aceitaOnboardingIOS().
+    async aceitarPoliticaETermos() {
+        if (process.env.PLATFORM === 'ios') return this.aceitarPoliticaETermosIOS();
+        await this.termo1();
+        await this.termos2();
+    }
 
-        if (resquicios.length > 0) {
-            throw new Error(`Navegação circular: ${quando}, a árvore ainda tem elementos do onboarding (${resquicios.join(', ')}).`);
+    // Um diálogo de permissão do Android: espera o diálogo (marcador por tipo, pelo id do botão de
+    // permitir — nunca pelo texto), toca no NEGAR da solicitação e confere que fechou. Melhor-esforço:
+    // nada aqui lança erro; o que não der certo vira aviso no log e o teste segue.
+    private async negarDialogoAndroid(tipo: 'localizacao' | 'notificacao', solicitacao: 1 | 2) {
+        const nome = `${tipo === 'localizacao' ? 'localização' : 'notificação'} (${solicitacao}ª solicitação)`;
+        const marcador = this.dialogoAndroid[tipo].marcador;
+
+        const apareceu = await $(marcador).waitForDisplayed({ timeout: 20000 }).then(() => true).catch(() => false);
+        if (!apareceu) {
+            console.warn(
+                `⚠ Diálogo de ${nome} não apareceu em 20s — seguindo sem negar ` +
+                '(permissão provavelmente já concedida).'
+            );
+            return;
         }
+
+        // O id esperado para a solicitação; se não estiver, o outro botão de negar que estiver na tela.
+        let negar = await $(this.negarAndroid[solicitacao]);
+        if (!(await negar.waitForDisplayed({ timeout: 5000 }).then(() => true).catch(() => false))) {
+            const outro = await $(this.negarAndroid[solicitacao === 1 ? 2 : 1]);
+            if (!(await outro.isDisplayed().catch(() => false))) {
+                console.warn(`⚠ Diálogo de ${nome}: nenhum botão de negar na tela — seguindo sem negar.`);
+                return;
+            }
+            negar = outro;
+        }
+        await negar.click();
+
+        const fechou = await driver
+            .waitUntil(async () => !(await $(marcador).isDisplayed().catch(() => false)), { timeout: 10000, interval: 500 })
+            .then(() => true)
+            .catch(() => false);
+        console.log(fechou ? `🚫 Diálogo de ${nome}: negado` : `⚠ Diálogo de ${nome}: continuou na tela 10s depois de tocar em negar — seguindo.`);
+        await driver.pause(1000);
     }
 }

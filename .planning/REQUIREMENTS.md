@@ -2,16 +2,15 @@
 
 ## O fluxo coberto hoje
 
-Um único cenário, em `test/specs/test.spec.ts`, rodando por device:
+**Os quatro testes principais e únicos** (decisão do Marcio, 2026-10-16), em `test/specs/`, cada um
+rodando por device nas duas plataformas. Comando de cada um: `COMO-RODAR-TESTES.md` (raiz).
 
-1. Abrir o app e tratar os diálogos iniciais (GPS, notificação, termos).
-2. Login com a conta atribuída ao device.
-3. Categorias → Roupas → Camisas.
-4. Favoritar a **primeira camisa que a lista mostrar**, seja qual for.
-5. Voltar para categorias, abrir Perfil → Favoritos.
-6. Validar que o item favoritado está lá, pelo nome capturado no passo 4.
-7. Desfavoritar.
-8. Logout.
+| Spec | Cenário |
+|---|---|
+| `01-fluxo-favoritar` | onboarding, login, Categorias → Roupas → Camisas, favoritar a 1ª camisa, conferir em Favoritos, desfavoritar, logout |
+| `02-compra-pix` | jornada completa de compra com Pix até o QR code, com os valores do resumo validados pelos preços lidos na PDP |
+| `03-compra-cartao` | onboarding negando as permissões, 1 calça, pagamento com cartão fake até a recusa (Pedido Cancelado com número e valor) |
+| `04-criar-conta` | cadastro de conta real, com os casos inválidos de cada etapa no mesmo teste |
 
 ## Critérios de aceite
 
@@ -27,16 +26,12 @@ Um único cenário, em `test/specs/test.spec.ts`, rodando por device:
   do usuário ou do app, como permitir ou negar, campo válido ou inválido, ou confirmar ou cancelar.
   Um cenário do PDF que repete o caminho de outro, ou que só confere o fim de um fluxo que outro
   teste já percorre, **não ganha teste próprio**: vira asserção dentro desse outro teste, e o
-  título dele cita o ID (ex.: `[ONB-04] ... (cobre [ONB-05] e [ONB-07])`). Caso repetido ou
-  desnecessário é excluído. O motivo é que cada teste roda em todos os devices do CI e o tempo se
-  multiplica. No gate (`test/utils/cobertura.check.mjs`), o cenário coberto assim tem situação
-  **C** e `cobertoPor`.
-  **Revertido na Etapa 1 (Marcio, 2026-10-03):** as reduções de Onboarding, Login e Logout foram
-  desfeitas, e os specs e o gate voltaram ao último commit (15 testes, ONB-01..05 e 07, LOG-01..05
-  e 07, OUT-01..03). **Nenhum teste é juntado ou removido sem autorização explícita do Marcio
-  para aquele spec e aquele número.** A redução pode ser proposta, mas não pode ser aplicada por
+  título dele cita o ID do cenário coberto. Caso repetido ou desnecessário é excluído. O motivo é
+  que cada teste roda em todos os devices do CI e o tempo se multiplica.
+  **Nenhum teste é juntado ou removido sem autorização explícita do Marcio para aquele spec e
+  aquele número.** A redução pode ser proposta, mas não pode ser aplicada por
   conta própria.
-- **Onboarding não tem retorno**: cenário de "Voltar" dentro do onboarding (ONB-06) está fora
+- **Onboarding não tem retorno**: cenário de "Voltar" dentro do onboarding está fora
   do escopo (decisão do Marcio, 2026-10-01). Não planejar nem perguntar.
 - O teste não pode depender de nome de produto fixo: o catálogo muda entre versões e
   ambientes.
@@ -72,7 +67,7 @@ Cada uma custou um incidente. Detalhes no `CLAUDE.md`.
 - **Não subir execução no AVD sem pedido explícito do Marcio.** O emulador é ambiente de
   trabalho dele; dois runs simultâneos invalidam os dois.
 - **Uma suíte só, para as duas plataformas.** Nunca criar spec, classe ou arquivo de page
-  object separado por sistema operacional. O `test/specs/test.spec.ts` é o mesmo, os page
+  object separado por sistema operacional. Cada spec de `test/specs/` é o mesmo, os page
   objects são os mesmos e os nomes de método são os mesmos; quem precisar detecta a
   plataforma (`process.env.PLATFORM === 'ios'`) e escolhe o seletor **dentro do método** —
   o padrão que o `ativarApp()` de `test/pageobjects/HomePage.ts` inaugurou. Duplicar a suíte
@@ -89,6 +84,11 @@ Cada uma custou um incidente. Detalhes no `CLAUDE.md`.
   (`wdio.conf.ts:35`, `:70` e `:83`) **ficam como estão por enquanto**, porque retirá-las já
   afetou os testes antes. Validar no futuro se dá para removê-las (pendência no `STATE.md`).
   Nenhuma linha nova desse tipo entra.
+  **2026-10-16 (Marcio):** o `autoGrantPermissions: true` do AVD (antiga linha 83) **saiu**; os diálogos
+  de permissão do Android são tratados nos page objects pelo resource-id do `permissioncontroller`.
+  No mesmo dia saíram também os dois `autoAcceptAlerts: true` do iOS (Device Farm e Remote Access):
+  os alertas do sistema são aceitos ou negados nos page objects por `mobile: alert`. **Não sobrou
+  nenhuma capability que aja no lugar do teste.**
 - **Nunca alterar o `.claude/settings.json`** (decisão do Marcio, 2026-10-02). Isso inclui hooks,
   permissões e qualquer outra chave, mesmo quando houver algo aparentemente quebrado nele, como o
   `gsd-secret-read-guard.js` registrado sem o arquivo existir. Achado ali vira registro no
@@ -97,6 +97,17 @@ Cada uma custou um incidente. Detalhes no `CLAUDE.md`.
   Uma mudança em configuração, dependência, hook ou infraestrutura cujo efeito no projeto não
   esteja medido não é feita. O que existe e funciona fica como está, e a ideia vai para as
   pendências do `STATE.md` como "validar no futuro".
+- **Documentação de elementos = UM build só, o último instalado** (Marcio, 2026-10-15, reforçada em
+  2026-10-16). Vale para o `ELEMENTOS-SEM-TESTID.md` (Android), o `ELEMENTOS-SEM-TESTID-IOS.md` (iOS) e
+  todos os drafts de `.planning/drafts/app-migrado/<plataforma>/`. A cada build novo que o Marcio instala
+  e manda capturar:
+  1. conferir todos os ids nos dumps desse build, inclusive os que o dev diz ter colocado (`TESTIDS-ALTERADOS.md`);
+  2. **reescrever** os documentos no lugar: o que ganhou testID **sai** da lista de falta, o que mudou é
+     corrigido no corpo, o build anterior é **descartado**;
+  3. o que a captura não alcançou fica numa seção "Não conferido neste build", só com o nome.
+  **Proibido:** seção ou coluna por build ("Build 352", "no 349 era", "acréscimo de…"), histórico de
+  versões, e bug do app misturado (bug vai no `BUGS-APP-ANDROID.md` / `BUGS-APP-IOS.md`). No topo de cada
+  documento, uma linha só: versão/build, data e pasta de capturas.
 
 ## Restrições conhecidas de ambiente
 

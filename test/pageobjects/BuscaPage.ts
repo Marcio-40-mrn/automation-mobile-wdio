@@ -60,10 +60,32 @@ export class BuscaPage extends BasePage {
     // iOS: `addValue` mantém o acento ("óculos"; o `mobile: keys` o perde — draft 21, rodada do
     // cartão) e a busca é enviada pela tecla "search" do teclado do sistema (captura 20). A tecla
     // não tem id: o rótulo é do teclado do iOS, só localiza.
+    // iOS, build 1.21.7/352: o addValue na velocidade padrão perde letras do meio — 11 de 11 errados
+    // ("óos", "óulos", "ólos"), e a busca errada dá "0 products", sem nenhum product-card. Com
+    // maxTypingFrequency 10 (setting de sessão, só durante a digitação) saiu "óculos" em 9 de 9 (N = 10,
+    // 5 e 3) e a busca trouxe 4 product-card. O `mobile: keys` não serve: perde o "ó" ("Culos").
+    // fonte: captures-2026-10-18-busca-oculos/ (NOTAS.md, caps. 02-14). Se o campo não ficar com o
+    // termo exato, falha aqui com o que foi digitado (não segue buscando o termo errado).
     async buscar(termo: string) {
-        const campo = await $(this.campoBusca);
-        await this.waitForElement(campo);
-        await campo.addValue(termo);
+        if (IOS) {
+            const campo = await $(this.campoBusca);
+            await this.waitForElement(campo);
+            await driver.updateSettings({ maxTypingFrequency: 10 });
+            try {
+                await campo.addValue(termo);
+            } finally {
+                await driver.updateSettings({ maxTypingFrequency: 60 });
+            }
+            const digitado = await $(this.campoBusca).getAttribute('value').catch(() => null);
+            console.log(`⌨ Busca: campo com "${digitado ?? 'não lido'}" (esperado "${termo}")`);
+            if (digitado !== termo) {
+                throw new Error(`Busca: o campo ficou com "${digitado ?? 'não lido'}" depois de digitar "${termo}" (letra perdida na digitação).`);
+            }
+        } else {
+            const campo = await $(this.campoBusca);
+            await this.waitForElement(campo);
+            await campo.addValue(termo);
+        }
         if (IOS) {
             const tecla = await $('-ios predicate string:type == "XCUIElementTypeButton" AND label == "search"');
             await this.waitForElement(tecla);

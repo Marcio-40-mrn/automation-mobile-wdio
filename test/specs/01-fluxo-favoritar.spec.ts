@@ -13,16 +13,6 @@ import {
 import allure from '@wdio/allure-reporter';
 import { Status } from 'allure-js-commons';
 
-// POC do favoritar, migrada para o app migrado como FUMAÇA da fase 06 (DEC-A item b, D-02).
-// Roda só local, uma plataforma por vez (o CI roda a suíte inteira em todos os devices):
-//   Android (AVD, pedido do Marcio):  npm run wdio:android -- --spec test/specs/00-poc-favoritar.spec.ts
-//   iOS (sessão AWS Remote Access):   npm run wdio:ios -- --spec test/specs/00-poc-favoritar.spec.ts
-
-// Limpeza depois de uma falha entre favoritar e desfavoritar. Melhor esforço: cada erro aqui é
-// registrado e engolido, porque o erro do teste é o que veio antes. O app é reaberto primeiro —
-// a falha pode ter deixado a tela em qualquer estado (banner aberto, listagem, modal) e
-// terminate + activate volta à Home com o login preservado. Se mesmo assim não der, o Allure
-// recebe um anexo dizendo qual conta ficou com qual item, para a limpeza manual ser dirigida.
 async function limparFavoritoOrfao(
     produto: string,
     conta: string,
@@ -59,7 +49,7 @@ async function limparFavoritoOrfao(
     }
 }
 
-describe('Teste Login e Perfil', () => {
+describe('Navegação', () => {
     it('Adiciona produto em favoritos e valida adição', async () => {
         const homePage = new HomePage();
         const loginPage = new LoginPage();

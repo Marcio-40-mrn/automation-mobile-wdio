@@ -188,9 +188,10 @@ Não está escrito ainda — definir quando o build chegar:
 ## M6 — Cenários Gherkin da seção 3 no app migrado 🔄 em andamento
 
 **Em execução desde 2026-10-01** (`/gsd-execute-phase 6`): 5/16 planos concluídos — 06-01 (DEC-A +
-captura iOS), 06-02 e 06-03 (POC migrada, Etapa 0) **verde local no Android e no iOS**; 06-04 e
-06-05 (**Etapa 1 — Acesso verde no AVD-S24, 5/5**, na versão reduzida a 5 testes; em 2026-10-03 o
-Marcio mandou reverter as reduções e os specs voltaram aos 15 testes do último commit). CI do Device Farm pendente (Etapa 0 e Etapa 1). Próximo: 06-06. Ver `STATE.md`.
+captura iOS), 06-02 e 06-03 (POC migrada, Etapa 0) **verde local no Android e no iOS**. CI do Device Farm pendente. Ver `STATE.md`.
+**2026-10-16 (Marcio):** a suíte passou a ter só quatro testes, os principais e únicos (`01-fluxo-favoritar`,
+`02-compra-pix`, `03-compra-cartao`, `04-criar-conta`; `REQUIREMENTS.md`). Os specs da Etapa 1 (onboarding,
+login e logout) e os planos 06-04 e 06-05 foram excluídos.
 
 **Planejado em 2026-10-01** pelo `/gsd-plan-phase 6`: 16 planos
 (`.planning/phases/06-cenarios-gherkin-app-migrado/06-01-PLAN.md`…`06-16-PLAN.md`), em sequência,
@@ -257,7 +258,7 @@ cartão → finalizar compra (e o bloqueio de ReCAPTCHA abaixo).
 recapturado no M5, e o teste — quando vier — corre no app migrado. Não se sabe se o app
 migrado tem o mesmo ReCAPTCHA; o bloqueio abaixo foi medido no app atual.
 
-**2026-10-14 — cenário de compra com Pix no app migrado (Android, local):** `test/specs/04-compra-pix.spec.ts`,
+**2026-10-14 — cenário de compra com Pix no app migrado (Android, local):** `test/specs/02-compra-pix.spec.ts`,
 pedido do Marcio, finaliza um pedido Pix real e valida os valores do resumo pelos preços lidos na PDP.
 Roda no Device Farm (guarda que o pulava removida em 2026-10-16). Registro: `plans/2026-10-14-compra-pix.md`.
 

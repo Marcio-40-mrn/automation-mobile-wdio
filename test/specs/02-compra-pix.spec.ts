@@ -12,69 +12,13 @@ import {
     anexarCrashDoAppSeFechou,
     configurarFechadorDeBanner,
     limparLogDeCrash,
-    // registrarAvisoNoRelatorio,   // só a limpeza da Mochila usa (desativada)
     rotularTeste,
     step,
 } from "../utils/allure-helpers";
 import allure from '@wdio/allure-reporter';
-// import { Status } from 'allure-js-commons';   // só a limpeza da Mochila usa (desativada)
-// import { driver } from '@wdio/globals';         // só a limpeza da Mochila usa (desativada)
 
-// Cenário 1 — Jornada completa de compra com Pix (cenário do Marcio, 2026-10-14): do primeiro
-// acesso até o alerta "aguardando pagamento" na Home. Os comentários "Passo N" seguem a
-// numeração do cenário.
-//
-// Rodar (AVD, quem roda é o Marcio):
-//   npx wdio run ./wdio.conf.ts --spec test/specs/04-compra-pix.spec.ts
-// (no PowerShell, `npm run wdio:android -- --spec ...` perde o --spec e roda a suíte inteira)
-//
-// ATENÇÃO: o teste FINALIZA uma compra de verdade. Cada execução cria pedido(s) Pix reais
-// "aguardando pagamento" na conta — nas capturas de 2026-10-14, um toque em finalizar com 2
-// produtos na Mochila criou 2 pedidos. Por isso o toque em finalizar nunca é repetido
-// (CheckoutPage.finalizarPedido).
-//
-// Seletores e tempos: .planning/drafts/app-migrado/android/captures-2026-10-14-compra-pix/ e
-// captures-2026-10-14-compra-pix-rodada2/ (35 passos percorridos no AVD).
-//
-// iOS (2026-10-15, build 1.21.6/349): ramo escrito a partir de
-// .planning/drafts/app-migrado/ios/captures-2026-10-15-compra-pix/ e -compra-cartao/, com os
-// seletores conferidos nas árvores, AINDA NÃO RODADO. Rodar no Remote Access (REMOTE_* no .env):
-//   npm run wdio:ios -- --spec test/specs/04-compra-pix.spec.ts
-// Diferenças no iOS, todas no page object:
-//   - sheet de tamanho e de "produto adicionado" fora da árvore: toque por fração da tela
-//     (exceção autorizada pelo Marcio, 2026-10-15; ProdutoPage);
-//   - carrossel de indicação SEM validação por ora (fora da árvore; ProdutoPage);
-//   - copiar código Pix sem seletor (o QR nunca carregou nas capturas iOS; PedidoPage). Enquanto o
-//     QR não carregar no iOS, o teste para no validarQrCode, com o pedido já criado.
-
-// Produto buscado no passo 11 (variável do cenário). O teste compra o 1º resultado, seja qual for.
 const PRODUTO_BUSCA = 'óculos';
 
-// LIMPEZA DA MOCHILA DESATIVADA (Marcio, 2026-10-14): ele quer ver se a Mochila fica com item da
-// execução anterior. Para religar: descomentar esta função, os imports `Status` e `driver`, e as
-// duas chamadas no fim do `it` (passo final e catch).
-// // Limpeza depois de uma falha com produto na Mochila. Melhor esforço: o erro do teste é o que
-// // vale, e cada erro aqui só vira aviso no relatório. O app é reaberto primeiro (a falha pode ter
-// // deixado qualquer tela aberta: sheet, PDP, checkout); terminate + activate volta à Home logado.
-// async function limparMochila(checkoutPage: CheckoutPage, homePage: HomePage, conta: string) {
-//     const app = 'com.aramis.ecomm';
-//     allure.startStep('Limpeza: esvaziar a Mochila');
-//     try {
-//         await driver.execute('mobile: terminateApp', { appId: app });
-//         await driver.execute('mobile: activateApp', { appId: app });
-//         await driver.pause(5000);
-//         await homePage.fechaBanner();
-//         await checkoutPage.esvaziarMochila();
-//         allure.endStep(Status.PASSED);
-//     } catch (erroLimpeza) {
-//         const motivo = erroLimpeza instanceof Error ? erroLimpeza.message : String(erroLimpeza);
-//         registrarAvisoNoRelatorio(
-//             'Produto na Mochila da conta',
-//             `A Mochila da conta ${conta} pode ter ficado com produto(s) deste teste. Motivo: ${motivo}`
-//         );
-//         allure.endStep(Status.FAILED);
-//     }
-// }
 
 describe('Compra', () => {
     it('Jornada completa de compra com Pix', async function (this: Mocha.Context) {
@@ -95,35 +39,15 @@ describe('Compra', () => {
         await rotularTeste('compra-pix');
 
         let numeroPedido = '';
-        // Limpeza da Mochila (pedido do Marcio, 2026-10-14): a conta do teste não pode acumular
-        // produtos entre execuções. Se o teste falhar depois de pôr produto na Mochila e antes de
-        // finalizar o pedido, o catch esvazia a Mochila (melhor esforço) e relança o erro original.
-        // No caminho feliz, o último passo esvazia o que tiver sobrado.
         let produtoNaMochila = false;
         let pedidoFinalizado = false;
-        // Valores da compra, guardados no teste para a validação do passo 29 (antes do clique que
-        // leva à tela do Pix):
-        //   - o preço de cada produto, lido na PDP ANTES do clique em comprar;
-        //   - a soma dos preços;
-        //   - o desconto de cupom: 0 enquanto o teste não aplica cupom. Quando aplicar, o valor
-        //     do desconto do cupom entra aqui;
-        //   - o DESCONTO DO PIX, calculado com a regra abaixo.
-        // Nenhum valor é fixo: preços e entrega são lidos da tela a cada execução.
         let precoOculos = 0;
         let precoCamisa = 0;
         const descontoCupom = 0;
-        // Regra: pagamento com Pix tem 10% de desconto, e o frete ENTRA na base do desconto
-        // (confirmado pelo Marcio no site da empresa, 2026-10-14). Base = produtos - cupom + entrega.
         const DESCONTO_PIX = 0.10;
-        // DESLIGADO por ora (Marcio, 2026-10-14): o resumo do app NÃO mostra o desconto do Pix
-        // (run de 23:10: Descontos 0 e Total 1499.8, esperado 149.98 e 1349.82). Enquanto os devs não
-        // corrigem, o desconto do Pix é validado SÓ na tela do Pix. Corrigido o app, trocar para `true`
-        // e o passo 29 volta a exigir Descontos e Total do resumo com o desconto do Pix.
-        const VALIDAR_DESCONTO_PIX_NO_RESUMO = false;
-        // Guardados também para o anexo "Evidências da compra" no fim do teste (ver finally).
         let valoresResumo: ValoresResumo | null = null;
         let totalPagamento: number | null = null;
-        let valorPix: number | null = null;
+        let valorComDescontoNoPagamento: number | null = null;
         let descontoPixEsperado: number | null = null;
         let totalComPixEsperado: number | null = null;
 
@@ -193,26 +117,27 @@ describe('Compra', () => {
 
             // Passos 27 e 28 — Pix e resumo do pedido.
             await step('checkoutPage.selecionarPix()', async () => { totalPagamento = await checkoutPage.selecionarPix(); });
+            // A partir do build 1.21.7/507: o Pagamento mostra o valor com desconto do Pix. Lido aqui
+            // e comparado no passo 29, porque a entrega só aparece no Resumo.
+            await step('checkoutPage.lerDescontoPix()', async () => { valorComDescontoNoPagamento = await checkoutPage.lerDescontoPix(); });
             await step('checkoutPage.prosseguirParaResumo()', () => checkoutPage.prosseguirParaResumo());
 
-            // Passo 29 — validação dos valores ANTES do clique que leva à tela do Pix, com os
-            // valores guardados no teste:
+            // Passo 29 — validação dos valores ANTES do clique que leva à tela do Pix (regra a partir
+            // do build 1.21.7/507), com os valores guardados no teste:
             //   (1) Produtos do resumo  = precoOculos + precoCamisa (lidos na PDP);
-            //   (2) Descontos do resumo = desconto de cupom + DESCONTO DO PIX (10% de produtos - cupom + entrega);
-            //   (3) Total do resumo     = produtos - cupom + entrega - desconto do Pix.
+            //   (2) Descontos do resumo = desconto de cupom + DESCONTO DO PIX (10% de produtos - cupom, SEM a entrega);
+            //   (3) Total do resumo     = produtos - cupom + entrega - desconto do Pix;
+            //   (4) valor com desconto do Pagamento e total do botão de pagamento = (3).
             // A entrega vem do próprio resumo (o teste não escolhe frete com preço conhecido).
-            // Se o resumo não mostrar o desconto do Pix, o teste para AQUI, antes de finalizar —
-            // nenhum pedido é criado.
-            // POR ORA (VALIDAR_DESCONTO_PIX_NO_RESUMO = false) só o (1) é exigido aqui; os valores com
-            // desconto do Pix são calculados e validados na tela do Pix.
-            await step(VALIDAR_DESCONTO_PIX_NO_RESUMO ? 'validar valores do resumo (com desconto do Pix)' : 'validar valor dos produtos no resumo', async () => {
+            // Se algum valor não conferir, o teste para AQUI, antes de finalizar — nenhum pedido é criado.
+            await step('validar valores do resumo (com desconto do Pix)', async () => {
                 const v = await checkoutPage.lerValoresDoResumo();
                 valoresResumo = v;
                 const somaProdutos = Math.round((precoOculos + precoCamisa) * 100) / 100;
-                const baseDoPix = Math.round((somaProdutos - descontoCupom + v.entrega) * 100) / 100;
+                const baseDoPix = Math.round((somaProdutos - descontoCupom) * 100) / 100;
                 const descontoPix = Math.round(baseDoPix * DESCONTO_PIX * 100) / 100;
                 const descontosEsperados = Math.round((descontoCupom + descontoPix) * 100) / 100;
-                const totalEsperado = Math.round((baseDoPix - descontoPix) * 100) / 100;
+                const totalEsperado = Math.round((baseDoPix + v.entrega - descontoPix) * 100) / 100;
                 descontoPixEsperado = descontoPix;
                 totalComPixEsperado = totalEsperado;
 
@@ -229,11 +154,12 @@ describe('Compra', () => {
                     `Soma dos produtos: ${somaProdutos}\n` +
                     `Desconto de cupom: ${descontoCupom}\n` +
                     `Entrega (resumo): ${v.entrega}\n` +
-                    `Base do desconto do Pix: ${somaProdutos} - ${descontoCupom} + ${v.entrega} = ${baseDoPix}\n` +
+                    `Base do desconto do Pix (sem entrega): ${somaProdutos} - ${descontoCupom} = ${baseDoPix}\n` +
                     `Desconto do Pix (10%): ${descontoPix}\n` +
-                    `Total esperado com desconto do Pix: ${baseDoPix} - ${descontoPix} = ${totalEsperado}\n\n` +
+                    `Total esperado com desconto do Pix: ${baseDoPix} + ${v.entrega} - ${descontoPix} = ${totalEsperado}\n\n` +
                     `Resumo — Produtos: ${v.produtos} | Entrega: ${v.entrega} | Descontos: ${v.descontos} | Total: ${v.total}\n` +
-                    `Total no botão do pagamento (tela anterior): ${totalPagamento ?? 'não lido'}`,
+                    `Valor com desconto do Pix no Pagamento: ${valorComDescontoNoPagamento ?? 'não lido'}\n` +
+                    `Total no botão do pagamento: ${totalPagamento ?? 'não lido'}`,
                     'text/plain'
                 );
                 console.log(
@@ -246,31 +172,25 @@ describe('Compra', () => {
                 if (Math.abs(v.produtos - somaProdutos) > 0.009) {
                     erros.push(`Produtos do resumo = ${v.produtos}, soma dos preços = ${precoOculos} + ${precoCamisa} = ${somaProdutos}`);
                 }
-                if (VALIDAR_DESCONTO_PIX_NO_RESUMO) {
-                    if (Math.abs(v.descontos - descontosEsperados) > 0.009) {
-                        erros.push(
-                            `Descontos do resumo = ${v.descontos}, esperado = desconto do Pix (10% de ${baseDoPix}) ${descontoPix}` +
-                            (descontoCupom ? ` + cupom ${descontoCupom} = ${descontosEsperados}` : '')
-                        );
-                    }
-                    if (Math.abs(v.total - totalEsperado) > 0.009) {
-                        erros.push(`Total do resumo = ${v.total}, total esperado com desconto do Pix = ${baseDoPix} - ${descontoPix} = ${totalEsperado}`);
-                    }
-                } else {
-                    console.log(
-                        `ℹ Desconto do Pix NÃO validado no resumo (desligado até o app corrigir): ` +
-                        `resumo mostra descontos ${v.descontos} e total ${v.total}; esperado ${descontosEsperados} e ${totalEsperado}`
+                if (Math.abs(v.descontos - descontosEsperados) > 0.009) {
+                    erros.push(
+                        `Descontos do resumo = ${v.descontos}, esperado = desconto do Pix (10% de ${baseDoPix}, sem entrega) ${descontoPix}` +
+                        (descontoCupom ? ` + cupom ${descontoCupom} = ${descontosEsperados}` : '')
                     );
                 }
-                if (VALIDAR_DESCONTO_PIX_NO_RESUMO && totalPagamento !== null && Math.abs(totalPagamento - totalEsperado) > 0.009) {
-                    erros.push(`Total no botão da tela de pagamento = ${totalPagamento}, total esperado com desconto do Pix = ${totalEsperado}`);
+                if (Math.abs(v.total - totalEsperado) > 0.009) {
+                    erros.push(`Total do resumo = ${v.total}, total esperado com desconto do Pix = ${baseDoPix} + ${v.entrega} - ${descontoPix} = ${totalEsperado}`);
+                }
+                if (valorComDescontoNoPagamento === null || Math.abs(valorComDescontoNoPagamento - totalEsperado) > 0.009) {
+                    erros.push(`Valor com desconto do Pix na tela de Pagamento = ${valorComDescontoNoPagamento ?? 'não lido'}, total esperado = ${totalEsperado}`);
+                }
+                if (totalPagamento === null || Math.abs(totalPagamento - totalEsperado) > 0.009) {
+                    erros.push(`Total no botão da tela de Pagamento = ${totalPagamento ?? 'não lido'}, total esperado com desconto do Pix = ${totalEsperado}`);
                 }
                 if (erros.length > 0) {
                     throw new Error(`Valores do resumo não conferem com o desconto do Pix:\n- ${erros.join('\n- ')}`);
                 }
-                console.log(VALIDAR_DESCONTO_PIX_NO_RESUMO
-                    ? '✅ Resumo confere: preços dos produtos e desconto do Pix (10%)'
-                    : '✅ Resumo confere: valor dos produtos = soma dos preços lidos na PDP');
+                console.log('✅ Resumo confere: preços dos produtos e desconto do Pix (10% só dos produtos), igual ao Pagamento');
             });
 
             // Passo 30 — prosseguir com a compra (UM toque; cria o pedido).
@@ -282,24 +202,8 @@ describe('Compra', () => {
             // Passos 31 a 33 — QR code, copiar o código, Meus pedidos com o número.
             await step('pedidoPage.validarQrCode()', () => pedidoPage.validarQrCode());
             await step('pedidoPage.numeroDoPedido()', async () => { numeroPedido = await pedidoPage.numeroDoPedido(); });
-            // Valor a pagar da tela do Pix = total com o DESCONTO DO PIX calculado no passo 29 (pedido
-            // do Marcio, 2026-10-14), que é também o total do resumo. Nas capturas o Pix mostrou só o
-            // valor de UM dos 2 pedidos criados (óculos), então esta checagem falha enquanto o app
-            // dividir a compra — com os valores na mensagem.
-            await step('validar valor da tela do Pix (com desconto do Pix)', async () => {
-                valorPix = await pedidoPage.valorAPagar();
-                allure.addArgument('Valor a pagar no Pix', String(valorPix));
-                if (totalComPixEsperado === null) {
-                    throw new Error('Tela do Pix: o total esperado com desconto do Pix não foi calculado (resumo não lido).');
-                }
-                if (Math.abs(valorPix - totalComPixEsperado) > 0.009) {
-                    throw new Error(
-                        `Tela do Pix: valor a pagar ${valorPix} diferente do total esperado com desconto do Pix ` +
-                        `${totalComPixEsperado} (desconto do Pix ${descontoPixEsperado}; pedido ${numeroPedido}).`
-                    );
-                }
-                console.log(`✅ Valor a pagar no Pix (${valorPix}) = total com desconto do Pix (${totalComPixEsperado})`);
-            });
+            // A partir do build 1.21.7/507 a tela do Pix não mostra valor em R$: o valor foi validado no
+            // passo 29 (Pagamento e Resumo). Até o 506 havia aqui o step "validar valor da tela do Pix".
             await step('pedidoPage.copiarCodigo()', () => pedidoPage.copiarCodigo());
             await step('pedidoPage.verMeusPedidos()', async () => { await pedidoPage.verMeusPedidos(numeroPedido); });
 
@@ -333,11 +237,11 @@ describe('Compra', () => {
                 `Desconto de cupom: ${descontoCupom}\n` +
                 `Desconto do Pix (10%) esperado: ${descontoPixEsperado ?? 'não calculado'}\n` +
                 `Total esperado com desconto do Pix: ${totalComPixEsperado ?? 'não calculado'}\n` +
+                `Valor com desconto do Pix na tela de pagamento: ${valorComDescontoNoPagamento ?? 'não lido'}\n` +
                 `Total no botão da tela de pagamento: ${totalPagamento ?? 'não lido'}\n` +
                 (r
                     ? `Resumo — Produtos: ${r.produtos} | Entrega: ${r.entrega} | Descontos: ${r.descontos} | Total: ${r.total}\n`
                     : 'Resumo: não lido\n') +
-                `Valor a pagar na tela do Pix: ${valorPix ?? 'não lido'}\n` +
                 `Pedido nº: ${numeroPedido || 'não criado / não lido'}`,
                 'text/plain'
             );

@@ -1,4 +1,4 @@
-# Jornada completa de compra com Pix (spec `04-compra-pix`)
+# Jornada completa de compra com Pix (spec `02-compra-pix`)
 
 **Status:** escrito em 2026-10-14 (working tree, não commitado). **Passou no AVD-S24 em 2026-10-14
 20:43–20:50** (4º run do Marcio; ver "Execuções"). Só Android.
@@ -17,7 +17,7 @@ seguem essa numeração.
 ## Como rodar
 
 ```
-npx wdio run ./wdio.conf.ts --spec test/specs/04-compra-pix.spec.ts
+npx wdio run ./wdio.conf.ts --spec test/specs/02-compra-pix.spec.ts
 ```
 
 Não usar `npm run wdio:android -- --spec ...` no PowerShell: o `--` não chega ao wdio, o filtro se
@@ -31,7 +31,7 @@ colocada sem pedido do Marcio e removida em 2026-10-16.
 
 | Arquivo | O que faz |
 |---|---|
-| `test/specs/04-compra-pix.spec.ts` | o cenário; guarda os valores da compra e valida no passo 29; limpeza da Mochila em falha |
+| `test/specs/02-compra-pix.spec.ts` | o cenário; guarda os valores da compra e valida no passo 29; limpeza da Mochila em falha |
 | `test/pageobjects/BuscaPage.ts` | lupa de Categorias (XPath), campo de busca, Enter, resultados |
 | `test/pageobjects/ProdutoPage.ts` | `lerPrecoDoProduto()`, `comprar()` (tamanho + adicionar), carrossel, continuar comprando, `voltarAteCategorias()` |
 | `test/pageobjects/CheckoutPage.ts` | Mochila, endereço, entrega, Pix, `lerValoresDoResumo()`, `finalizarPedido()`, `esvaziarMochila()` |
@@ -204,7 +204,7 @@ Marcio):** `timeLimit` do `startRecordingScreen` do AVD local passou de 180 para
 - **Pendentes de decisão do Marcio:** entrar no CI (Device Farm) ou não (cria pedidos reais);
   relatório de bug para os achados da compra (2 pedidos por compra, tela do Pix com 1 pedido, resumo sem
   desconto do Pix, QR intermitente) — o do crash já existe (`BUG-CRASH-ANDROID.md`).
-- **Nada commitado.** Arquivos novos/alterados: `test/specs/04-compra-pix.spec.ts`, `test/pageobjects/{Busca,Produto,Checkout,Pedido}Page.ts`
+- **Nada commitado.** Arquivos novos/alterados: `test/specs/02-compra-pix.spec.ts`, `test/pageobjects/{Busca,Produto,Checkout,Pedido}Page.ts`
   (novos), `BasePage`, `LoginPage`, `PerfilPage`, `HomePage`, `test/utils/allure-helpers.ts`, `wdio.conf.ts`
   (`timeLimit` 900 do vídeo local), specs 01–03 comentados, `ELEMENTOS-SEM-TESTID.md` (seção 00),
   `BUG-CRASH-ANDROID.md` (novo).
@@ -231,3 +231,32 @@ Marcio):** `timeLimit` do `startRecordingScreen` do AVD local passou de 180 para
   apareceu).
 - Tamanhos da camisa: P, M e GG não habilitam o adicionar; G, XGG e XXG habilitam — confirma o
   motivo da falha do 2º run (o P) e a escolha por tentativa em ordem.
+
+## 2026-10-17 — Desconto do Pix só sobre produtos, validado no Pagamento e no Resumo (build 1.21.7/507)
+
+**Motivo (Marcio, 2026-10-17):** a partir do build **1.21.7/507** a tela do Pix não mostra mais valor, e o
+desconto de 10% incide só sobre os produtos (frete fora da base), mostrado antes do QR code.
+
+**Evidência:** captura no AVD, build 1.21.7/507, `drafts/app-migrado/android/captures-2026-10-17-pix-desconto/`
+(00–39, pedido real #165851; drafts 18, 32 e 38). Óculos 699,90 + camisa 799,90 = 1.499,80; entrega 0,00:
+- Pagamento com Pix escolhido (cap. 34): `payment-wake-pix-discount` "10% off - R$ 1.349,82" (antes da
+  escolha o id é `payment-wake-pix-discount-preview`, "... estimated"); `payment-submit-button` passa a ter o valor.
+- Resumo (cap. 36): Produtos 1.499,80 | Entrega 0,00 | Descontos 149,98 | Valor total 1.349,82 (visível sem rolar).
+- Tela do Pix (cap. 39): nenhum "R$".
+- Limite: frete grátis, então a captura não separa "10% só dos produtos" de "10% com frete". A regra é a do Marcio.
+- 1 toque em finalizar com 2 produtos criou 1 pedido só (até o 506 eram 2). Uma tentativa; não prova correção.
+
+**Mudança (build 1.21.7/507):**
+- `02-compra-pix.spec.ts`: base do desconto = produtos − cupom (antes: + entrega); sai a flag
+  `VALIDAR_DESCONTO_PIX_NO_RESUMO`; o passo 29 exige Produtos, Descontos, Total do Resumo e que o valor com
+  desconto do Pagamento e o total do botão sejam iguais ao Total; novo step `checkoutPage.lerDescontoPix()`
+  depois do `selecionarPix()`; removido o step "validar valor da tela do Pix".
+- `CheckoutPage.lerDescontoPix()` (novo): `payment-wake-pix-discount`, reserva `-preview`. No iOS o id depois
+  da escolha não foi capturado (só o `-preview`, build 352): **não verificado no iOS**.
+- `PedidoPage`: removidos `valorAPagar()` e o seletor `VALOR_A_PAGAR_PIX` (o elemento não existe no 507).
+- Não mudou: `lerValoresDoResumo()`, `03-compra-cartao`, `wdio.conf.ts`, CI.
+
+**Conferir no próximo run (Android 507 e iOS):** log `💠 Valor com desconto do Pix no Pagamento (...)` e
+`✅ Resumo confere: preços dos produtos e desconto do Pix (10% só dos produtos), igual ao Pagamento`. Se falhar,
+o erro do passo 29 lista cada valor divergente, e nenhum pedido é criado. Num run com frete pago, conferir que
+Descontos = 10% só dos produtos.

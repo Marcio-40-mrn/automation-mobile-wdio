@@ -329,8 +329,8 @@ export class BasePage {
   async iniciaApp() {
     // fonte: .planning/drafts/app-migrado/android/captures-2026-09-29/01-boasvindas.xml
     const container = '//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]';
-    // Destinos válidos depois do toque: diálogo de permissão do sistema (Device Farm) ou a tela
-    // de Tópicos (AVD local, onde autoGrantPermissions pula os diálogos).
+    // Destinos válidos depois do toque: diálogo de permissão do sistema (o normal, com o app limpo)
+    // ou a tela de Tópicos (permissão já concedida antes, sem diálogo).
     const destinos = [
       // fonte: captures-2026-09-29/02-permissao-local.xml
       'id:com.android.permissioncontroller:id/permission_message',
@@ -365,8 +365,9 @@ export class BasePage {
     );
   }
 
-  // Localização: "Durante o uso do app". Opcional de propósito: no AVD local o
-  // autoGrantPermissions já concede e o diálogo não aparece (DEC-A, 06-01-SUMMARY).
+  // Localização: "Durante o uso do app", pelo resource-id do diálogo do sistema. O teste é quem
+  // concede (o autoGrantPermissions saiu do wdio.conf.ts em 2026-10-16, decisão do Marcio).
+  // Continua opcional: se a permissão já estiver concedida, o diálogo não aparece.
   async ativaGps() {
     // fonte: captures-2026-09-29/02-permissao-local.xml (draft android/02)
     await this.clickIfPresent("id:com.android.permissioncontroller:id/permission_allow_foreground_only_button");
@@ -389,18 +390,91 @@ export class BasePage {
     // fonte: captures-2026-09-29/04-topicos.xml (draft android/03)
     // Desde o build 500 cada tela do onboarding tem o seu aceite (o `accept-button` genérico sumiu).
     // fonte: captures-2026-10-09-build500/RESULTADO.md e captures-2026-10-14-compra-pix-rodada2
+    // Build 507 (run local de 2026-10-16 23:01, vídeo): o diálogo de NOTIFICAÇÃO chega ~15-25s
+    // depois do de localização, já por cima dos Tópicos, e esconde o `permission-topic`. Por isso a
+    // espera e a saída respondem os diálogos de permissão que aparecerem no caminho.
     const topico = seletorTestId('permission-topic');
     const aceite = seletorTestId('onboarding-topics-continue');
 
-    const apareceu = await $(topico)
-      .waitForDisplayed({ timeout: 20000 })
-      .then(() => true)
-      .catch(() => false);
+    const apareceu = await this.esperarTelaRespondendoPermissoesAndroid(topico, 'permitir');
     if (!apareceu) {
-      throw new Error('Tópicos de permissão não apareceram: nenhum permission-topic visível em 20s.');
+      throw new Error('Tópicos de permissão não apareceram: nenhum permission-topic visível (sem diálogo por cima) em 45s.');
     }
 
-    await this.aceitarEEsperarSair('Tópicos de permissão', aceite, topico);
+    // Um diálogo que chega junto com o toque no Continue segura a tela nos Tópicos: depois de
+    // respondê-lo, toca de novo (até 3 vezes).
+    for (let toque = 1; toque <= 3; toque++) {
+      await this.responderDialogosPermissaoAndroid('permitir');
+      await (await $(aceite)).click();
+      const saiu = await driver
+        .waitUntil(async () => {
+          await this.responderDialogosPermissaoAndroid('permitir');
+          if (await this.dialogoPermissaoAndroidNaTela()) return false;
+          return !(await $(topico).isDisplayed().catch(() => false));
+        }, { timeout: 15000, interval: 500 })
+        .then(() => true)
+        .catch(() => false);
+      if (saiu) {
+        console.log(`✅ Aceite (Tópicos de permissão, toque ${toque}/3)`);
+        await driver.pause(timewhait);
+        return;
+      }
+      console.log(`⚠ Tópicos: toque ${toque}/3 no Continue não saiu da tela`);
+    }
+    throw new Error(
+      'Onboarding Android travado em "Tópicos de permissão": 3 toques em onboarding-topics-continue ' +
+      'e a tela não trocou.'
+    );
+  }
+
+  // ---- Diálogos de permissão do Android (pacote permissioncontroller) ----------------------
+  // Pelo id do botão, nunca pelo texto. O autoGrantPermissions saiu do wdio.conf.ts em
+  // 2026-10-16, então todo diálogo é respondido aqui. fonte: drafts android/02 e 03 (build 506).
+  private readonly botoesPermissaoAndroid = {
+    permitir: ['permission_allow_foreground_only_button', 'permission_allow_button'],
+    negar: ['permission_deny_and_dont_ask_again_button', 'permission_deny_button'],
+  } as const;
+
+  async dialogoPermissaoAndroidNaTela(): Promise<boolean> {
+    for (const id of [...this.botoesPermissaoAndroid.permitir, ...this.botoesPermissaoAndroid.negar]) {
+      if (await $(`id:com.android.permissioncontroller:id/${id}`).isDisplayed().catch(() => false)) return true;
+    }
+    return false;
+  }
+
+  // Responde, um atrás do outro, os diálogos de permissão que estiverem na tela AGORA (não espera
+  // nenhum aparecer). Devolve quantos respondeu.
+  async responderDialogosPermissaoAndroid(acao: 'permitir' | 'negar'): Promise<number> {
+    let respondidos = 0;
+    for (let i = 0; i < 4; i++) {
+      let tocou = false;
+      for (const id of this.botoesPermissaoAndroid[acao]) {
+        const botao = await $(`id:com.android.permissioncontroller:id/${id}`);
+        if (await botao.isDisplayed().catch(() => false)) {
+          await botao.click();
+          console.log(`${acao === 'permitir' ? '✅' : '🚫'} Diálogo de permissão: ${id}`);
+          respondidos++;
+          tocou = true;
+          await driver.pause(1500);
+          break;
+        }
+      }
+      if (!tocou) break;
+    }
+    return respondidos;
+  }
+
+  // Espera `destino` ficar visível sem diálogo de permissão por cima, respondendo os diálogos que
+  // aparecerem no caminho.
+  async esperarTelaRespondendoPermissoesAndroid(destino: string, acao: 'permitir' | 'negar', timeout = 45000): Promise<boolean> {
+    return driver
+      .waitUntil(async () => {
+        await this.responderDialogosPermissaoAndroid(acao);
+        if (await this.dialogoPermissaoAndroidNaTela()) return false;
+        return $(destino).isDisplayed().catch(() => false);
+      }, { timeout, interval: 500 })
+      .then(() => true)
+      .catch(() => false);
   }
 
   // Política de Privacidade: texto longo num TextView só; o `accept-button` só entra na árvore
@@ -549,7 +623,7 @@ export class BasePage {
   // (build antigo). Nos Tópicos o botão agora é `onboarding-topics-continue`.
   async iniciaAppIOS() {
     // Alerta de notificação: aparece antes das boas-vindas. Opcional — pode não vir (já
-    // respondido, ou aceito por autoAcceptAlerts no Device Farm).
+    // respondido antes; ou negado pelo chamador, como no negarPermissoesIniciais do 05).
     await this.aceitarAlertasSistemaIOS('notificação', 1, 10000);
     await this.fechaBanner();
 
@@ -629,7 +703,24 @@ export class BasePage {
   // porque a comparação é por igualdade. Sem nenhum dos dois, cai no accept sem rótulo (último
   // recurso, já existente no código anterior).
   private async aceitarAlertasSistemaIOS(contexto: string, maximo: number, primeiroTimeout: number): Promise<number> {
-    const rotulosAceitar = ['Allow While Using App', 'Allow'];
+    return this.responderAlertasSistemaIOS(contexto, maximo, primeiroTimeout, 'aceitar');
+  }
+
+  // Nega até `maximo` alertas do sistema em sequência (notificação, ATT, localização). Rótulos de
+  // negar, medidos no build 352 (captures-2026-10-16-calcas-cadastro/NOTAS.md): "Don’t Allow"
+  // (notificação e localização; o apóstrofo do iOS é U+2019) e "Ask App Not to Track" (ATT). Sem
+  // nenhum deles nos botões, cai no `dismiss` sem rótulo, que no iOS toca o botão de cancelar.
+  async negarAlertasSistemaIOS(contexto: string, maximo: number, primeiroTimeout: number): Promise<number> {
+    return this.responderAlertasSistemaIOS(contexto, maximo, primeiroTimeout, 'negar');
+  }
+
+  private async responderAlertasSistemaIOS(
+    contexto: string, maximo: number, primeiroTimeout: number, resposta: 'aceitar' | 'negar'
+  ): Promise<number> {
+    const rotulosAceitar = resposta === 'aceitar'
+      ? ['Allow While Using App', 'Allow']
+      : ['Don’t Allow', "Don't Allow", 'Ask App Not to Track'];
+    const acaoSemRotulo = resposta === 'aceitar' ? 'accept' : 'dismiss';
     let aceitos = 0;
 
     for (let i = 0; i < maximo; i++) {
@@ -646,10 +737,10 @@ export class BasePage {
 
       const buttonLabel = rotulosAceitar.find((rotulo) => botoes.includes(rotulo));
       try {
-        await driver.execute('mobile: alert', buttonLabel ? { action: 'accept', buttonLabel } : { action: 'accept' });
-        console.log(`✅ Alerta aceito por "${buttonLabel ?? 'accept sem rótulo'}" (botões: ${botoes.join(' | ') || '?'})`);
+        await driver.execute('mobile: alert', buttonLabel ? { action: 'accept', buttonLabel } : { action: acaoSemRotulo });
+        console.log(`✅ Alerta ${resposta === 'aceitar' ? 'aceito' : 'negado'} por "${buttonLabel ?? `${acaoSemRotulo} sem rótulo`}" (botões: ${botoes.join(' | ') || '?'})`);
       } catch (erro) {
-        console.log(`⚠ "${buttonLabel ?? 'accept sem rótulo'}" não serviu: ${erro}`);
+        console.log(`⚠ "${buttonLabel ?? `${acaoSemRotulo} sem rótulo`}" não serviu: ${erro}`);
       }
 
       aceitos++;
@@ -713,9 +804,6 @@ export class BasePage {
   async aceitaOnboardingIOS() {
     const continuar = seletorTestId('onboarding-topics-continue');
     const politica = seletorTestId('privacy-accept');
-    const termos = seletorTestId('terms-accept');
-    const home = seletorTestId('tab-home');
-    const maxSwipes = 45;
 
     // Tópicos
     const naTela = await $(continuar).waitForDisplayed({ timeout: 20000 }).then(() => true).catch(() => false);
@@ -727,8 +815,8 @@ export class BasePage {
       await this.fechaBanner();
       await (await $(continuar)).click();
       console.log(`👆 Tópicos: Continue (toque ${toque}/3)`);
-      // ATT e localização (SpringBoard), quando vierem. Com o autoAcceptAlerts do wdio.conf.ts
-      // eles podem já ter sido aceitos: aí nenhum aparece e o laço segue.
+      // ATT e localização (SpringBoard), quando vierem. Se já foram respondidos antes, nenhum
+      // aparece e o laço segue.
       await this.aceitarAlertasSistemaIOS('ATT e localização', 3, 8000);
       const saiu = await $(politica).waitForExist({ timeout: 10000 }).then(() => true).catch(() => false);
       if (saiu) break;
@@ -741,7 +829,17 @@ export class BasePage {
     }
     console.log('✅ Aceite (tópicos)');
 
-    // Política e Termos
+    await this.aceitarPoliticaETermosIOS();
+  }
+
+  // Política (`privacy-accept`) e Termos (`terms-accept`) do iOS, até a Home (`tab-home`).
+  // Separado do aceitaOnboardingIOS() para o spec que nega as permissões reaproveitar (03-compra-cartao).
+  async aceitarPoliticaETermosIOS() {
+    const politica = seletorTestId('privacy-accept');
+    const termos = seletorTestId('terms-accept');
+    const home = seletorTestId('tab-home');
+    const maxSwipes = 45;
+
     const telas: Array<[string, string, string]> = [
       ['política de privacidade', politica, termos],
       ['termos e condições', termos, home],
@@ -809,6 +907,16 @@ export class BasePage {
   // próximo.
   async voltarIOS(titulo?: string) {
     await this.aguardarTelaEstavel();
+
+    // Build 1.21.7/352: o voltar da listagem é `header-back-button` (label = título, [16,74 95x24],
+    // accessible=true); `Back` e o 2º nó com o name do título não existem mais, e o voltar()
+    // morria nesta tela. Os caminhos abaixo ficam como reserva.
+    // fonte: captures-2026-10-17-listagem-camisas/04-camisas-30s.xml. Favoritos também tem o id
+    // (captures-2026-10-17-favoritos-com-item/03-favoritos.xml). O sucesso continua sendo a tab bar.
+    const headerBack = 'accessibility id:header-back-button';
+    if (await $(headerBack).isDisplayed().catch(() => false)) {
+      if (await this.tentarVoltarIOS(headerBack, 'header-back-button')) return;
+    }
 
     const back = "accessibility id:Back";
     if (await $(back).isDisplayed().catch(() => false)) {
@@ -908,7 +1016,7 @@ export class BasePage {
   // Não há como conferir o texto digitado pela árvore (nota 1 do logarIOS); a checagem real
   // é o modal de erro, tratado no laço do botão de entrar. A senha nunca é logada — só o
   // comprimento.
-  protected async digitarIOS(seletor: string, valor: string, rotulo: string) {
+  protected async digitarIOS(seletor: string, valor: string, rotulo: string, frequencia = 10) {
     const campo = await $(seletor);
     await this.waitForElement(campo);
     await this.fechaBanner();
@@ -924,7 +1032,10 @@ export class BasePage {
     // Espera o reflow do formulário (923 -> 615) terminar antes da primeira tecla.
     await driver.pause(1000);
 
-    await driver.updateSettings({ maxTypingFrequency: 20 });
+    // 10 a partir do build 1.21.7/352 (era 20): na busca, 10/5/3 deram o texto certo 9 de 9 e o padrão
+    // errou 11 de 11; o 20 nunca foi medido (captures-2026-10-18-busca-oculos/). Mesmo valor da busca.
+    // `frequencia` menor só onde foi preciso: o formulário do cartão usa 3 (ver CheckoutPage).
+    await driver.updateSettings({ maxTypingFrequency: frequencia });
     try {
       await campo.addValue(valor);
     } finally {

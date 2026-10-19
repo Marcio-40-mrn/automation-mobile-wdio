@@ -31,6 +31,9 @@ const VALOR_EM_REAIS = /R\$\s*(-?\s*[\d.]+,\d{2})/;
 
 export type ValoresResumo = { produtos: number; entrega: number; descontos: number; total: number };
 
+// Dados do cartão no formulário "Novo cartão". `mes` e `ano` com 2 dígitos (cap. 52: 12 e 30).
+export type DadosCartao = { numero: string; titular: string; mes: string; ano: string; cvv: string; cpf: string };
+
 export function paraNumero(valor: string): number {
     return Number(valor.replace(/\s/g, '').replace(/\./g, '').replace(',', '.'));
 }
@@ -159,9 +162,47 @@ export class CheckoutPage extends BasePage {
         return total;
     }
 
+    // Valor com o desconto do Pix mostrado na tela de Pagamento, depois de escolher o Pix. Só o
+    // número é usado ("10% off - R$ 1.349,82"). A partir do build 1.21.7/507 (Android, captura 34 de
+    // captures-2026-10-17-pix-desconto/): com o Pix escolhido o id é `payment-wake-pix-discount`;
+    // antes da escolha era `payment-wake-pix-discount-preview` ("... estimated").
+    // iOS: o `-preview` foi visto no build 352; o id depois da escolha NÃO foi capturado no iOS, por
+    // isso o `-preview` fica como reserva (não verificado no iOS).
+    async lerDescontoPix(): Promise<number> {
+        for (const id of ['payment-wake-pix-discount', 'payment-wake-pix-discount-preview']) {
+            const el = await $(seletorTestId(id));
+            if (!(await el.waitForDisplayed({ timeout: 5000 }).then(() => true).catch(() => false))) continue;
+            const texto = IOS ? `${await el.getAttribute('label')}` : await el.getText();
+            const valor = valorEmReais(texto);
+            if (valor === null) {
+                throw new Error(`Pagamento: o valor com desconto do Pix (${id}) não pôde ser lido como valor em reais ("${texto}").`);
+            }
+            console.log(`💠 Valor com desconto do Pix no Pagamento (${id}): R$ ${valor}`);
+            return valor;
+        }
+        throw new Error('Pagamento: o valor com desconto do Pix (payment-wake-pix-discount / -preview) não apareceu depois de escolher o Pix.');
+    }
+
     async prosseguirParaResumo() {
         await (await $(seletorTestId('payment-submit-button'))).click();
-        const resumo = await $(seletorTestId('summary-finalize-purchase')).waitForDisplayed({ timeout: 30000 }).then(() => true).catch(() => false);
+        let resumo: boolean;
+        if (IOS) {
+            // iOS, build 1.21.7/352: no run de 2026-10-18 11:05 o Resumo não abriu em 30 s; na captura do
+            // mesmo dia (captures-2026-10-18-pix-ate-pedido/, caps. 15-17) um toque abriu em ~1 s. Causa não
+            // provada. Este botão NÃO cria pedido, então, se o Resumo não vier em 15 s e o botão continuar
+            // na tela, há um 2º toque (ordem do Marcio, 2026-10-18).
+            resumo = await $(seletorTestId('summary-finalize-purchase')).waitForDisplayed({ timeout: 15000 }).then(() => true).catch(() => false);
+            if (!resumo && (await $(seletorTestId('payment-submit-button')).isDisplayed().catch(() => false))) {
+                console.log('⚠ Resumo não abriu em 15 s com o 1º toque em payment-submit-button — tocando de novo');
+                await (await $(seletorTestId('payment-submit-button'))).click();
+            }
+            if (!resumo) {
+                resumo = await $(seletorTestId('summary-finalize-purchase')).waitForDisplayed({ timeout: 30000 }).then(() => true).catch(() => false);
+            }
+            if (!resumo) await anexarPrint('Pagamento — Resumo não abriu');
+        } else {
+            resumo = await $(seletorTestId('summary-finalize-purchase')).waitForDisplayed({ timeout: 30000 }).then(() => true).catch(() => false);
+        }
         if (!resumo) {
             throw new Error('Pagamento: o resumo do pedido (summary-finalize-purchase) não abriu em 30s.');
         }
@@ -264,6 +305,398 @@ export class CheckoutPage extends BasePage {
             );
         }
         console.log('✅ Pedido criado: tela do Pix aberta');
+    }
+
+    // ---- Pagamento com CARTÃO (spec 03-compra-cartao) ------------------------------------------
+    // Android, build 1.21.6/506: captures-2026-10-15-compra-cartao/32 a 59 (NOTAS.md) e drafts
+    // android/18, 19, 30, 31, 32 e 33.
+    // iOS, build 1.21.7/352: captures-2026-10-16-build352-compra/ (caps. 56–75, até o Resumo) e drafts
+    // ios/18 e 19; finalizar, modal antifraude e Pedido Cancelado só foram capturados no 1.21.6/349
+    // (captures-2026-10-15-compra-cartao/, caps. 45–46, drafts ios/39 e 40). Os ids são os mesmos do
+    // Android, exceto no formulário (ver preencherCartaoIOS).
+
+    // No Android NENHUM método vem marcado (cap. 32: payment-submit-button enabled=false). Toca no
+    // cartão, confere a marca `selection-filled` DENTRO da opção (cap. 33: [962,453] dentro de
+    // [42,393][1038,533]) e o botão habilitado. Devolve o total do rótulo do botão (só o número).
+    async selecionarCartao(): Promise<number | null> {
+        const cartao = await $(seletorTestId('select-wake-method-cartao-de-credito'));
+        await this.waitForElement(cartao);
+        await this.fechaBanner();
+        await cartao.click();
+
+        const marcado = await driver
+            .waitUntil(async () => {
+                const marca = await $(seletorTestId('selection-filled'));
+                if (!(await marca.isDisplayed().catch(() => false))) return false;
+                const { y: yMarca } = await marca.getLocation();
+                const { y: yCartao } = await cartao.getLocation();
+                const { height } = await cartao.getSize();
+                return yMarca >= yCartao && yMarca <= yCartao + height;
+            }, { timeout: 10000, interval: 500 })
+            .then(() => true)
+            .catch(() => false);
+        if (!marcado) {
+            throw new Error('Pagamento: a marca de seleção (selection-filled) não apareceu na opção cartão de crédito.');
+        }
+
+        const botao = await $(seletorTestId('payment-submit-button'));
+        const habilitou = await driver
+            .waitUntil(async () => botao.isEnabled().catch(() => false), { timeout: 10000, interval: 500 })
+            .then(() => true)
+            .catch(() => false);
+        if (!habilitou) {
+            throw new Error('Pagamento: com o cartão marcado, o payment-submit-button não habilitou em 10s.');
+        }
+        // iOS: o total vem no label (cap. 58: "Prosseguir com a compra · R$ 716,80"), igual ao Pix.
+        const total = valorEmReais(`${await botao.getAttribute(IOS ? 'label' : 'content-desc')} ${await botao.getText().catch(() => '')}`);
+        console.log(`💳 Cartão selecionado; total no botão de pagamento: ${total ?? 'não lido'}`);
+        await anexarPrint(`Pagamento — cartão selecionado (botão: R$ ${total ?? 'não lido'})`);
+        return total;
+    }
+
+    // Pagamento -> formulário "Novo cartão" (cap. 34): `card-number-input` na tela e o Prosseguir
+    // (`pressable`) DESABILITADO com o formulário vazio.
+    // iOS: o único id do formulário é o `card-installments-input`, que existe com visible=false (abaixo
+    // da dobra, cap. 59): a chegada é ele existir; `pressable` enabled=false igual.
+    async prosseguirParaFormularioDoCartao() {
+        await (await $(seletorTestId('payment-submit-button'))).click();
+        const abriu = IOS
+            ? await $(seletorTestId('card-installments-input')).waitForExist({ timeout: 30000 }).then(() => true).catch(() => false)
+            : await $(seletorTestId('card-number-input')).waitForDisplayed({ timeout: 30000 }).then(() => true).catch(() => false);
+        if (!abriu) {
+            throw new Error(`Pagamento: o formulário do cartão (${IOS ? 'card-installments-input' : 'card-number-input'}) não abriu em 30s.`);
+        }
+        if (await $(seletorTestId('pressable')).isEnabled().catch(() => false)) {
+            throw new Error('Formulário do cartão abriu com o Prosseguir (pressable) HABILITADO: o formulário não está vazio.');
+        }
+        console.log('💳 Formulário do cartão aberto, vazio');
+        await driver.pause(timewhait);
+    }
+
+    // Preenche os 6 campos por id (cap. 51–55). Número e CPF vão SÓ com dígitos: a máscara é do app
+    // (`4693 5775 7175 8219`, `598.998.115-56`). Cada campo é conferido depois de digitado: dígitos
+    // iguais nos campos numéricos, valor igual (sem caixa) no titular — é o dado digitado, não texto
+    // do app. O teclado é fechado com ENTER (keycode 66), que na captura fechou o teclado numérico
+    // sem sair da tela (cap. 37); BACK não é usado (poderia voltar de tela).
+    async preencherCartao(cartao: DadosCartao) {
+        if (IOS) return this.preencherCartaoIOS(cartao);
+        const campos: Array<[string, string, string, boolean]> = [
+            ['número', 'card-number-input', cartao.numero, true],
+            ['titular', 'card-holder-input', cartao.titular, false],
+            ['mês', 'card-expiry-month-input', cartao.mes, true],
+            ['ano', 'card-expiry-year-input', cartao.ano, true],
+            ['CVV', 'card-cvv-input', cartao.cvv, true],
+            ['CPF', 'card-cpf-input', cartao.cpf, true],
+        ];
+        const soDigitos = (v: string) => v.replace(/\D/g, '');
+
+        for (const [nome, id, valor, numerico] of campos) {
+            const campo = await $(seletorTestId(id));
+            await this.waitForElement(campo);
+            await campo.click();
+            await campo.clearValue();
+            await campo.addValue(numerico ? soDigitos(valor) : valor);
+            await driver.pause(500);
+            if (await driver.isKeyboardShown().catch(() => false)) {
+                await driver.pressKeyCode(66);
+                await driver.pause(500);
+            }
+
+            const lido = ((await $(seletorTestId(id)).getText().catch(() => '')) ?? '').trim();
+            const confere = numerico
+                ? soDigitos(lido) === soDigitos(valor)
+                : lido.toUpperCase() === valor.toUpperCase();
+            if (!confere) {
+                throw new Error(`Formulário do cartão: o campo ${nome} (${id}) ficou "${lido}" depois de digitar "${valor}".`);
+            }
+            console.log(`⌨ Cartão — ${nome}: ok`);
+        }
+        await anexarPrint('Formulário do cartão preenchido');
+    }
+
+    // Parcelamento à vista: `card-installments-input` abre o sheet (cap. 47); as 7 opções NÃO têm id
+    // e a 1ª é o 1x. Seletor estrutural, sem texto: 1º clicável dentro do ScrollView irmão do
+    // `bottom-sheet-close` (conferido com lxml no dump 47: 7 clicáveis, o 1º é o 1x [84,722][996,867];
+    // 0 nos dumps sem o sheet). O campo fica ABAIXO do Prosseguir fixo (cap. 34: [42,2231][1038,2135]),
+    // então a página é rolada até ele ficar acima do botão. Escolha confirmada pelo sheet fechando e
+    // pelo Prosseguir HABILITADO (cap. 48). Devolve o valor da parcela (número do content-desc do campo).
+    async escolherParcelaAVista(): Promise<number | null> {
+        if (IOS) return this.escolherParcelaAVistaIOS();
+        const parcelas = seletorTestId('card-installments-input');
+        await this.rolarAteAcimaDoProsseguir(parcelas);
+        await (await $(parcelas)).click();
+
+        const opcao1x = '(//*[@resource-id="bottom-sheet-close"]/following-sibling::android.widget.ScrollView[1]//*[@clickable="true"])[1]';
+        const abriu = await $(opcao1x).waitForDisplayed({ timeout: 15000 }).then(() => true).catch(() => false);
+        if (!abriu) {
+            throw new Error('Parcelamento: o sheet de parcelas não abriu (nenhuma opção visível em 15s depois de tocar em card-installments-input).');
+        }
+        await (await $(opcao1x)).click();
+
+        const fechou = await driver
+            .waitUntil(async () => !(await $(seletorTestId('bottom-sheet-close')).isDisplayed().catch(() => false)), { timeout: 10000, interval: 500 })
+            .then(() => true)
+            .catch(() => false);
+        if (!fechou) {
+            throw new Error('Parcelamento: o sheet de parcelas não fechou 10s depois de tocar na 1ª opção.');
+        }
+        const habilitou = await driver
+            .waitUntil(async () => $(seletorTestId('pressable')).isEnabled().catch(() => false), { timeout: 10000, interval: 500 })
+            .then(() => true)
+            .catch(() => false);
+        if (!habilitou) {
+            throw new Error('Formulário do cartão: com os campos preenchidos e a parcela escolhida, o Prosseguir (pressable) não habilitou em 10s.');
+        }
+        const parcela = valorEmReais((await $(parcelas).getAttribute('content-desc').catch(() => '')) ?? '');
+        console.log(`💳 Parcela à vista escolhida: R$ ${parcela ?? 'não lido'}`);
+        await anexarPrint(`Formulário do cartão — 1x de R$ ${parcela ?? 'não lido'}`);
+        return parcela;
+    }
+
+    // Prosseguir do formulário (`pressable`, único na tela) -> Resumo (`summary-finalize-purchase`, cap. 56).
+    async prosseguirDoCartaoParaResumo() {
+        const prosseguir = await $(seletorTestId('pressable'));
+        await this.waitForElement(prosseguir);
+        if (!(await prosseguir.isEnabled().catch(() => false))) {
+            throw new Error('Formulário do cartão: o Prosseguir (pressable) está desabilitado.');
+        }
+        await prosseguir.click();
+        const resumo = await $(seletorTestId('summary-finalize-purchase')).waitForDisplayed({ timeout: 30000 }).then(() => true).catch(() => false);
+        if (!resumo) {
+            throw new Error('Formulário do cartão: o resumo do pedido (summary-finalize-purchase) não abriu em 30s.');
+        }
+        console.log('🧾 Resumo do pedido aberto');
+        await driver.pause(timewhait);
+    }
+
+    // Finalizar com cartão: UM toque em `summary-finalize-purchase` e espera o modal antifraude
+    // (`read-all-modal` com o `button-confirm`, cap. 57: na tela 6 s depois). NUNCA repete o toque
+    // (cada toque cria pedido). Antes, o mesmo ajuste do finalizarPedido() do Pix: o UiAutomator2
+    // para de esperar a tela "parar" (as telas seguintes animam), válido até o fim da sessão.
+    // iOS: o ajuste é do UiAutomator2 e não é feito (igual ao finalizarPedido do Pix).
+    async finalizarPedidoComCartao() {
+        if (!IOS) await driver.updateSettings({ waitForIdleTimeout: 0 });
+        await this.fechaBanner();
+
+        const finalizar = await $(seletorTestId('summary-finalize-purchase'));
+        await this.waitForElement(finalizar);
+        await finalizar.click();
+        console.log('🛒 Finalizar tocado (1 vez)');
+
+        const modal = await $(seletorTestId('button-confirm')).waitForDisplayed({ timeout: 60000 }).then(() => true).catch(() => false);
+        if (!modal) {
+            throw new Error(
+                'Finalizar (cartão): o modal antifraude (button-confirm) não apareceu em 60s. O toque NÃO é repetido ' +
+                '(cada toque cria pedido) — conferir no vídeo e em Meus pedidos se o pedido foi criado.'
+            );
+        }
+        await anexarPrint('Modal antifraude');
+        console.log('⚠ Modal antifraude na tela');
+    }
+
+    // "Entendi" (`button-confirm`) fecha o modal; destino = tela do pedido em processamento
+    // (`wake-order-processing-aguardando`, cap. 58) ou já cancelado (`-cancelado`, cap. 59).
+    // iOS (349, caps. 45–46): por baixo do modal estava `wake-order-processing-erro` e, depois do
+    // Entendi, `-cancelado`; o `-erro` também conta como chegada (o Cancelado é validado no passo seguinte).
+    async fecharModalAntifraude() {
+        await (await $(seletorTestId('button-confirm'))).click();
+        const estados = ['wake-order-processing-aguardando', 'wake-order-processing-cancelado'];
+        if (IOS) estados.push('wake-order-processing-erro');
+        const destino = await this.algumVisivel(estados.map((id) => seletorTestId(id)), 30000);
+        if (!destino) {
+            throw new Error('Modal antifraude: depois do "Entendi" (button-confirm), a tela do pedido (wake-order-processing-*) não abriu em 30s.');
+        }
+        console.log('✅ Modal antifraude fechado; tela do pedido aberta');
+    }
+
+    // ---- iOS do formulário do cartão (build 1.21.7/352, captures-2026-10-16-build352-compra/, caps. 59–75,
+    // draft ios/19) ----
+    // Campos SEM id e sem TextField: `Other` com name = placeholder, que some ao preencher (o mesmo tipo de
+    // seletor do login iOS). O valor digitado não vai para o campo; a prova é a prévia do cartão, um `Other`
+    // cujo name junta titular, número, CVV e validade ("TESTE AUTOMACAO 4693 5775 7175 8219 123 12/30";
+    // vazia: "Nome impresso no cartão 0000 0000 0000 0000 0000 ??? 00/00"). Conferido com lxml nas caps.
+    // 59–74: é o único Other cujo name termina em "dd/dd". O CPF não aparece na prévia: a prova dele é o
+    // placeholder sumir (e, depois, o Prosseguir habilitar).
+    // O teclado cobre os campos de baixo e o toque num campo atrás dele não foca (cap. 62: o "12" do Mês
+    // foi parar no titular); por isso cada campo é rolado para cima do teclado antes do toque.
+    // Digitação: o número perdeu dígitos com 120–170 ms por tecla (cap. 60) e saiu certo com 260 ms (65).
+    // Aqui vai pelo digitarIOS (o mesmo do login) com maxTypingFrequency 3, que na busca deu o texto certo
+    // 9 de 9 (captures-2026-10-18-busca-oculos/); no formulário do cartão o 3 NÃO foi medido, por isso cada
+    // campo é conferido pela prévia e a falha diz o que ficou.
+    private async preencherCartaoIOS(cartao: DadosCartao) {
+        const soDigitos = (v: string) => v.replace(/\D/g, '');
+        const campos: Array<[string, string, string, (previa: string) => boolean]> = [
+            ['número', 'Digite o número do seu cartão', soDigitos(cartao.numero), (p) => soDigitos(p).includes(soDigitos(cartao.numero))],
+            ['titular', 'Digite o nome do titular', cartao.titular, (p) => p.toUpperCase().startsWith(`${cartao.titular.toUpperCase()} `)],
+            ['mês', 'Mês', cartao.mes, () => true],
+            ['ano', 'Ano', cartao.ano, (p) => p.endsWith(` ${cartao.mes}/${cartao.ano}`)],
+            ['CVV', 'Digite o cvv', cartao.cvv, (p) => p.endsWith(` ${cartao.cvv} ${cartao.mes}/${cartao.ano}`)],
+            ['CPF', 'Digite o CPF do titular', soDigitos(cartao.cpf), () => true],
+        ];
+
+        for (const [nome, placeholder, valor, confere] of campos) {
+            const seletor = `-ios predicate string:type == "XCUIElementTypeOther" AND name == "${placeholder}"`;
+            await this.deixarAcimaDoTecladoIOS(seletor, `o campo ${nome}`);
+            await this.digitarIOS(seletor, valor, `Cartão — ${nome}`, 3);
+
+            const vazio = await $(seletor).isExisting().catch(() => false);
+            const previa = await this.previaDoCartaoIOS();
+            if (vazio || !confere(previa)) {
+                await anexarPrint(`Formulário do cartão — ${nome} não conferiu`);
+                throw new Error(
+                    `Formulário do cartão (iOS): depois de digitar o ${nome}, ` +
+                    (vazio ? `o campo continua vazio (placeholder "${placeholder}" na tela)` : `a prévia do cartão ficou "${previa}"`) + '.'
+                );
+            }
+            console.log(`⌨ Cartão — ${nome}: ok`);
+        }
+        await anexarPrint('Formulário do cartão preenchido');
+    }
+
+    // Prévia do cartão no alto do formulário: o Other de name mais curto terminado em "dd/dd" (os
+    // contêineres acima dele juntam o texto da tela inteira).
+    private async previaDoCartaoIOS(): Promise<string> {
+        const nomes: string[] = [];
+        for (const el of await $$('-ios predicate string:type == "XCUIElementTypeOther" AND name MATCHES ".*[0-9]{2}/[0-9]{2}"')) {
+            const nome = (await el.getAttribute('name').catch(() => '')) ?? '';
+            if (nome) nomes.push(nome.trim());
+        }
+        if (!nomes.length) {
+            throw new Error('Formulário do cartão (iOS): a prévia do cartão (Other terminado em "dd/dd") não está na árvore.');
+        }
+        return nomes.reduce((a, b) => (b.length < a.length ? b : a));
+    }
+
+    // Rola o formulário até o alvo ficar inteiro entre o cabeçalho e o teclado (sem teclado, o Prosseguir
+    // fixo na base). O formulário começa em y=107 de 932 (cap. 59), daí o topo em 12% da janela. Até 4
+    // rolagens com `mobile: swipe` (o mesmo gesto do PerfilPage); erro nomeado e print se não conseguir.
+    private async deixarAcimaDoTecladoIOS(seletor: string, rotulo: string) {
+        const { height } = await driver.getWindowRect();
+        for (let i = 0; i <= 4; i++) {
+            const alvo = await $(seletor);
+            if (!(await alvo.waitForExist({ timeout: 10000 }).then(() => true).catch(() => false))) {
+                throw new Error(`Formulário do cartão (iOS): ${rotulo} não está na árvore (${seletor}).`);
+            }
+            const { y } = await alvo.getLocation();
+            const { height: h } = await alvo.getSize();
+            const teclado = await $('-ios class chain:**/XCUIElementTypeKeyboard');
+            const base = (await teclado.isExisting().catch(() => false))
+                ? (await teclado.getLocation()).y
+                : (await $(seletorTestId('pressable')).getLocation().catch(() => ({ y: height }))).y;
+            const abaixo = y + h > base - 8;
+            if (!abaixo && y >= height * 0.12) return;
+            if (i === 4) break;
+            await driver.execute('mobile: swipe', { direction: abaixo ? 'up' : 'down', velocity: 400 });
+            await driver.pause(800);
+        }
+        await anexarPrint(`Formulário do cartão — ${rotulo} fora da área visível`);
+        throw new Error(`Formulário do cartão (iOS): ${rotulo} não ficou entre o cabeçalho e o teclado depois de 4 rolagens.`);
+    }
+
+    // Parcelas no iOS, build 1.21.7/352: `card-installments-input` abre o sheet com o `bottom-sheet-close`.
+    // As opções NÃO têm id e nem sempre estão na árvore:
+    //   - captures-2026-10-16-build352-compra/ (430x932, caps. 71–74): Other de 55 pt com o label
+    //     "Nx de R$ … sem juros", 1x em [32,285 366x55]; o predicate por "1x de" pegava o contêiner das 7
+    //     (398x587), cujo centro cai na 4ª — por isso a opção é a de menor y abaixo do X e com < 100 pt;
+    //   - captures-2026-10-18-parcelas/ (402x874, caps. 09–12): FORA da árvore (só backdrop, `Bottom Sheet`
+    //     sem filhos e o X em y=236). O filtro antigo ("R$") pegava o `pressable` escondido atrás do sheet e
+    //     o sheet não fechava (run 18/10 19:52). `mobile: tap` no centro da 1x (x=201, y=297) fechou o sheet
+    //     com "1x de R$ 716,80 sem juros" (cap. 12).
+    // Sem nó, a 1x é tocada por posição relativa ao X (o sheet fica preso ao topo: nas duas janelas o
+    // centro da 1x está ~61 pt abaixo do y do X), no centro da largura. Exceção de coordenada do iOS
+    // (REQUIREMENTS.md), dívida com o app: `card-installments-option-<n>` (ELEMENTOS-SEM-TESTID-IOS.md).
+    // Prova da escolha: o sheet fecha, o Prosseguir habilita e o valor da parcela no
+    // `card-installments-input` é igual ao total do Prosseguir (1x).
+    // O campo fica atrás do teclado depois do CPF; com o teclado aberto, botão pede 2 toques (o 1º só
+    // fecha o teclado: login e cadastro, draft ios/00 item 7), por isso há um 2º toque se o sheet não abrir.
+    private async escolherParcelaAVistaIOS(): Promise<number | null> {
+        const parcelas = seletorTestId('card-installments-input');
+        const fechar = seletorTestId('bottom-sheet-close');
+        for (let toque = 1; toque <= 2; toque++) {
+            await this.deixarAcimaDoTecladoIOS(parcelas, 'o campo de parcelas');
+            await (await $(parcelas)).click();
+            const abriu = await $(fechar).waitForDisplayed({ timeout: toque === 1 ? 5000 : 15000 }).then(() => true).catch(() => false);
+            if (abriu) break;
+            if (toque === 2) {
+                await anexarPrint('Parcelamento — sheet não abriu');
+                throw new Error('Parcelamento (iOS): o sheet de parcelas (bottom-sheet-close) não abriu depois de 2 toques em card-installments-input.');
+            }
+            console.log('⚠ O 1º toque em card-installments-input não abriu o sheet — tocando de novo');
+        }
+
+        const { y: yFechar } = await (await $(fechar)).getLocation();
+        let opcao: WebdriverIO.Element | null = null;
+        let menorY = Infinity;
+        for (const el of await $$('-ios predicate string:type == "XCUIElementTypeOther" AND label CONTAINS "x de R$" AND label CONTAINS "sem juros" AND name != "card-installments-input"')) {
+            const { y } = await el.getLocation();
+            const { height: h } = await el.getSize();
+            if (y > yFechar && h < 100 && y < menorY) {
+                menorY = y;
+                opcao = el;
+            }
+        }
+        if (opcao) {
+            console.log(`💳 Opção 1x na árvore (y=${menorY}) — element click`);
+            await opcao.click();
+        } else {
+            const { width } = await driver.getWindowRect();
+            const ponto = { x: Math.round(width / 2), y: Math.round(yFechar + 61) };
+            console.log(`💳 Opções de parcela fora da árvore — mobile: tap na 1ª opção (${ponto.x}, ${ponto.y}), 61 pt abaixo do X`);
+            await driver.execute('mobile: tap', ponto);
+        }
+
+        const fechou = await driver
+            .waitUntil(async () => !(await $(fechar).isDisplayed().catch(() => false)), { timeout: 10000, interval: 500 })
+            .then(() => true)
+            .catch(() => false);
+        if (!fechou) {
+            throw new Error('Parcelamento (iOS): o sheet de parcelas não fechou 10s depois de tocar na 1ª opção.');
+        }
+        const prosseguir = await $(seletorTestId('pressable'));
+        const habilitou = await driver
+            .waitUntil(async () => prosseguir.isEnabled().catch(() => false), { timeout: 10000, interval: 500 })
+            .then(() => true)
+            .catch(() => false);
+        if (!habilitou) {
+            await anexarPrint('Formulário do cartão — Prosseguir desabilitado');
+            throw new Error('Formulário do cartão (iOS): com os campos preenchidos e a parcela escolhida, o Prosseguir (pressable) não habilitou em 10s.');
+        }
+        const parcela = valorEmReais((await $(parcelas).getAttribute('label').catch(() => '')) ?? '');
+        const total = valorEmReais((await prosseguir.getAttribute('label').catch(() => '')) ?? '');
+        if (parcela === null || total === null || Math.abs(parcela - total) > 0.009) {
+            throw new Error(`Parcelamento (iOS): a parcela escolhida (R$ ${parcela ?? 'não lida'}) não é à vista: o total do Prosseguir é R$ ${total ?? 'não lido'}.`);
+        }
+        console.log(`💳 Parcela à vista escolhida: R$ ${parcela}`);
+        await anexarPrint(`Formulário do cartão — 1x de R$ ${parcela}`);
+        return parcela;
+    }
+
+    // Rola o formulário (gesto na metade de cima, longe do botão fixo) até o alvo ficar inteiro ACIMA
+    // do Prosseguir fixo na base. Até 4 rolagens; erro nomeado se não conseguir.
+    private async rolarAteAcimaDoProsseguir(seletor: string) {
+        const { width, height } = await driver.getWindowRect();
+        for (let i = 0; i <= 4; i++) {
+            const alvo = await $(seletor);
+            const botao = await $(seletorTestId('pressable'));
+            const visivel = await alvo.isDisplayed().catch(() => false);
+            if (visivel) {
+                const { y } = await alvo.getLocation();
+                const { height: h } = await alvo.getSize();
+                const { y: yBotao } = await botao.getLocation().catch(() => ({ y: height }));
+                if (h > 0 && y + h <= yBotao) return;
+            }
+            if (i === 4) break;
+            await driver.execute('mobile: scrollGesture', {
+                left: Math.round(width * 0.1),
+                top: Math.round(height * 0.2),
+                width: Math.round(width * 0.8),
+                height: Math.round(height * 0.5),
+                direction: 'down',
+                percent: 0.6,
+            });
+            await driver.pause(800);
+        }
+        throw new Error(`Formulário do cartão: ${seletor} não ficou acima do Prosseguir depois de 4 rolagens.`);
     }
 
     // Esvazia a Mochila: abre pela aba e toca no remover (`wake-remove-item`) de cada produto até

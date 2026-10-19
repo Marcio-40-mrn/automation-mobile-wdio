@@ -413,6 +413,47 @@ export class CategoriasPage extends BasePage {
         );
     }
 
+    // Roupas expandido -> Calças (spec 03-compra-cartao). SEM texto: Calças é o 4º
+    // `sub-categories-button` (índice 3) na ordem da árvore. Os 7 botões são irmãos planos no mesmo
+    // ViewGroup (o `sub-categories-container` não é pai deles). Conferido com lxml no dump
+    // captures-2026-10-15-compra-cartao/22-roupas-expandido.xml: 7 nós, o 4º com desc "Calças"
+    // [42,1754][1038,1804]; tocado na captura 23 com efeito (listagem com product-list e product-card-*).
+    // Destino: listagem com o 1º product-card-* visível (a lista leva tempo para montar: 40 s).
+    // iOS, build 1.21.7/352 (captures-2026-10-16-calcas-cadastro/, caps. 12–13, draft ios/41): mesma
+    // regra, `name` no lugar de `resource-id`: o 4º `sub-categories-button` é Calças (1 nó, conferido
+    // com lxml na cap. 12; tocado pelo inspetor com efeito: listagem com product-list e product-card-*).
+    async abrirCalcas() {
+        const ios = process.env.PLATFORM === 'ios';
+        const botoes = ios ? '//*[@name="sub-categories-button"]' : '//*[@resource-id="sub-categories-button"]';
+        const calcas = await $(`(${botoes})[4]`);
+        const existe = await calcas.waitForExist({ timeout: 20000 }).then(() => true).catch(() => false);
+        if (!existe) {
+            throw new Error(
+                `Calças: o 4º sub-categories-button não existe em 20s (há ${await $$(botoes).length}). ` +
+                'Roupas está expandido? (clickRoupas)'
+            );
+        }
+        if (!(await calcas.isDisplayed().catch(() => false))) {
+            await calcas.scrollIntoView();
+        }
+        await this.fechaBanner();
+        await calcas.click();
+
+        const card = ios
+            ? '-ios predicate string:name BEGINSWITH "product-card-"'
+            : '-android uiautomator:new UiSelector().resourceIdMatches("product-card-.*")';
+        const listagem = await $(card).waitForDisplayed({ timeout: 40000 }).then(() => true).catch(() => false);
+        const lista = await $(seletorTestId('product-list')).isDisplayed().catch(() => false);
+        if (!listagem || !lista) {
+            throw new Error(
+                `Calças: a listagem não abriu depois do toque no 4º sub-categories-button ` +
+                `(product-list ${lista ? 'na tela' : 'ausente'}, product-card-* ${listagem ? 'na tela' : 'ausente em 40s'}).`
+            );
+        }
+        console.log('👖 Listagem de Calças aberta');
+        await driver.pause(timewhait);
+    }
+
     // Tab bar do Android no app migrado: os testIDs `tab-categories` e `tab-menu` (ids estáveis,
     // sem texto) — as duas telas de destino do voltar() têm tab bar, as de origem não.
     // fonte: drafts/app-migrado/android/09-categorias.md (tab-*), captures-2026-09-29/15-categorias.xml

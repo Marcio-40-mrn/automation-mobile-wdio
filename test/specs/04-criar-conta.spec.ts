@@ -13,21 +13,6 @@ import {
 } from "../utils/allure-helpers";
 import allure from '@wdio/allure-reporter';
 
-// Criar Conta (pedido do Marcio, 2026-10-16): cadastro REAL, até o fim, a cada execução, passando
-// antes pelos casos inválidos de cada etapa. Decisões do Marcio (2026-10-16):
-//   - vai até o fim e cria conta real;
-//   - e-mail gerado na hora no padrão `informatica.mrn+{texto}@gmail.com` (gerarDadosCadastro);
-//   - todos os dados preenchidos no relatório (anexo "Dados do cadastro") e no
-//     .planning/MASSA-DE-DADOS.md (seção "Contas criadas…");
-//   - inválidos + caminho feliz no mesmo teste;
-//   - iOS: falha explícita (CadastroPage) até existir captura iOS do cadastro.
-// Inválidos validados SEM texto: mensagem de erro presente no campo (etapa 1) e botão desabilitado.
-//
-// Seletores: .planning/drafts/app-migrado/android/captures-2026-10-16-criar-conta/ (drafts 34–37).
-// Rodar (AVD, quem roda é o Marcio):
-//   npx wdio run ./wdio.conf.ts --spec test/specs/06-criar-conta.spec.ts
-
-// Inválidos usados (os mesmos da captura): o app recusa todos (caps. 16–18, 24–27).
 const EMAIL_INVALIDO = 'abc';
 const CPF_INVALIDO = '11111111111';
 const TELEFONE_INCOMPLETO = '1193';

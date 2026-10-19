@@ -75,6 +75,16 @@ export class FavoritosPage extends BasePage {
     // a escolha é pela geometria: o de MAIOR x dentro do rect do card. Mesma regra do iOS.
     // fonte: android/20-favoritos.md ("Coração = maior x").
     private async coracaoDoCardAndroid(card: WebdriverIO.Element, produto?: string) {
+        // Build 500+: o card é `product-card-<id>` e o coração é `favorite-toggle-<id>`, com o
+        // mesmo número (a sacola é `add-to-bag-<id>`); o `action-button` sumiu de Favoritos.
+        // fonte: captures-2026-10-15-testids-505/20-favoritos.xml.
+        const idCard = (await card.getAttribute('resource-id').catch(() => '')) ?? '';
+        const numero = idCard.match(/^product-card-(\d+)$/)?.[1];
+        if (numero) {
+            console.log(`💔 Desfavoritar: favorite-toggle-${numero}`);
+            return $(seletorTestId(`favorite-toggle-${numero}`)) as unknown as WebdriverIO.Element;
+        }
+
         const posicaoCard = await card.getLocation();
         const tamanhoCard = await card.getSize();
 
@@ -148,7 +158,7 @@ export class FavoritosPage extends BasePage {
                 'Desfavoritar no iOS: o conteúdo de flatlist-favorites não mudou em 30s depois do ' +
                 `toque no coração.\nAntes:  ${antes}\nDepois: ${depois}\n` +
                 'Se o conteúdo é idêntico, o toque não removeu nada — conferir no log qual ' +
-                'action-button foi escolhido (o coração é o de MAIOR x dentro do card).'
+                'favorite-toggle-<id> foi tocado.'
             );
         }
         console.log(`💔 ${produto ? `"${produto}"` : 'Item'} removido de Favoritos`);
@@ -214,29 +224,30 @@ export class FavoritosPage extends BasePage {
         const posicaoCard = await card.getLocation();
         const tamanhoCard = await card.getSize();
 
-        const dentro: { el: WebdriverIO.Element; x: number; y: number }[] = [];
-        for (const botao of await $$('accessibility id:action-button')) {
+        // Build 1.21.7/352: em Favoritos o `action-button` sumiu (0 nós). O coração é
+        // `favorite-toggle-<id>` e a sacola `add-to-bag-<id>`, então não há mais como confundir os
+        // dois; o filtro pelo rect do card continua para pegar o coração do produto lido.
+        // fonte: captures-2026-10-17-favoritos-com-item/ (caps. 03-06): card [16,134 185x467],
+        // favorite-toggle-164803 [160,139 32x32], element click removeu o item em ~2 s.
+        const dentro: { el: WebdriverIO.Element; x: number; y: number; nome: string }[] = [];
+        for (const botao of await $$('-ios predicate string:name BEGINSWITH "favorite-toggle-"')) {
             const p = await botao.getLocation().catch(() => null);
             if (!p) continue;
             const cabe =
                 p.x >= posicaoCard.x && p.x <= posicaoCard.x + tamanhoCard.width &&
                 p.y >= posicaoCard.y && p.y <= posicaoCard.y + tamanhoCard.height;
-            if (cabe) dentro.push({ el: botao, x: p.x, y: p.y });
+            if (cabe) dentro.push({ el: botao, x: p.x, y: p.y, nome: (await botao.getAttribute('name').catch(() => '')) ?? '' });
         }
 
         if (!dentro.length) {
             throw new Error(
-                `Desfavoritar no iOS: nenhum action-button dentro do card ` +
+                `Desfavoritar no iOS: nenhum favorite-toggle-<id> dentro do card ` +
                 `[${Math.round(posicaoCard.x)},${Math.round(posicaoCard.y)} ${tamanhoCard.width}x${tamanhoCard.height}]. ` +
                 'A estrutura do card mudou — recapturar a tela antes de mexer no seletor.'
             );
         }
 
-        dentro.sort((a, b) => b.x - a.x);
-        console.log(
-            `💔 Desfavoritar: ${dentro.length} action-button no card ` +
-            `(x = ${dentro.map((d) => Math.round(d.x)).join(', ')}); escolhido o de maior x = ${Math.round(dentro[0].x)}`
-        );
+        console.log(`💔 Desfavoritar: ${dentro[0].nome} (x = ${Math.round(dentro[0].x)})`);
         return dentro[0].el;
     }
 

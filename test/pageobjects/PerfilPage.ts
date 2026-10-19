@@ -1,5 +1,5 @@
 import { BasePage, timewhait, scrollUntilVisible, seletorTestId } from "./BasePage";
-import { driver, $, $$ } from '@wdio/globals'
+import { driver, $ } from '@wdio/globals'
 import allure from '@wdio/allure-reporter';
 import { texto } from "../utils/textos";
 
@@ -12,21 +12,10 @@ const MAX_SWIPES_MENU = 14;
 
 export class PerfilPage extends BasePage {
 
-    // Android: o content-desc do card é "Título, Subtítulo", então o início basta
-    // (descriptionStartsWith) e não depende do subtítulo. iOS: o texto vem no label e o CONTAINS
-    // faz o mesmo papel.
-    // fonte: Android captures-2026-09-29/45-menu-logado.xml (draft android/24);
-    //        iOS captures-m6-sessao-a/ACOES.md captura 41.
     async abrirFavoritos() {
-        // Android SEM texto: "Favoritos" virou "Favorites" com o AVD em inglês (run local de
-        // 2026-10-01). Os 4 menu-card têm ordem fixa — Meus dados, Meus pedidos, Favoritos,
-        // Notificações —, logado e deslogado (45-menu-logado.xml, 10-menu-deslogado.xml), então o
-        // Favoritos é o 3º: instance(2).
-        const element = await $(
-            process.env.PLATFORM === 'ios'
-                ? `-ios predicate string:name == "menu-card" AND label CONTAINS "${texto('menu.favoritos')}"`
-                : '-android uiautomator:new UiSelector().resourceId("menu-card").instance(2)'
-        );
+        // Desde o build 500 (Android) e o 350 (iOS) o card tem testID próprio: o `menu-card`
+        // genérico sumiu (captures-2026-10-09-build500/RESULTADO.md; ELEMENTOS-SEM-TESTID-IOS.md).
+        const element = await $(seletorTestId('menu-card-favorites'));
         await this.waitForElement(element);
         if (process.env.PLATFORM === 'ios') await this.fechaBanner();
         await element.click();
@@ -106,10 +95,7 @@ export class PerfilPage extends BasePage {
             .waitForDisplayed({ timeout: 15000 })
             .then(() => true)
             .catch(() => false);
-        // Sem diálogo NÃO é falha por si só: na sessão iOS remota o wdio.conf.ts liga
-        // autoAcceptAlerts, e o diálogo de logout do app migrado é um UIAlert nativo — o Appium o
-        // aceita sozinho antes de o teste vê-lo (run iOS local de 2026-10-01: 16/17 passos, parou
-        // aqui com "o diálogo não apareceu"). Quem decide é o estado seguinte, validado abaixo.
+        // Sem diálogo NÃO é falha por si só: quem decide é o estado seguinte, validado abaixo.
         if (apareceu && ios) {
             await driver.execute('mobile: alert', { action: 'accept', buttonLabel: texto('logout.confirmar') });
             await driver.pause(timewhait);
@@ -117,7 +103,7 @@ export class PerfilPage extends BasePage {
             await element.click();
             await driver.pause(timewhait);
         } else {
-            console.log('ℹ Diálogo de logout não apareceu em 15s (provável autoAcceptAlerts) — validando pelo estado do Menu');
+            console.log('ℹ Diálogo de logout não apareceu em 15s — validando pelo estado do Menu');
         }
 
         // Deslogado = o Menu mostra de novo o acesso ao Login. iOS: o convite do topo OU o botão do
@@ -137,7 +123,8 @@ export class PerfilPage extends BasePage {
                     this.seletorAcessoLogin('menu.acessoLoginRodape'),
                 ]
                 : [
-                    '-android uiautomator:new UiSelector().resourceId("menu-card").enabled(false)',
+                    // Build 500+: `menu-card-*` no lugar do `menu-card` genérico, mesmo sinal enabled.
+                    '-android uiautomator:new UiSelector().resourceIdMatches("menu-card-.*").enabled(false)',
                     this.seletorAcessoLogin('menu.acessoLoginRodape'),
                 ],
             20000
@@ -150,112 +137,6 @@ export class PerfilPage extends BasePage {
         }
 
         console.log('✅ Logout confirmado pelo estado da tela (acesso ao Login de volta no Menu)');
-    }
-
-    // ---- Etapa 1 do M6 (06-05): OUT-01..03 -------------------------------------------------
-    // REGRA FIXA (REQUIREMENTS.md, 2026-10-01): os testes NÃO validam texto. O PDF pede o diálogo
-    // "Logout" com a pergunta "Você deseja sair da sua conta?" e as opções CANCELAR e SAIR; aqui o
-    // diálogo é asserido pela ESTRUTURA (título, mensagem e os dois botões presentes) e nenhuma
-    // string exibida é lida ou comparada. Seletores abaixo NÃO VERIFICADOS em run até o 06-05
-    // Tarefa 2 — exceção: `android:id/button1` já passou no AVD e no iPhone via confirmarLogout().
-    // fonte Android: .planning/drafts/app-migrado/android/28-logout.md (captura 50-dialogo-logout);
-    // fonte iOS: captures-m6-sessao-a/NOTAS.md capturas 30 a 32 (XCUIElementTypeAlert, 2 botões).
-
-    // O diálogo de logout é OBSERVÁVEL neste ambiente? Android: sempre. iOS: só se a sessão NÃO
-    // aceita alertas sozinha — com `autoAcceptAlerts` ligado (wdio.conf.ts, que não muda: DEC-C e)
-    // o Appium aceita o UIAlert nativo antes de o teste vê-lo e o logout acontece sem passar por
-    // aqui (06-03, desvio 8). A capability é lida da sessão; se a chave não vier, assume NÃO
-    // observável (a escolha segura: pular com motivo em vez de tocar em Sair e perder o diálogo).
-    // Não toca o device. Nunca decide por texto.
-    dialogoLogoutObservavel(): boolean {
-        if (process.env.PLATFORM !== 'ios') return true;
-        const caps = driver.capabilities as unknown as Record<string, unknown>;
-        const auto = caps['appium:autoAcceptAlerts'] ?? caps['autoAcceptAlerts'];
-        return auto === false;
-    }
-
-    // Presença do diálogo: Android = o título (`alert_title`); iOS = o próprio XCUIElementTypeAlert.
-    private seletorDialogoLogout(): string {
-        return process.env.PLATFORM === 'ios'
-            ? '-ios class chain:**/XCUIElementTypeAlert'
-            : 'id:com.aramis.ecomm:id/alert_title';
-    }
-
-    private async dialogoLogoutVisivel(): Promise<boolean> {
-        return $(this.seletorDialogoLogout()).isDisplayed().catch(() => false);
-    }
-
-    // Rola até "Sair", toca e confirma que o diálogo apareceu (10s), com erro nomeado.
-    async abrirDialogoLogout() {
-        await this.logout();
-        const apareceu = await $(this.seletorDialogoLogout())
-            .waitForDisplayed({ timeout: 10000 })
-            .then(() => true)
-            .catch(() => false);
-        if (!apareceu) {
-            throw new Error(
-                'Logout: o diálogo de confirmação não apareceu 10s depois de tocar em Sair ' +
-                `(${this.seletorDialogoLogout()}). Se um banner do Insider ou a lista rolada ` +
-                'escondeu o toque, o Menu continua na tela; se o logout foi feito sem diálogo, o ' +
-                'ambiente aceitou o alerta sozinho (autoAcceptAlerts).'
-            );
-        }
-        console.log('💬 Diálogo de logout exibido');
-    }
-
-    // OUT-01: o diálogo tem a estrutura esperada. Sem comparar nenhuma string.
-    //   Android: título + mensagem + botão de cancelar (button2) + botão de confirmar (button1).
-    //   iOS: o Alert + exatamente 2 botões (o resto da árvore do Alert não foi capturado).
-    async validarEstruturaDialogoLogout() {
-        if (process.env.PLATFORM === 'ios') return this.validarEstruturaDialogoLogoutIOS();
-
-        const partes: Array<[string, string]> = [
-            ['título (alert_title)', 'id:com.aramis.ecomm:id/alert_title'],
-            ['mensagem (android:id/message)', 'id:android:id/message'],
-            ['botão de cancelar (android:id/button2)', 'id:android:id/button2'],
-            ['botão de confirmar (android:id/button1)', 'id:android:id/button1'],
-        ];
-        const ausentes: string[] = [];
-        for (const [nome, seletor] of partes) {
-            if (!(await $(seletor).isDisplayed().catch(() => false))) ausentes.push(nome);
-        }
-        if (ausentes.length > 0) {
-            throw new Error(`Diálogo de logout sem a estrutura esperada: ausente(s) ${ausentes.join('; ')}.`);
-        }
-        console.log('✅ Diálogo de logout com título, mensagem e os dois botões');
-    }
-
-    private async validarEstruturaDialogoLogoutIOS() {
-        const total = await $$('-ios class chain:**/XCUIElementTypeAlert/**/XCUIElementTypeButton').length;
-        if (total !== 2) {
-            throw new Error(`Diálogo de logout no iOS com ${total} botão(ões) no Alert; esperados 2 (cancelar e confirmar).`);
-        }
-        console.log('✅ Diálogo de logout (iOS) com o Alert e os dois botões');
-    }
-
-    // OUT-02: cancela, confirma que o diálogo fechou e que a conta continua logada.
-    //   Android: android:id/button2. iOS: 1º botão do Alert (Cancel vem antes de Logout na árvore —
-    //   getButtons = ["Cancel","Logout"], NOTAS.md captura 30; não verificado em run).
-    async cancelarLogout() {
-        const botao = process.env.PLATFORM === 'ios'
-            ? '-ios class chain:**/XCUIElementTypeAlert/**/XCUIElementTypeButton[1]'
-            : 'id:android:id/button2';
-        const element = await $(botao);
-        const visivel = await element.waitForDisplayed({ timeout: 10000 }).then(() => true).catch(() => false);
-        if (!visivel) {
-            throw new Error(`Logout: o botão de cancelar do diálogo não ficou visível em 10s (${botao}).`);
-        }
-        await element.click();
-        await driver.pause(timewhait);
-
-        const fechou = await driver
-            .waitUntil(async () => !(await this.dialogoLogoutVisivel()), { timeout: 10000, interval: 500 })
-            .then(() => true)
-            .catch(() => false);
-        if (!fechou) {
-            throw new Error('Logout: o diálogo continuou na tela 10s depois de tocar em cancelar.');
-        }
-        await this.validarLogado();
     }
 
     // Menu no estado LOGADO, por estrutura, nas duas plataformas (ver validarLogadoAndroid).

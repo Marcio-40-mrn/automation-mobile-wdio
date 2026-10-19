@@ -39,7 +39,6 @@ const SETA_VOLTAR_PDP = IOS
 const FRACOES_TAMANHO_IOS = [46, 114, 182, 250, 318].map((x) => x / 402);
 const FRACAO_Y_TAMANHO_IOS = 742 / 874;
 const FRACAO_ADICIONAR_IOS: [number, number] = [201 / 402, 816 / 874];
-const FRACAO_CONTINUAR_COMPRANDO_IOS: [number, number] = [201 / 402, 753 / 874];
 // O `bottom-sheet-close` existe nos dois sheets; a posição diz qual está aberto: y=498 pt no de
 // tamanho (capturas 22, 24, 33) e y=87 pt no de "produto adicionado" (25, 35).
 const LIMITE_Y_SHEET_ADICIONADO_IOS = 0.3;
@@ -73,44 +72,86 @@ export class ProdutoPage extends BasePage {
     //   são os da linha MAIS BAIXA da tela (y=2014 nas capturas), e é ali que o toque vale.
     // - Sucesso = sheet de "produto adicionado" (`bag-continue-shopping`). Na rodada 1 o 1º toque
     //   no adicionar não reagiu, por isso até 2 toques, só se o botão continuar na tela.
+    // - Tamanho que acaba entre a escolha e o toque em adicionar (build 1.21.7/507): o app avisa com
+    //   um modal de estoque em vez do sheet — comportamento correto do app. Run de 2026-10-17 12:38:
+    //   "Size sold out" no G da camisa, cuja última unidade estava reservada pelo pedido Pix pendente
+    //   do run anterior. "Insufficient stock" (2ª unidade) é `alert-modal` + `alert-modal-confirm`,
+    //   e o OK fecha o modal E o sheet (capturas 29-30 de captures-2026-10-17-sold-out-meus-pedidos/).
+    //   O id do "Size sold out" não foi capturado; presume-se o mesmo `alert-modal` — NÃO VERIFICADO.
+    //   Com o modal, o teste toca OK, reabre o sheet e tenta o próximo tamanho disponível.
     async comprar() {
         if (IOS) return this.comprarIOS();
-        await this.fechaBanner();
-        const comprar = await $(seletorTestId('pdp-buy-button'));
-        await this.waitForElement(comprar);
-        await comprar.click();
-
         const adicionar = seletorTestId('size-button');
-        const sheet = await $(adicionar).waitForDisplayed({ timeout: 15000 }).then(() => true).catch(() => false);
-        if (!sheet) {
-            throw new Error('Comprar: o sheet de tamanho (size-button) não abriu em 15s depois de tocar no pdp-buy-button.');
-        }
+        const modalEstoque = seletorTestId('alert-modal');
+        const recusados: string[] = [];
 
-        const tamanho = await this.escolherTamanho(adicionar);
+        while (true) {
+            await this.fechaBanner();
+            const comprar = await $(seletorTestId('pdp-buy-button'));
+            await this.waitForElement(comprar);
+            await comprar.click();
 
-        for (let tentativa = 1; tentativa <= 2; tentativa++) {
-            await (await $(adicionar)).click();
-            const adicionado = await $(seletorTestId('bag-continue-shopping'))
-                .waitForDisplayed({ timeout: 20000 })
-                .then(() => true)
-                .catch(() => false);
-            if (adicionado) {
-                console.log(`✅ Produto adicionado à Mochila (tamanho ${tamanho})`);
-                await driver.pause(timewhait);
-                return;
+            const sheet = await $(adicionar).waitForDisplayed({ timeout: 15000 }).then(() => true).catch(() => false);
+            if (!sheet) {
+                throw new Error('Comprar: o sheet de tamanho (size-button) não abriu em 15s depois de tocar no pdp-buy-button.');
             }
-            if (!(await $(adicionar).isDisplayed().catch(() => false))) break;
-            console.log(`⚠ Toque ${tentativa}/2 em adicionar não abriu o sheet de produto adicionado`);
-        }
 
-        throw new Error('Comprar: o sheet de "produto adicionado" (bag-continue-shopping) não apareceu depois de tocar em adicionar.');
+            const tamanho = await this.escolherTamanho(adicionar, recusados);
+            let recusado = false;
+
+            for (let tentativa = 1; tentativa <= 2; tentativa++) {
+                await (await $(adicionar)).click();
+                // 45s: no build 507 o sheet chega ~30s depois do toque, com a PDP "parada" no meio
+                // (bug 22 do BUGS-APP-ANDROID.md, run de 2026-10-17 01:33). Era 20s.
+                let resultado: 'adicionado' | 'modal' | null = null;
+                await driver
+                    .waitUntil(async () => {
+                        if (await $(seletorTestId('bag-continue-shopping')).isDisplayed().catch(() => false)) resultado = 'adicionado';
+                        else if (await $(modalEstoque).isDisplayed().catch(() => false)) resultado = 'modal';
+                        return resultado !== null;
+                    }, { timeout: 45000, interval: 1000 })
+                    .catch(() => undefined);
+                if (resultado === 'adicionado') {
+                    console.log(`✅ Produto adicionado à Mochila (tamanho ${tamanho})`);
+                    await driver.pause(timewhait);
+                    return;
+                }
+                if (resultado === 'modal') {
+                    await anexarPrint(`Comprar — modal de estoque no tamanho ${tamanho}`);
+                    console.log(`⚠ O app recusou o tamanho ${tamanho} (modal de estoque) — tocando OK e tentando outro tamanho`);
+                    await (await $(seletorTestId('alert-modal-confirm'))).click();
+                    const fechou = await driver
+                        .waitUntil(async () => !(await $(modalEstoque).isDisplayed().catch(() => false)), { timeout: 10000, interval: 500 })
+                        .then(() => true)
+                        .catch(() => false);
+                    if (!fechou) {
+                        throw new Error(`Comprar: o modal de estoque (alert-modal) não fechou depois do OK (alert-modal-confirm), tamanho ${tamanho}.`);
+                    }
+                    recusados.push(tamanho);
+                    recusado = true;
+                    break;
+                }
+                if (!(await $(adicionar).isDisplayed().catch(() => false))) break;
+                console.log(`⚠ Toque ${tentativa}/2 em adicionar não abriu o sheet de produto adicionado`);
+            }
+
+            if (!recusado) {
+                throw new Error('Comprar: o sheet de "produto adicionado" (bag-continue-shopping) não apareceu depois de tocar em adicionar.');
+            }
+            // O OK volta à PDP sem sheet (captura 30); se o sheet ficou aberto, fecha antes de reabrir.
+            if (await $(adicionar).isDisplayed().catch(() => false)) {
+                await (await $(seletorTestId('bottom-sheet-close'))).click().catch(() => undefined);
+                await driver.pause(timewhait);
+            }
+        }
     }
 
-    // Escolhe o 1º tamanho que HABILITA o botão de adicionar. No 2º run do Marcio (2026-10-14
-    // 19:13) o toque no P da camisa deixou o size-button desabilitado por 10s; o vídeo não cobre o
-    // momento. Hipótese (não provada): tamanho sem estoque não fica selecionável. Por isso os
-    // tamanhos do sheet são tentados em ordem — escolher tamanho não cria nada. Os do sheet são os
-    // da linha MAIS BAIXA da tela (cada size-option-* pode existir também na PDP, por trás).
+    // Escolhe o 1º tamanho DISPONÍVEL: o 1º que HABILITA o botão de adicionar. Tamanho sem estoque
+    // aparece cinza com "+" e o toque nele não habilita o adicionar (build 1.21.7/507, capturas 20 e
+    // 26 de captures-2026-10-17-sold-out-meus-pedidos/), mas no dump ele vem enabled=true como os
+    // outros — por isso o critério é o efeito no botão. Os tamanhos do sheet são tentados em ordem
+    // (escolher tamanho não cria nada). Os do sheet são os da linha MAIS BAIXA da tela (cada
+    // size-option-* pode existir também na PDP, por trás).
     // Lê o PREÇO do produto na PDP, antes do clique em comprar, e devolve o número. O valor é lido
     // da tela a CADA execução (nunca fixo no código): o nó é o `price`, único na PDP (capturas de
     // 2026-10-14). O spec guarda o valor numa variável por produto e, no resumo do pedido, valida
@@ -128,7 +169,11 @@ export class ProdutoPage extends BasePage {
         return preco;
     }
 
-    private async escolherTamanho(adicionar: string): Promise<string> {
+    // `ignorar`: tamanhos que o app já recusou com o modal de estoque neste comprar().
+    // A partir do build 1.21.7/507 os tamanhos sem estoque vêm cinza com "+" no print, mas com
+    // enabled=true no dump (capturas 20 e 26 de captures-2026-10-17-sold-out-meus-pedidos/): só o
+    // efeito no adicionar os distingue, que é o critério daqui.
+    private async escolherTamanho(adicionar: string, ignorar: string[] = []): Promise<string> {
         const opcoes = [];
         for (const el of await $$(SELETOR_TAMANHO)) {
             if (!(await el.isDisplayed().catch(() => false))) continue;
@@ -144,6 +189,7 @@ export class ProdutoPage extends BasePage {
         const tentados: string[] = [];
         for (const opcao of doSheet) {
             const tamanho = opcao.id.replace('size-option-', '');
+            if (ignorar.includes(tamanho)) continue;
             tentados.push(tamanho);
             // Reencontra pelo id e pela linha: a referência antiga pode ficar obsoleta depois de um toque.
             for (const el of await $$(seletorTestId(opcao.id))) {
@@ -165,7 +211,8 @@ export class ProdutoPage extends BasePage {
 
         allure.addAttachment('Sheet de tamanho', Buffer.from(await driver.takeScreenshot(), 'base64'), 'image/png');
         throw new Error(
-            `Comprar: nenhum tamanho habilitou o botão de adicionar (size-button). Tentados: ${tentados.join(', ')}.`
+            `Comprar: nenhum tamanho habilitou o botão de adicionar (size-button). Tentados: ${tentados.join(', ')}` +
+            (ignorar.length ? `; recusados pelo app (modal de estoque): ${ignorar.join(', ')}.` : '.')
         );
     }
 
@@ -312,12 +359,17 @@ export class ProdutoPage extends BasePage {
         );
     }
 
-    // "Continue shopping" por fração; sucesso = os sheets fecham e a PDP volta (captura 26).
+    // Build 1.21.7/352: o sheet fica preso ao topo e a distância até o "Continue shopping" muda com a
+    // largura da janela (402 pt: 666; 430: 687,5; 440: 694), então a fração errava (run 2026-10-18 12:47,
+    // tocou ~36 pt abaixo em 440x956). Agora fecha pelo X (`bottom-sheet-close`, na árvore): element
+    // click fechou o sheet e devolveu a PDP, com o contador mantido, em 3 de 3 (camisa G, M, G).
+    // fonte: captures-2026-10-18-sheet-fechar-x/ (NOTAS.md). Sucesso = sheet fechado e PDP de volta.
     private async continuarComprandoIOS() {
         if ((await this.sheetAbertoIOS()) !== 'adicionado') {
             throw new Error('Continuar comprando (iOS): o sheet de produto adicionado não está aberto.');
         }
-        await this.tapProporcional(...FRACAO_CONTINUAR_COMPRANDO_IOS, '"Continue shopping"');
+        await (await $(seletorTestId('bottom-sheet-close'))).click();
+        console.log('👆 Sheet de produto adicionado: toque no X (bottom-sheet-close)');
 
         const fechou = await driver
             .waitUntil(async () => (await this.sheetAbertoIOS()) === null, { timeout: 10000, interval: 500 })
