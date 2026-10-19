@@ -1,5 +1,60 @@
 # STATE
 
+**2026-10-19 (tarde) — `04-criar-conta` iOS: a etapa 1 PASSOU inteira, inclusive o telefone, mas o run estourou os
+15 min do mocha.** O passo da senha `abcdefgh` levou 410 s sem terminar, e a causa não está provada (falta o log do
+terminal). Por ordem do Marcio, o spec valida UMA senha fora da regra por execução, sorteada entre as 4 (`abc`, `abcdefgh`,
+`Abcdefgh`, `Abcdefg1`), nas duas plataformas, além da confirmação diferente e da senha válida. Só `tsc`.
+
+**2026-10-19 — `04-criar-conta` iOS (Remote Access) falhou de novo no telefone ("1193" foi digitado no Nascimento, que
+ficou "11/93"); a causa é a mesma da captura de 18/10. Correção APLICADA (ordem do Marcio), NÃO RODADA:**
+`CadastroPage.focarCampoIOS` agora lê o rect com a tela parada (2 leituras iguais). Se a caixa estiver atrás do
+teclado, arrasta o formulário (`mobile: dragFromToForDuration`, distância calculada do rect do campo e do teclado).
+No telefone, confirma o foco pela ausência da tecla ".". São 3 tentativas, depois erro explícito. Só `tsc`. Os
+comandos `mobile: tap`/`keys`/`dragFromToForDuration`/`touchAndHold` continuam sem rodar no host iOS do Device Farm
+(xcuitest 7.27.0). No `appium.log` do iPhone 13 (Run #24), `POST /actions` (W3C) responde 200 nesse host.
+
+**2026-10-19 — Contas do CI limpas no AVD (app 1.21.7/508), pedido do Marcio.** Capturas
+`drafts/app-migrado/android/captures-2026-10-19-build508-contas-ci/` (`NOTAS.md`). 10 das 11 contas logaram. Em todas
+elas os Favoritos estão vazios. Em 9 o único favorito era a "Camisa Manga Longa Regular Tech Flex Falso Liso Azul"
+(`favorite-toggle-164803`), removida; a `marciorocha` não tinha favorito. A Mochila ficou vazia e o endereço genérico
+foi cadastrado (CEP 01310-100, Av. Paulista 1000); a `marciorocha` já tinha endereço. Persistência do endereço provada
+na `test150`: logout, force-stop, login e checkout abriram a LISTA de endereços, e o caminho seguiu até o Pagamento,
+sem finalizar. **`aaliyahrochanascimento087+qa160` (S23 Ultra) RECUSA o login** ("Incorrect e-mail or password", com
+"Create new password"), e a senha é a mesma das outras. Isso explica o S23 Ultra do Run #24, que não chegou à
+tab-home: o Marcio precisa resetar ou recriar essa conta. Ids do 508 iguais aos do 507 nas telas dos 4 testes; novo
+só o `pickup-address` (opção "Store pickup" da Entrega). Bug: crash (error boundary + `JavascriptException`) no login
+da `qatest100`, que não se repetiu na 2ª vez. Menu deslogado rolado depois do logout mostra o login sem
+`menu-login-button` até rolar ao topo.
+
+**2026-10-18 (noite) — CI Run #24 (21:15, commit `1e3c49e`, anterior às correções do cadastro iOS): tudo FAILED.**
+Diagnóstico pelo AWS CLI (`Test spec output` dos 11 aparelhos + Allure do S24+ e do iPhone 13):
+- `01-fluxo-favoritar`: "Conta suja" em 9 aparelhos. As contas do CI já tinham a "Camisa Manga Longa Regular Tech
+  Flex Falso Liso Azul" favoritada. O S23 Ultra caiu no login (tab-home não veio em 20 s). O iPhone 14 passou.
+- `02-compra-pix` (Android 6/6) e `03-compra-cartao` (Android 5/6, iOS 4/5): **as contas do CI não têm endereço
+  salvo**. Depois do `bag-checkout-button` o app abre direto o formulário "New delivery address" (print da falha no
+  S24+ e no iPhone 13), e não a lista com "Cadastrar novo endereço" que o `finalizarCompraESelecionarEndereco` espera.
+- iOS no host do Device Farm: o WDA responde `Unhandled endpoint` para `mobile: keys`
+  (`/wda/element/0/keyboardInput`) e `mobile: tap` (`/wda/tap/0`). Isso derrubou o login do Pix nos 5 iPhones
+  (`LoginPage.completarEmailIOS`) e o cadastro no 14 Pro Max e no 15 Pro Max. No Remote Access os dois funcionam.
+  Todo passo iOS que use esses dois comandos não roda no CI.
+- `04-criar-conta`: Android 4/6 passou (contas no `MASSA-DE-DADOS.md`). S23+ e S26 Ultra: no passo do telefone, o
+  `create-account-email` (usado para tirar o foco) não foi achado. iOS: o seletor por tamanho, já corrigido.
+**Captura `ios/captures-2026-10-18-cadastro-telefone/` (402x874):** a tela rola a cada tecla do Nascimento e o y do
+Phone oscila (629/574/605…), depois assenta em 509. Lido no meio da rolagem, o toque cai no teclado e o foco fica no
+Nascimento (cap. 13). O `focarCampoIOS` dá sucesso porque o teclado já estava aberto. O discriminador de foco é a
+tecla "." (existe no teclado do Nascimento, some no do telefone). Rolar até sair do teclado e tocar funciona (14d).
+Drafts 42 e 43 reescritos. Correção NÃO aplicada (aguarda o Marcio).
+
+**2026-10-18 (21:21) — `04-criar-conta` iOS rodou (app 1.21.7/352, janela 402x874) e FALHOU no 1º campo.** Onboarding,
+login e abertura do Criar Conta passaram. O formulário estava na tela (print). Causa: o seletor dos campos usava o
+TAMANHO (`x=16`, `width=398`, `height=48/49`), medido só em 430x932. Em 402 pt o campo tem 370 de largura. Nenhuma conta
+foi criada. **Mudança (352, aprovada pelo Marcio), NÃO RODADA:** `CadastroPage` no iOS: o campo N é o N-ésimo irmão
+`Other` com accessible="true" ANTES do botão da etapa (`create-account-submit` / `create-account-security-submit`). O
+toque vai na moldura do campo, que é o irmão anterior. O erro é o campo seguido de nó accessible="false" e de StaticText.
+Nenhum tamanho e nenhuma posição na tela. Conferido com lxml nas 24 árvores de `captures-2026-10-16-calcas-cadastro/`
+(6 campos na etapa 1 e 2 na etapa 2; erro achado só onde existe), todas em 430 pt. Só `tsc`. Android sem mudança.
+`ELEMENTOS-SEM-TESTID-IOS.md`: os campos do cadastro estão anotados para os devs, com o impacto.
+
 **2026-10-18 (noite) — `03-compra-cartao` iOS rodou (app 1.21.7/352, 19:52–20:01) e FALHOU na parcela.** Passou onboarding,
 login, Calças (R$ 699,90), Mochila, endereço, entrega, cartão (R$ 716,80) e o formulário inteiro (print com todos os campos
 certos). Parou em `escolherParcelaAVistaIOS`: o sheet abriu, o toque na "1ª opção" não o fechou em 10 s. Nenhum pedido criado.

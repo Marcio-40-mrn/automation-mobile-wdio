@@ -1,19 +1,23 @@
 import { BasePage, timewhait, seletorTestId } from "./BasePage";
-import { driver, $ } from '@wdio/globals'
+import { driver, $, $$ } from '@wdio/globals'
 
 // Criar Conta (cadastro), a partir da tela de Login. Seletores medidos no Android, build
 // 1.21.6/506: .planning/drafts/app-migrado/android/captures-2026-10-16-criar-conta/ (drafts 34–37).
 //
 // iOS, build 1.21.7/352: .planning/drafts/app-migrado/ios/captures-2026-10-16-calcas-cadastro/
 // (drafts 42–45). Diferenças que mudam o código:
-//   - os campos NÃO têm testID nem TextField na árvore: cada campo é um `Other` sem name, x=16,
-//     398x48 (49 com a tela rolada), na ordem e-mail, nome, sobrenome, CPF, nascimento, telefone
-//     (etapa 2: senha, confirmação) — só por posição (pedido de id no ELEMENTOS-SEM-TESTID-IOS.md);
+//   - os campos NÃO têm testID nem TextField na árvore (pedido de id no ELEMENTOS-SEM-TESTID-IOS.md).
+//     Âncora estrutural, sem tamanho nem posição na tela: os irmãos `Other` com accessible="true"
+//     que vêm ANTES do botão da etapa (`create-account-submit` / `create-account-security-submit`),
+//     na ordem e-mail, nome, sobrenome, CPF, nascimento, telefone (etapa 2: senha, confirmação).
+//     Conferido nas caps. 19, 20b, 28, 30, 31, 33, 34, 38, 39: sempre 6 (etapa 1) e 2 (etapa 2),
+//     com ou sem mensagem de erro (logo, instrução, moldura e erro são accessible="false");
 //   - o valor digitado não aparece na árvore: a prova é a mensagem de erro e o `enabled` do botão;
 //   - digitar: `mobile: keys` 1 caractere por chamada (string inteira perde caracteres; 120–170 ms
 //     ainda perdeu no cartão, 260 ms não); apagar: segurar a tecla `delete` (alfa) / `Delete`
 //     (numérico) do teclado, achada por nome — `clearValue` e "\b" não funcionam;
-//   - erro do campo: StaticText sem id em x=36, y = campo.y + 56 (caps. 20b, 28, 30, 34, 39);
+//   - erro do campo: logo depois do campo vêm a moldura do próximo campo (ou o botão); com erro,
+//     vêm um ícone `Other` accessible="false" e o StaticText da mensagem (caps. 20b, 28, 30, 34, 39);
 //   - enviar e finalizar: o 1º toque com o teclado aberto só fecha o teclado; o 2º age.
 //
 // Duas etapas:
@@ -50,28 +54,88 @@ export class CadastroPage extends BasePage {
 
     // ---------- iOS ----------
 
+    // Campo nº `posicao` da etapa aberta: só um dos dois botões existe na tela por vez.
     private seletorCampoIOS(posicao: number): string {
-        return '(//XCUIElementTypeOther[@x="16" and @width="398" and (@height="48" or @height="49") and not(@name)])' +
-            `[${posicao}]`;
+        return `(//*[@name="${ID_ENVIAR_ETAPA1}" or @name="${ID_FINALIZAR}"]` +
+            `/preceding-sibling::XCUIElementTypeOther[@accessible="true"])[${posicao}]`;
+    }
+
+    // Moldura do campo: o irmão imediatamente anterior a ele.
+    private seletorCaixaIOS(posicao: number): string {
+        return `${this.seletorCampoIOS(posicao)}/preceding-sibling::*[1]`;
+    }
+
+    // Rect do elemento depois de a tela parar de rolar: a tela rola a cada tecla digitada
+    // (captures-2026-10-18-cadastro-telefone, y do Phone 629/574/605 → 509), e um rect lido no
+    // meio da rolagem manda o toque para o teclado. Duas leituras iguais seguidas = parou.
+    private async rectEstavelIOS(seletor: string) {
+        let anterior = await driver.getElementRect(await $(seletor).elementId);
+        for (let i = 0; i < 15; i++) {
+            await driver.pause(300);
+            const atual = await driver.getElementRect(await $(seletor).elementId);
+            if (atual.x === anterior.x && atual.y === anterior.y && atual.height === anterior.height) return atual;
+            anterior = atual;
+        }
+        return anterior;
+    }
+
+    // Tecla "." do teclado numérico: existe no do Nascimento e não no do telefone (cap. 13 × 14d
+    // de captures-2026-10-18-cadastro-telefone). Ainda presente depois do toque no Phone = o foco
+    // ficou no Nascimento.
+    private async teclaPontoNaTelaIOS(): Promise<boolean> {
+        return (await $$('-ios predicate string:type == "XCUIElementTypeKey" AND name == "."').length) > 0;
     }
 
     // Toque na caixa do campo, perto da borda direita (o centro cai no placeholder, que some ao
-    // focar); ponto calculado do rect do próprio elemento. Confere o teclado aberto.
+    // focar); ponto calculado do rect do próprio elemento, lido com a tela parada. Se a caixa
+    // estiver atrás do teclado, arrasta o formulário para cima antes (cap. 14d). Confere o teclado
+    // aberto e, no telefone, a troca de teclado (sem a tecla ".").
     private async focarCampoIOS(posicao: number) {
         const teclado = '-ios class chain:**/XCUIElementTypeKeyboard';
-        for (let tentativa = 1; tentativa <= 2; tentativa++) {
-            const campo = await $(this.seletorCampoIOS(posicao));
-            const existe = await campo.waitForExist({ timeout: 10000 }).then(() => true).catch(() => false);
+        const seletor = this.seletorCaixaIOS(posicao);
+        for (let tentativa = 1; tentativa <= 3; tentativa++) {
+            const existe = await $(seletor).waitForExist({ timeout: 10000 }).then(() => true).catch(() => false);
             if (!existe) {
-                throw new Error(`Criar Conta (iOS): o campo nº ${posicao} (Other x=16 398x48 sem name) não está na árvore.`);
+                throw new Error(`Criar Conta (iOS): o campo nº ${posicao} (irmão accessible antes do botão da etapa) não está na árvore.`);
             }
-            const { x, y } = await campo.getLocation();
-            const { width, height } = await campo.getSize();
-            await driver.execute('mobile: tap', { x: Math.round(x + width - 40), y: Math.round(y + height / 2) });
-            if (await $(teclado).waitForExist({ timeout: 5000 }).then(() => true).catch(() => false)) return;
-            console.log(`⚠ Toque ${tentativa}/2 no campo nº ${posicao} não abriu o teclado`);
+            let caixa = await this.rectEstavelIOS(seletor);
+            const tecladoAberto = await $(teclado).isExisting();
+            if (tecladoAberto) {
+                const tec = await driver.getElementRect(await $(teclado).elementId);
+                const sobra = caixa.y + caixa.height + 16 - tec.y;
+                if (sobra > 0) {
+                    // arrasta de logo acima do teclado para cima, a distância que a caixa precisa subir
+                    const xMeio = Math.round(tec.x + tec.width / 2);
+                    const yIni = Math.round(tec.y - 20);
+                    const yFim = Math.max(Math.round(yIni - sobra - 40), 80);
+                    console.log(`↕ Campo nº ${posicao} atrás do teclado (${Math.round(sobra)} pt): arrastando o formulário`);
+                    await driver.execute('mobile: dragFromToForDuration',
+                        { fromX: xMeio, fromY: yIni, toX: xMeio, toY: yFim, duration: 0.5 });
+                    caixa = await this.rectEstavelIOS(seletor);
+                    if (caixa.y + caixa.height > tec.y) {
+                        console.log(`⚠ Tentativa ${tentativa}/3: campo nº ${posicao} continua atrás do teclado`);
+                        continue;
+                    }
+                }
+            }
+            const pontoAntes = tecladoAberto && await this.teclaPontoNaTelaIOS();
+            await driver.execute('mobile: tap',
+                { x: Math.round(caixa.x + caixa.width - 40), y: Math.round(caixa.y + caixa.height / 2) });
+            if (!(await $(teclado).waitForExist({ timeout: 5000 }).then(() => true).catch(() => false))) {
+                console.log(`⚠ Toque ${tentativa}/3 no campo nº ${posicao} não abriu o teclado`);
+                continue;
+            }
+            if (posicao === POSICAO_IOS.phone && pontoAntes) {
+                await driver.pause(500);
+                if (await this.teclaPontoNaTelaIOS()) {
+                    console.log(`⚠ Toque ${tentativa}/3 no telefone: o teclado com "." continua (foco no Nascimento)`);
+                    continue;
+                }
+            }
+            return;
         }
-        throw new Error(`Criar Conta (iOS): o teclado não abriu depois de 2 toques no campo nº ${posicao}.`);
+        throw new Error(`Criar Conta (iOS): não consegui focar o campo nº ${posicao} em 3 tentativas ` +
+            '(teclado não abriu, campo atrás do teclado ou foco ficou no campo anterior).');
     }
 
     // Apaga o campo focado: segura a tecla de apagar (`delete` no teclado alfa, `Delete` no numérico).
@@ -224,13 +288,13 @@ export class CadastroPage extends BasePage {
         console.log(`✅ Campo "${campo}" ${comErro ? 'com' : 'sem'} mensagem de erro, como esperado`);
     }
 
-    // iOS: a mensagem aparece com o foco ainda no campo (cap. 20b), então não há blur. Erro = um
-    // StaticText em x=36 com y = campo.y + 56 (tolerância de 3 pt), sem ler o texto.
+    // iOS: a mensagem aparece com o foco ainda no campo (cap. 20b), então não há blur. Erro = o
+    // campo seguido de um nó accessible="false" (ícone) e de um StaticText, sem ler o texto. Sem
+    // erro, o 1º irmão seguinte é a moldura do próximo campo (e o 2º, o campo) ou o botão
+    // (accessible="true"), o que exclui o "Already have an account?" depois do telefone.
     private async validarErroNoCampoIOS(campo: CampoCadastro, comErro: boolean) {
-        const caixa = await $(this.seletorCampoIOS(POSICAO_IOS[campo]));
-        const { y } = await caixa.getLocation();
-        const alvo = Math.round(y) + 56;
-        const erro = `//XCUIElementTypeStaticText[@x="36" and @y >= ${alvo - 3} and @y <= ${alvo + 3}]`;
+        const erro = `${this.seletorCampoIOS(POSICAO_IOS[campo])}` +
+            '/following-sibling::*[1][@accessible="false"]/following-sibling::*[1][self::XCUIElementTypeStaticText]';
 
         const apareceu = await $(erro)
             .waitForExist({ timeout: comErro ? 5000 : 2000 })
@@ -239,7 +303,7 @@ export class CadastroPage extends BasePage {
         if (apareceu !== comErro) {
             throw new Error(
                 `Campo "${campo}": esperado ${comErro ? 'COM' : 'SEM'} mensagem de erro, ` +
-                `mas a tela mostrou ${apareceu ? 'a mensagem' : 'nenhuma mensagem'} (StaticText x=36, y≈${alvo}).`
+                `mas a tela mostrou ${apareceu ? 'a mensagem' : 'nenhuma mensagem'} (StaticText logo depois do campo).`
             );
         }
         console.log(`✅ Campo "${campo}" ${comErro ? 'com' : 'sem'} mensagem de erro, como esperado`);

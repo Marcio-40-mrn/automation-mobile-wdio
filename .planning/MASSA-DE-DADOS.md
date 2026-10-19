@@ -24,12 +24,16 @@ Marcio de anotar todos os dados preenchidos).
 nascimento aleatório entre 1970 e 1999, telefone `(11) 9xxxx-xxxx` aleatório, senha `Aramis@<4 letras><dígito>a`.
 Cada execução anexa no Allure o "Dados do cadastro" com todos os campos; a linha é copiada para a tabela abaixo
 quando o run é levantado. Inválidos usados no spec: e-mail `abc`, CPF `111.111.111-11`, telefone `1193`, senhas
-`abc`, `abcdefgh`, `Abcdefgh`, `Abcdefg1` e confirmação diferente.
+UMA senha sorteada por execução entre `abc`, `abcdefgh`, `Abcdefgh` e `Abcdefg1` (Marcio, 2026-10-19, para reduzir o tempo; a sorteada aparece no nome do step) e confirmação diferente.
 
 | Data | Origem | E-mail | Nome | Sobrenome | CPF | Nascimento | Telefone | Senha | Resultado |
 |---|---|---|---|---|---|---|---|---|---|
 | 2026-10-16 13:50 | captura Android (AVD-S24, build 506) | `informatica.mrn+cadastro-avd-s24-mvb7e8sd-xxny@gmail.com` | Teste | Automacao | `285.729.154-00` | 15/05/1990 | 11 933683272 | `Aramis@E8SD9a` | conta criada; senha aceita sem troca; cadastro concluiu e a conta ficou logada direto na Home (cap. 29), Menu mostrou "Teste Automacao" (cap. 30) |
 | 2026-10-16 ~18:01 | captura iOS (Remote Access, build 1.21.7/352) | `informatica.mrn+cadastro-ios-mvbfy8l1-nrhv@gmail.com` | Teste | Automacao | `842.523.377-12` | 15/03/1990 | (11) 96384-7205 | `Aramis@57189a` | conta criada; Home logada direto após o 2º toque em finalizar, Menu mostrou "TA Teste Automacao" (cap. 43); logout feito em seguida. E-mail lido no print (`l`/`1` ambíguos na fonte); login confirmado na captura das ~19h (`captures-2026-10-16-build352-compra`), que salvou nela o endereço Av. Paulista 1000, CEP 01310-100, destinatário Teste Automacao. Estado final: Mochila vazia, sem favoritos, sem pedidos, deslogada |
+| 2026-10-18 ~21:30 | CI Run #24, Device Farm, Samsung Galaxy S23 Ultra | `informatica.mrn+cadastro-samsung-galaxy-s23-u-mvejtj3p-nkur@gmail.com` | Teste | Automacao | `856.566.187-30` | 23/04/1980 | (11) 94795-9941 | `Aramis@QWVE6a` | conta criada (spec 04 PASSED neste device; dados do `Test spec output`) |
+| 2026-10-18 ~21:30 | CI Run #24, Device Farm, Samsung Galaxy S24 Ultra | `informatica.mrn+cadastro-samsung-galaxy-s24-u-mvein5tg-fc13@gmail.com` | Teste | Automacao | `272.262.087-17` | 18/08/1984 | (11) 93850-2237 | `Aramis@RMDJ6a` | conta criada (spec 04 PASSED neste device; dados do `Test spec output`) |
+| 2026-10-18 ~21:30 | CI Run #24, Device Farm, Samsung Galaxy S24+ | `informatica.mrn+cadastro-samsung-galaxy-s24-mveje2sh-slz0@gmail.com` | Teste | Automacao | `621.911.278-43` | 26/03/1973 | (11) 97659-3433 | `Aramis@EFGK5a` | conta criada (spec 04 PASSED neste device; dados do `Test spec output`) |
+| 2026-10-18 ~21:30 | CI Run #24, Device Farm, Samsung Galaxy S25 Ultra | `informatica.mrn+cadastro-samsung-galaxy-s25-u-mvejfjfj-cmq2@gmail.com` | Teste | Automacao | `416.503.081-32` | 12/02/1997 | (11) 95025-0667 | `Aramis@LQZB9a` | conta criada (spec 04 PASSED neste device; dados do `Test spec output`) |
 
 ## Compra
 
@@ -38,6 +42,7 @@ quando o run é levantado. Inválidos usados no spec: e-mail `abc`, CPF `111.111
 | Termo de busca | `óculos` | `PRODUTO_BUSCA` em `test/specs/02-compra-pix.spec.ts` |
 | Segundo produto | 1ª camisa de Categorias → Roupas → Camisas (sem nome fixo) | spec `02-compra-pix` |
 | Endereço de entrega | o salvo na conta: Av. Paulista, 1000 | cadastrado na 2ª leva do M5 (2026-09-29) |
+| Endereço das contas do CI | CEP 01310-100, Av. Paulista 1000, destinatário Teste Automacao | cadastrado no AVD (build 508) em 2026-10-19 nas 10 contas do CI que logaram (a `marciorocha` já tinha); a `qa160` recusou o login e ficou sem conferir; persistência provada na `test150` (logout, force-stop, login, checkout abriu a lista) |
 | Desconto do Pix | 10% sobre os produtos | `DESCONTO_PIX` no spec `02-compra-pix` |
 
 ## Cartão de crédito (fake)

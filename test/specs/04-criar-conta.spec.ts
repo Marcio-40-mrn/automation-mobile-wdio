@@ -16,7 +16,10 @@ import allure from '@wdio/allure-reporter';
 const EMAIL_INVALIDO = 'abc';
 const CPF_INVALIDO = '11111111111';
 const TELEFONE_INCOMPLETO = '1193';
-const SENHAS_FORA_DA_REGRA = ['abc', 'abcdefgh', 'Abcdefgh', 'Abcdefg1']; // curta, sem maiúscula, sem número, sem especial
+// Uma senha fora da regra por execução, sorteada entre as 4 (Marcio, 2026-10-19: para caber no tempo
+// do iOS; cada run, e cada device do CI, pode validar uma diferente). A sorteada aparece no nome do step.
+const SENHAS_INVALIDAS = ['abc', 'abcdefgh', 'Abcdefgh', 'Abcdefg1']; // curta, sem maiúscula, sem número, sem especial
+const SENHAS_FORA_DA_REGRA = [SENHAS_INVALIDAS[Math.floor(Math.random() * SENHAS_INVALIDAS.length)]];
 
 describe('Criar Conta', () => {
     it('Cadastro de conta nova, com os casos inválidos de cada etapa', async function (this: Mocha.Context) {
