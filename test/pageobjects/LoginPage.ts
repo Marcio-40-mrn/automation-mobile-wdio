@@ -223,14 +223,12 @@ export class LoginPage extends BasePage {
 
     // Modal de credenciais recusadas.
     //  - iOS: nó único da árvore (sem filho para o OK); o label serve só para DETECTAR (captura 18).
-    //  - Android: sem testID. Estrutura da captura m6e1/26: o botão OK é o ViewGroup clicável
-    //    IRMÃO que vem logo depois do ScrollView da mensagem, dentro do cartão do modal. Na tela de
-    //    Login (captura 15) nenhum ScrollView é seguido de um ViewGroup clicável, então o seletor
-    //    só casa com o modal. Não depende de idioma.
+    //  - Android: `alert-modal` (caixa do modal), build 1.22.1/511
+    //    (captures-2026-10-20-build511/11-recusada; o OK é `alert-modal-confirm`).
     private seletorModalErro(): string {
         return process.env.PLATFORM === 'ios'
             ? `-ios predicate string:label CONTAINS "${texto('login.modalCredenciais')}"`
-            : '//android.widget.ScrollView/following-sibling::android.view.ViewGroup[@clickable="true"][1]';
+            : seletorTestId('alert-modal');
     }
 
     // Entra no Login a partir do Menu deslogado e confirma que o formulário abriu vazio. Se o app

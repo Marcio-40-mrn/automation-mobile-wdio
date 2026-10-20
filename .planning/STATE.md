@@ -1,5 +1,44 @@
 # STATE
 
+**2026-10-20 (noite) — CI Run #29 (18:40, commit `037560c`, app 1.22.2): `01` 11/11; `02` 0/11; `03` 0/11; `04` 9/11.**
+`02`: o run usou o código antigo (10% fixo); a leitura do percentual na tela ainda não estava commitada. `03` Android
+(print do S24+): depois de finalizar, a tela de erro do app "Oops" com `WakeOrderProcessing: Exception in HostFunction:
+__next_prime overflow` (ID `41cbead3c84c48028710de2902602781`); reprodução pedida no Android 16 (Remote Access).
+`03` iOS (print do iPhone 15): veio o modal antifraude ("Entendi"), não a tela de recusa. `04` S23+ e S26 Ultra
+(prints): o erro do telefone estava na tela; falhou o toque em `create-account-email` para tirar o foco, porque o
+formulário rolou e o e-mail saiu da árvore. **Mudanças (Marcio), só `tsc`:** `CheckoutPage.esperarDestinoDoFinalizar`
+(Pix e cartão) aceita o modal antifraude (`button-confirm`) sempre que aparecer; no cartão o modal aceito OU a tela de recusa = verde (Marcio), nas duas plataformas; falha na hora, com o texto, se vier
+a tela de erro do app (`error-id`/`error-name`); o cartão aceita `wake-order-processing-recusado|aguardando|cancelado|erro`.
+`CadastroPage.validarErroNoCampo` Android tira o foco pelo campo visível mais próximo acima.
+
+**2026-10-20 (noite) — AVD no build 1.22.2/512 (targetSdk 36, PR do Android 16).** Captura
+`drafts/app-migrado/android/captures-2026-10-20-android16/` + `RELATORIO-PR-ANDROID16.md` (texto para a PR). **O AVD é
+Android 14 (API 34): a validação de edge-to-edge da PR NÃO vale**; falta um AVD API 36 (decisão do Marcio em aberto). Voltar
+do Android OK em 14 fluxos. `ELEMENTOS-SEM-TESTID.md` e drafts 12/13/15/17 reescritos para o 512; os demais drafts seguem no
+511 (ids comparados, iguais). **`ProdutoPage.comprar()` Android vale no 512, sem mudança de código:** a captura
+`captures-2026-10-20-build512-comprar/` (óculos e camisa, 2/2) provou `pdp-buy-button` → sheet "Select size"
+(`size-option-*`, `size-button` enabled=false) → tamanho → `size-button` enabled → `bag-continue-shopping` em ≤9 s.
+O "sem sheet de tamanho" da captura android16 estava ERRADO: lá o tamanho foi escolhido na PDP rolada (tamanhos inline,
+que o app IGNORA: o Buy reabre o sheet com `size-button` desabilitado) e o Buy foi tocado por coordenada. Tamanho sem
+estoque: no dump igual aos outros, sem o `TextView` filho (só `SvgView` "+"); o toque não habilita o `size-button`,
+que é o critério do `escolherTamanho`. **Pix (Marcio):** o percentual vem
+da Wake e muda ao escolher o Pix (prévia "10% off … estimated" → escolhido "15% off"). `02-compra-pix` agora lê a linha
+ANTES (`CheckoutPage.lerPreviaPix`, `payment-wake-pix-discount-preview`) e DEPOIS (`lerDescontoPix`,
+`payment-wake-pix-discount`) e valida cada valor pelo percentual lido; saiu o `DESCONTO_PIX = 0.10`. Só `tsc`.
+O 10% → 15% é comportamento da Wake, não bug: item 34 retirado do `BUGS-APP-ANDROID.md` (Marcio, 2026-10-20).
+
+**2026-10-20 — AVD no build 1.22.1/511: captura completa (sem finalizar) e docs Android reescritos para o 511.**
+Capturas `drafts/app-migrado/android/captures-2026-10-20-build511/` (00–72) e `captures-2026-10-20-contas-ci-meus-dados/`
+(Meus dados das 11 contas do CI; lista nome/sobrenome/e-mail em `CONTAS-CI-AUTOMACAO.csv`/`.md`, raiz, para o time de
+dados). `ELEMENTOS-SEM-TESTID.md`, drafts 01–30/32/34–36/40 e `00-INDICE.md` reescritos; não conferidos no 511: 31, 33,
+37, 38, 39 (exigem finalizar pedido/cadastro ou abrir o formulário de endereço). `BUGS-APP-ANDROID.md` 33 (crash no Criar
+Conta) e 34 (prévia do Pix "10% off", Pix escolhido "15% off"). **No 511 o Resumo do Pix voltou a mostrar o desconto, de
+15%** (R$ 187,47 sobre 1.249,80); o `02-compra-pix` calcula 10% (`DESCONTO_PIX`) e vai falhar no Resumo. **Aguarda o
+Marcio dizer qual é o desconto certo** antes de mudar o spec e o `CheckoutPage.lerDescontoPix` (que pode passar a ler
+`payment-wake-pix-discount`). Teste mudado: só `LoginPage.seletorModalErro` Android → `alert-modal` (o método só é usado
+no laço iOS, sem efeito no Android). Só `tsc`. CI Run #32 (20/10 14:21): Tests Suite FAILED nos 11 aparelhos, não
+diagnosticado (o Marcio decidiu deixar o status do workflow como está).
+
 **2026-10-19 (noite) — CI Run #25 (18:18, `f5ff5e9`, app 1.22.0: Android 509 / iOS 354): nenhuma compra passou;
 correções ESCRITAS (aprovadas pelo Marcio), NÃO RODADAS, só `tsc`.** Registro completo:
 `plans/2026-10-19-ci-run25-build509.md`. Resultado: `01` Android 5/6, iOS 5/5; `02` 0/11; `03` 0/11; `04` Android 3/6,

@@ -5,7 +5,7 @@ import { PerfilPage } from "../pageobjects/PerfilPage";
 import { CategoriasPage } from "../pageobjects/CategoriasPage";
 import { BuscaPage } from "../pageobjects/BuscaPage";
 import { ProdutoPage } from "../pageobjects/ProdutoPage";
-import { CheckoutPage, type ValoresResumo } from "../pageobjects/CheckoutPage";
+import { CheckoutPage, type ValoresResumo, type LinhaPix } from "../pageobjects/CheckoutPage";
 import { PedidoPage } from "../pageobjects/PedidoPage";
 import { getCredentials } from "../utils/credentials";
 import {
@@ -18,6 +18,8 @@ import {
 import allure from '@wdio/allure-reporter';
 
 const PRODUTO_BUSCA = 'óculos';
+
+const fmtPix = (l: LinhaPix | null) => (l ? `${l.percentual}% · R$ ${l.valor}` : 'não lido');
 
 
 describe('Compra', () => {
@@ -44,10 +46,12 @@ describe('Compra', () => {
         let precoOculos = 0;
         let precoCamisa = 0;
         const descontoCupom = 0;
-        const DESCONTO_PIX = 0.10;
         let valoresResumo: ValoresResumo | null = null;
         let totalPagamento: number | null = null;
-        let valorComDescontoNoPagamento: number | null = null;
+        // Linha do desconto do Pix no Pagamento: prévia antes de escolher e valor depois de escolher.
+        // O percentual vem da Wake e muda ao escolher o Pix (10% → 15% no 511/512); o teste usa o lido.
+        let previaPix: LinhaPix | null = null;
+        let pixEscolhido: LinhaPix | null = null;
         let descontoPixEsperado: number | null = null;
         let totalComPixEsperado: number | null = null;
 
@@ -116,18 +120,23 @@ describe('Compra', () => {
             await step('checkoutPage.selecionarEntregaEContinuar()', () => checkoutPage.selecionarEntregaEContinuar());
 
             // Passos 27 e 28 — Pix e resumo do pedido.
+            // Desconto do Pix no Pagamento, lido ANTES e DEPOIS de escolher o Pix (build 1.22.2/512:
+            // `payment-wake-pix-discount-preview` e `payment-wake-pix-discount`). Comparados no passo 29,
+            // porque a entrega só aparece no Resumo.
+            await step('checkoutPage.lerPreviaPix() - antes de escolher o Pix', async () => { previaPix = await checkoutPage.lerPreviaPix(); });
             await step('checkoutPage.selecionarPix()', async () => { totalPagamento = await checkoutPage.selecionarPix(); });
-            // Valor com desconto do Pix no Pagamento (build 1.22.0/509: só no rótulo do botão
-            // payment-submit-button). Lido aqui e comparado no passo 29, porque a entrega só aparece no Resumo.
-            await step('checkoutPage.lerDescontoPix()', async () => { valorComDescontoNoPagamento = await checkoutPage.lerDescontoPix(); });
+            await step('checkoutPage.lerDescontoPix() - depois de escolher o Pix', async () => { pixEscolhido = await checkoutPage.lerDescontoPix(); });
             await step('checkoutPage.prosseguirParaResumo()', () => checkoutPage.prosseguirParaResumo());
 
             // Passo 29 — validação dos valores ANTES do clique que leva à tela do Pix (regra a partir
             // do build 1.21.7/507), com os valores guardados no teste:
             //   (1) Produtos do resumo  = precoOculos + precoCamisa (lidos na PDP);
-            //   (2) Descontos do resumo = desconto de cupom + DESCONTO DO PIX (10% de produtos - cupom, SEM a entrega);
+            //   (2) Descontos do resumo = desconto de cupom + DESCONTO DO PIX (percentual lido no Pagamento
+            //       DEPOIS de escolher o Pix, sobre produtos - cupom, SEM a entrega);
             //   (3) Total do resumo     = produtos - cupom + entrega - desconto do Pix;
-            //   (4) valor com desconto do Pagamento e total do botão de pagamento = (3).
+            //   (4) valor do Pix escolhido no Pagamento e total do botão de pagamento = (3);
+            //   (5) valor da prévia (antes de escolher) = produtos - cupom + entrega - (percentual da prévia).
+            //       Com frete grátis em todas as capturas, não está provado se a prévia inclui a entrega.
             // A entrega vem do próprio resumo (o teste não escolhe frete com preço conhecido).
             // Se algum valor não conferir, o teste para AQUI, antes de finalizar — nenhum pedido é criado.
             await step('validar valores do resumo (com desconto do Pix)', async () => {
@@ -135,7 +144,14 @@ describe('Compra', () => {
                 valoresResumo = v;
                 const somaProdutos = Math.round((precoOculos + precoCamisa) * 100) / 100;
                 const baseDoPix = Math.round((somaProdutos - descontoCupom) * 100) / 100;
-                const descontoPix = Math.round(baseDoPix * DESCONTO_PIX * 100) / 100;
+                const pix = pixEscolhido as LinhaPix | null;
+                const previa = previaPix as LinhaPix | null;
+                if (!pix || !previa) {
+                    throw new Error('Pagamento: a prévia ou o desconto do Pix escolhido não foram lidos.');
+                }
+                const descontoPix = Math.round(baseDoPix * (pix.percentual / 100) * 100) / 100;
+                const descontoPrevia = Math.round(baseDoPix * (previa.percentual / 100) * 100) / 100;
+                const previaEsperada = Math.round((baseDoPix + v.entrega - descontoPrevia) * 100) / 100;
                 const descontosEsperados = Math.round((descontoCupom + descontoPix) * 100) / 100;
                 const totalEsperado = Math.round((baseDoPix + v.entrega - descontoPix) * 100) / 100;
                 descontoPixEsperado = descontoPix;
@@ -145,7 +161,9 @@ describe('Compra', () => {
                 allure.addArgument('Preço óculos', String(precoOculos));
                 allure.addArgument('Preço camisa', String(precoCamisa));
                 allure.addArgument('Soma dos produtos', String(somaProdutos));
-                allure.addArgument('Desconto do Pix (10%)', String(descontoPix));
+                allure.addArgument('Prévia do Pix (antes de escolher)', `${previa.percentual}% · ${previa.valor}`);
+                allure.addArgument('Pix escolhido', `${pix.percentual}% · ${pix.valor}`);
+                allure.addArgument(`Desconto do Pix (${pix.percentual}%)`, String(descontoPix));
                 allure.addArgument('Total esperado com desconto do Pix', String(totalEsperado));
                 allure.addAttachment(
                     'Valores da compra',
@@ -155,16 +173,17 @@ describe('Compra', () => {
                     `Desconto de cupom: ${descontoCupom}\n` +
                     `Entrega (resumo): ${v.entrega}\n` +
                     `Base do desconto do Pix (sem entrega): ${somaProdutos} - ${descontoCupom} = ${baseDoPix}\n` +
-                    `Desconto do Pix (10%): ${descontoPix}\n` +
+                    `Prévia do Pix (antes de escolher): ${previa.percentual}% · R$ ${previa.valor} | esperado ${baseDoPix} + ${v.entrega} - ${descontoPrevia} = ${previaEsperada}\n` +
+                    `Pix escolhido: ${pix.percentual}% · R$ ${pix.valor}\n` +
+                    `Desconto do Pix (${pix.percentual}%): ${descontoPix}\n` +
                     `Total esperado com desconto do Pix: ${baseDoPix} + ${v.entrega} - ${descontoPix} = ${totalEsperado}\n\n` +
                     `Resumo — Produtos: ${v.produtos} | Entrega: ${v.entrega} | Descontos: ${v.descontos} | Total: ${v.total}\n` +
-                    `Valor com desconto do Pix no Pagamento: ${valorComDescontoNoPagamento ?? 'não lido'}\n` +
                     `Total no botão do pagamento: ${totalPagamento ?? 'não lido'}`,
                     'text/plain'
                 );
                 console.log(
                     `💲 Óculos ${precoOculos} + camisa ${precoCamisa} = ${somaProdutos}; entrega ${v.entrega}; ` +
-                    `desconto do Pix (10%) ${descontoPix}; total esperado ${totalEsperado} | ` +
+                    `prévia ${previa.percentual}% ${previa.valor}; Pix escolhido ${pix.percentual}%, desconto ${descontoPix}; total esperado ${totalEsperado} | ` +
                     `resumo: produtos ${v.produtos}, descontos ${v.descontos}, total ${v.total}`
                 );
 
@@ -174,15 +193,18 @@ describe('Compra', () => {
                 }
                 if (Math.abs(v.descontos - descontosEsperados) > 0.009) {
                     erros.push(
-                        `Descontos do resumo = ${v.descontos}, esperado = desconto do Pix (10% de ${baseDoPix}, sem entrega) ${descontoPix}` +
+                        `Descontos do resumo = ${v.descontos}, esperado = desconto do Pix (${pix.percentual}% de ${baseDoPix}, sem entrega) ${descontoPix}` +
                         (descontoCupom ? ` + cupom ${descontoCupom} = ${descontosEsperados}` : '')
                     );
                 }
                 if (Math.abs(v.total - totalEsperado) > 0.009) {
                     erros.push(`Total do resumo = ${v.total}, total esperado com desconto do Pix = ${baseDoPix} + ${v.entrega} - ${descontoPix} = ${totalEsperado}`);
                 }
-                if (valorComDescontoNoPagamento === null || Math.abs(valorComDescontoNoPagamento - totalEsperado) > 0.009) {
-                    erros.push(`Valor com desconto do Pix na tela de Pagamento = ${valorComDescontoNoPagamento ?? 'não lido'}, total esperado = ${totalEsperado}`);
+                if (Math.abs(pix.valor - totalEsperado) > 0.009) {
+                    erros.push(`Valor do Pix escolhido na tela de Pagamento (${pix.percentual}%) = ${pix.valor}, total esperado = ${totalEsperado}`);
+                }
+                if (Math.abs(previa.valor - previaEsperada) > 0.009) {
+                    erros.push(`Prévia do Pix antes de escolher (${previa.percentual}%) = ${previa.valor}, esperado = ${baseDoPix} + ${v.entrega} - ${descontoPrevia} = ${previaEsperada}`);
                 }
                 if (totalPagamento === null || Math.abs(totalPagamento - totalEsperado) > 0.009) {
                     erros.push(`Total no botão da tela de Pagamento = ${totalPagamento ?? 'não lido'}, total esperado com desconto do Pix = ${totalEsperado}`);
@@ -190,7 +212,7 @@ describe('Compra', () => {
                 if (erros.length > 0) {
                     throw new Error(`Valores do resumo não conferem com o desconto do Pix:\n- ${erros.join('\n- ')}`);
                 }
-                console.log('✅ Resumo confere: preços dos produtos e desconto do Pix (10% só dos produtos), igual ao Pagamento');
+                console.log('✅ Resumo confere: preços dos produtos e desconto do Pix (percentual do Pix escolhido, só dos produtos), igual ao Pagamento; prévia confere');
             });
 
             // Passo 30 — prosseguir com a compra (UM toque; cria o pedido).
@@ -235,9 +257,10 @@ describe('Compra', () => {
                 `Preço camisa (lido na PDP): ${precoCamisa || 'não lido'}\n` +
                 `Soma dos produtos: ${soma}\n` +
                 `Desconto de cupom: ${descontoCupom}\n` +
-                `Desconto do Pix (10%) esperado: ${descontoPixEsperado ?? 'não calculado'}\n` +
+                `Prévia do Pix (antes de escolher): ${fmtPix(previaPix)}\n` +
+                `Pix escolhido: ${fmtPix(pixEscolhido)}\n` +
+                `Desconto do Pix esperado: ${descontoPixEsperado ?? 'não calculado'}\n` +
                 `Total esperado com desconto do Pix: ${totalComPixEsperado ?? 'não calculado'}\n` +
-                `Valor com desconto do Pix na tela de pagamento: ${valorComDescontoNoPagamento ?? 'não lido'}\n` +
                 `Total no botão da tela de pagamento: ${totalPagamento ?? 'não lido'}\n` +
                 (r
                     ? `Resumo — Produtos: ${r.produtos} | Entrega: ${r.entrega} | Descontos: ${r.descontos} | Total: ${r.total}\n`

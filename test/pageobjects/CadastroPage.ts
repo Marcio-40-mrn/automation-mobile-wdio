@@ -271,7 +271,21 @@ export class CadastroPage extends BasePage {
     // foco vai para outro campo antes de olhar a mensagem.
     async validarErroNoCampo(campo: CampoCadastro, comErro: boolean) {
         if (isIOS()) return this.validarErroNoCampoIOS(campo, comErro);
-        const outro: CampoCadastro = campo === 'email' ? 'firstName' : 'email';
+        // O campo que recebe o foco é o mais próximo ACIMA que está na tela. Com o teclado aberto o
+        // formulário rola e o `create-account-email` sai da árvore: CI Run #29 (1.22.2/512), S23+ e
+        // S26 Ultra, no telefone — o print da falha mostra o erro "Telefone inválido" na tela e o 1º
+        // campo visível é o Nome. Para o e-mail, o Nome (abaixo).
+        const ordem = Object.keys(ID_CAMPO) as CampoCadastro[];
+        const candidatos: CampoCadastro[] = campo === 'email'
+            ? ['firstName']
+            : ordem.slice(0, ordem.indexOf(campo)).reverse();
+        let outro: CampoCadastro | null = null;
+        for (const c of candidatos) {
+            if (await $(seletorTestId(ID_CAMPO[c])).isDisplayed().catch(() => false)) { outro = c; break; }
+        }
+        if (!outro) {
+            throw new Error(`Campo "${campo}": nenhum outro campo na tela para tirar o foco (${candidatos.join(', ')}).`);
+        }
         await (await $(seletorTestId(ID_CAMPO[outro]))).click();
         await driver.pause(1000);
 

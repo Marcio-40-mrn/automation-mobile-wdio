@@ -148,10 +148,10 @@ describe('Compra', () => {
                 console.log('✅ Resumo confere: valor dos produtos = preço da calça lido na PDP');
             });
 
-            // UM toque em finalizar (cria o pedido) e a tela de pagamento recusado. Build 1.22.0/509: não
-            // há mais modal antifraude nem tela de Pedido Cancelado; o pedido (Cancelado) só aparece em
-            // Meus pedidos. Verde = tela de recusa + 1º pedido de Meus pedidos com o total do resumo
-            // (decisão do Marcio, 2026-10-19).
+            // UM toque em finalizar (cria o pedido) e a tela de pagamento recusado (Android 509+) ou, se
+            // vier o modal antifraude, "Entendi" e a tela do pedido (iOS 1.22.2, CI Run #29). O modal é
+            // aceito sempre que aparecer (Marcio, 2026-10-20). Verde = tela de recusa/do pedido + 1º
+            // pedido de Meus pedidos com o total do resumo (decisão do Marcio, 2026-10-19).
             await step('checkoutPage.finalizarPedidoComCartao()', async () => {
                 pedidoFinalizado = true; // marcado antes do toque: a partir daqui pode existir pedido
                 await checkoutPage.finalizarPedidoComCartao();
