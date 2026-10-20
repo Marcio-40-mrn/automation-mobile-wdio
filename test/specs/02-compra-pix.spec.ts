@@ -117,8 +117,8 @@ describe('Compra', () => {
 
             // Passos 27 e 28 — Pix e resumo do pedido.
             await step('checkoutPage.selecionarPix()', async () => { totalPagamento = await checkoutPage.selecionarPix(); });
-            // A partir do build 1.21.7/507: o Pagamento mostra o valor com desconto do Pix. Lido aqui
-            // e comparado no passo 29, porque a entrega só aparece no Resumo.
+            // Valor com desconto do Pix no Pagamento (build 1.22.0/509: só no rótulo do botão
+            // payment-submit-button). Lido aqui e comparado no passo 29, porque a entrega só aparece no Resumo.
             await step('checkoutPage.lerDescontoPix()', async () => { valorComDescontoNoPagamento = await checkoutPage.lerDescontoPix(); });
             await step('checkoutPage.prosseguirParaResumo()', () => checkoutPage.prosseguirParaResumo());
 

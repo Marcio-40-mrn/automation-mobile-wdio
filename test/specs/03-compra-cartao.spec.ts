@@ -23,8 +23,9 @@ import allure from '@wdio/allure-reporter';
 //   - login direto, sem o teste de e-mail inválido;
 //   - um item só: a 1ª calça de Categorias → Roupas → Calças;
 //   - pagamento com cartão FAKE (MASSA-DE-DADOS.md) até finalizar;
-//   - RECUSA = VERDE: um toque em finalizar, "Entendi" no modal antifraude e a tela de Pedido
-//     Cancelado com o número do pedido e o total igual ao total do resumo.
+//   - RECUSA = VERDE: um toque em finalizar, a tela de pagamento recusado
+//     (`wake-order-processing-recusado`) e, em Meus pedidos, o 1º pedido com o total igual ao
+//     total do resumo (build 1.22.0/509; o número do pedido vai para o Allure).
 //
 // Rodar (AVD, quem roda é o Marcio):
 //   npx wdio run ./wdio.conf.ts --spec test/specs/03-compra-cartao.spec.ts
@@ -147,27 +148,29 @@ describe('Compra', () => {
                 console.log('✅ Resumo confere: valor dos produtos = preço da calça lido na PDP');
             });
 
-            // UM toque em finalizar (cria o pedido), modal antifraude e Pedido Cancelado.
+            // UM toque em finalizar (cria o pedido) e a tela de pagamento recusado. Build 1.22.0/509: não
+            // há mais modal antifraude nem tela de Pedido Cancelado; o pedido (Cancelado) só aparece em
+            // Meus pedidos. Verde = tela de recusa + 1º pedido de Meus pedidos com o total do resumo
+            // (decisão do Marcio, 2026-10-19).
             await step('checkoutPage.finalizarPedidoComCartao()', async () => {
                 pedidoFinalizado = true; // marcado antes do toque: a partir daqui pode existir pedido
                 await checkoutPage.finalizarPedidoComCartao();
             });
-            await step('checkoutPage.fecharModalAntifraude()', () => checkoutPage.fecharModalAntifraude());
-            await step('pedidoPage.validarPedidoCancelado()', () => pedidoPage.validarPedidoCancelado());
+            await step('pedidoPage.abrirMeusPedidosDepoisDaRecusa()', () => pedidoPage.abrirMeusPedidosDepoisDaRecusa());
             await step('pedidoPage.numeroDoPedidoComCartao()', async () => { numeroPedido = await pedidoPage.numeroDoPedidoComCartao(); });
 
-            // Total da tela do pedido cancelado = total do resumo.
-            await step('validar total do pedido cancelado = total do resumo', async () => {
+            // Total do 1º pedido de Meus pedidos = total do resumo.
+            await step('validar total do pedido em Meus pedidos = total do resumo', async () => {
                 totalPedido = await pedidoPage.totalDoPedidoComCartao();
                 allure.addArgument('Total do pedido', String(totalPedido));
                 const r = valoresResumo as ValoresResumo | null;
                 if (!r) {
-                    throw new Error('Pedido cancelado: o total do resumo não foi lido, não há com o que comparar.');
+                    throw new Error('Pedido recusado: o total do resumo não foi lido, não há com o que comparar.');
                 }
                 if (Math.abs(totalPedido - r.total) > 0.009) {
-                    throw new Error(`Pedido ${numeroPedido}: total ${totalPedido} na tela do pedido, diferente do total do resumo ${r.total}.`);
+                    throw new Error(`Pedido ${numeroPedido}: total ${totalPedido} em Meus pedidos, diferente do total do resumo ${r.total}.`);
                 }
-                console.log(`✅ Pedido ${numeroPedido} cancelado com total ${totalPedido} = total do resumo`);
+                console.log(`✅ Pedido ${numeroPedido} em Meus pedidos com total ${totalPedido} = total do resumo`);
             });
         } catch (erro) {
             // Se a falha foi o app fechando (crash intermitente do app), anexa o logcat de crash.

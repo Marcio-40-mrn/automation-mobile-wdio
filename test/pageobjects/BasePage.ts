@@ -1045,6 +1045,53 @@ export class BasePage {
     await driver.pause(500);
   }
 
+  // ---- Gestos e teclas por ações W3C (`POST /actions`), iOS ----
+  // O WDA do host iOS do Device Farm (xcuitest 7.27.0) responde `Unhandled endpoint` para
+  // `mobile: keys` (/wda/element/0/keyboardInput) e `mobile: tap` (/wda/tap/0) — CI Run #24 e #25
+  // (2026-10-18/19), nos 5 iPhones; no mesmo host o `POST /actions` respondeu 200 (appium.log do
+  // iPhone 13, Run #24). No Remote Access os `mobile:` funcionam; estas ações rodam nos dois.
+  // Ações de TECLADO no host: não verificadas até o próximo run do CI.
+
+  // Toque num ponto da tela (pt).
+  async tocarPonto(x: number, y: number) {
+    await driver
+      .action('pointer', { parameters: { pointerType: 'touch' } })
+      .move({ x: Math.round(x), y: Math.round(y) })
+      .down()
+      .pause(80)
+      .up()
+      .perform();
+  }
+
+  // Arrasta de (x1, y1) até (x2, y2), segurando antes de mover (como o dragFromToForDuration).
+  async arrastar(x1: number, y1: number, x2: number, y2: number, duracaoMs = 500) {
+    await driver
+      .action('pointer', { parameters: { pointerType: 'touch' } })
+      .move({ x: Math.round(x1), y: Math.round(y1) })
+      .down()
+      .pause(200)
+      .move({ x: Math.round(x2), y: Math.round(y2), duration: duracaoMs })
+      .up()
+      .perform();
+  }
+
+  // Segura o dedo no centro do elemento por `duracaoMs`.
+  async segurarElemento(seletor: string, duracaoMs: number) {
+    const r = await driver.getElementRect(await $(seletor).elementId);
+    await driver
+      .action('pointer', { parameters: { pointerType: 'touch' } })
+      .move({ x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) })
+      .down()
+      .pause(duracaoMs)
+      .up()
+      .perform();
+  }
+
+  // Uma tecla no campo focado (ação W3C de teclado, no lugar do `mobile: keys`).
+  async teclaW3C(caractere: string) {
+    await driver.action('key').down(caractere).up(caractere).perform();
+  }
+
   async debugContextAndSource() {
     console.log('=== CONTEXTOS ===');
     console.log(await driver.getContext());

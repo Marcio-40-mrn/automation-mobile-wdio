@@ -319,7 +319,8 @@ export class LoginPage extends BasePage {
             await driver.pause(1000);
         }
         for (const tecla of resto) {
-            await driver.execute('mobile: keys', { keys: [tecla] });
+            // Ação W3C de teclado: o host iOS do Device Farm não tem `mobile: keys` (BasePage.teclaW3C).
+            await this.teclaW3C(tecla);
             await driver.pause(150);
         }
         this.emailDigitadoIOS = emailCompleto;

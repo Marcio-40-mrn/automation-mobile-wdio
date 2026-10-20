@@ -34,6 +34,7 @@ UMA senha sorteada por execução entre `abc`, `abcdefgh`, `Abcdefgh` e `Abcdefg
 | 2026-10-18 ~21:30 | CI Run #24, Device Farm, Samsung Galaxy S24 Ultra | `informatica.mrn+cadastro-samsung-galaxy-s24-u-mvein5tg-fc13@gmail.com` | Teste | Automacao | `272.262.087-17` | 18/08/1984 | (11) 93850-2237 | `Aramis@RMDJ6a` | conta criada (spec 04 PASSED neste device; dados do `Test spec output`) |
 | 2026-10-18 ~21:30 | CI Run #24, Device Farm, Samsung Galaxy S24+ | `informatica.mrn+cadastro-samsung-galaxy-s24-mveje2sh-slz0@gmail.com` | Teste | Automacao | `621.911.278-43` | 26/03/1973 | (11) 97659-3433 | `Aramis@EFGK5a` | conta criada (spec 04 PASSED neste device; dados do `Test spec output`) |
 | 2026-10-18 ~21:30 | CI Run #24, Device Farm, Samsung Galaxy S25 Ultra | `informatica.mrn+cadastro-samsung-galaxy-s25-u-mvejfjfj-cmq2@gmail.com` | Teste | Automacao | `416.503.081-32` | 12/02/1997 | (11) 95025-0667 | `Aramis@LQZB9a` | conta criada (spec 04 PASSED neste device; dados do `Test spec output`) |
+| 2026-10-19 | captura Android (AVD-S24, build 1.22.0/509, `captures-2026-10-19-qa160/`), conta do CI recriada | `aaliyahrochanascimento087+qa160@gmail.com` | Aaliyah | Rocha Nascimento | `384.915.267-73` | 01/01/1990 | (11) 98765-4321 | não registrada (= `CLIENT_PASSWORD`) | conta criada; Home logada direto após o 2º toque em finalizar; logout e novo login funcionaram |
 
 ## Compra
 
@@ -42,7 +43,7 @@ UMA senha sorteada por execução entre `abc`, `abcdefgh`, `Abcdefgh` e `Abcdefg
 | Termo de busca | `óculos` | `PRODUTO_BUSCA` em `test/specs/02-compra-pix.spec.ts` |
 | Segundo produto | 1ª camisa de Categorias → Roupas → Camisas (sem nome fixo) | spec `02-compra-pix` |
 | Endereço de entrega | o salvo na conta: Av. Paulista, 1000 | cadastrado na 2ª leva do M5 (2026-09-29) |
-| Endereço das contas do CI | CEP 01310-100, Av. Paulista 1000, destinatário Teste Automacao | cadastrado no AVD (build 508) em 2026-10-19 nas 10 contas do CI que logaram (a `marciorocha` já tinha); a `qa160` recusou o login e ficou sem conferir; persistência provada na `test150` (logout, force-stop, login, checkout abriu a lista) |
+| Endereço das contas do CI | CEP 01310-100, Av. Paulista 1000, destinatário Teste Automacao | cadastrado no AVD em 2026-10-19 nas 10 contas do CI que logaram no 508 (a `marciorocha` já tinha); a `qa160` (conta recriada no 509 pelo cadastro) **ficou com o endereço**: formulário preenchido e salvo no checkout (`captures-2026-10-19-qa160/` caps. 49–57, a Entrega abriu em seguida); a reentrada pela lista de endereços não foi conferida nela. Persistência provada na `test150` (build 508: logout, force-stop, login, checkout abriu a lista) |
 | Desconto do Pix | 10% sobre os produtos | `DESCONTO_PIX` no spec `02-compra-pix` |
 
 ## Cartão de crédito (fake)
@@ -107,6 +108,7 @@ pagamento" na conta `CLIENT_USER`.
 | 2026-10-15 | #140130 (R$ 699,90) e #140139 (R$ 799,90) | captura iOS cartão fake, build 349, 1 toque, 2 pedidos, os dois "Pedido Cancelado" |
 | 2026-10-18 | #178710 (R$ 196,81: polo M R$ 199,90 + frete 16,90 − Pix 19,99) | captura iOS Pix (Remote Access, build presumido 1.21.7/352, `captures-2026-10-18-pix-ate-pedido/`), 1 toque, 1 pedido; QR carregou; ficou "Aguardando Pagamento" |
 | 2026-10-18 | #180606 (R$ 1.349,82: óculos R$ 699,90 + camisa R$ 799,90, frete 0 − Pix 149,98) | run do Marcio `02-compra-pix` iOS (Remote Access, 1.21.7/352), 13:37–13:47, **PASSOU**; QR carregou; mesmo número na tela do Pix e em Meus pedidos |
+| 2026-10-19 | #201280 (R$ 716,80: calça R$ 699,90 + frete 16,90; cartão fake, Cancelado; Meus pedidos mostra a data 20/10/2026, relógio do AVD) | captura Android do cartão, build 1.22.0/509 (`captures-2026-10-19-build509-run25/`), conta `marciorocha`, 1 toque, 1 pedido; a tela nova "Não conseguimos aprovar o pagamento" apareceu no lugar do modal antifraude. O Pix foi levado só até o Resumo, sem finalizar |
 
 Os pedidos de runs não listados aqui não foram anotados. A tabela é atualizada a cada captura ou run que
 finalizar uma compra.

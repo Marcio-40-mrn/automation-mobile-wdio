@@ -13,9 +13,11 @@ import { driver, $, $$ } from '@wdio/globals'
 //     Conferido nas caps. 19, 20b, 28, 30, 31, 33, 34, 38, 39: sempre 6 (etapa 1) e 2 (etapa 2),
 //     com ou sem mensagem de erro (logo, instrução, moldura e erro são accessible="false");
 //   - o valor digitado não aparece na árvore: a prova é a mensagem de erro e o `enabled` do botão;
-//   - digitar: `mobile: keys` 1 caractere por chamada (string inteira perde caracteres; 120–170 ms
-//     ainda perdeu no cartão, 260 ms não); apagar: segurar a tecla `delete` (alfa) / `Delete`
-//     (numérico) do teclado, achada por nome — `clearValue` e "\b" não funcionam;
+//   - digitar: 1 caractere por ação (string inteira perde caracteres; 120–170 ms ainda perdeu no
+//     cartão, 260 ms não); apagar: segurar a tecla `delete` (alfa) / `Delete` (numérico) do
+//     teclado, achada por nome — `clearValue` e "\b" não funcionam. Toque, arrasto, segurar e
+//     tecla são ações W3C (BasePage), porque o host iOS do Device Farm não tem `mobile: keys`,
+//     `mobile: tap`, `dragFromToForDuration` nem `touchAndHold` (CI Run #24/#25);
 //   - erro do campo: logo depois do campo vêm a moldura do próximo campo (ou o botão); com erro,
 //     vêm um ícone `Other` accessible="false" e o StaticText da mensagem (caps. 20b, 28, 30, 34, 39);
 //   - enviar e finalizar: o 1º toque com o teclado aberto só fecha o teclado; o 2º age.
@@ -109,8 +111,7 @@ export class CadastroPage extends BasePage {
                     const yIni = Math.round(tec.y - 20);
                     const yFim = Math.max(Math.round(yIni - sobra - 40), 80);
                     console.log(`↕ Campo nº ${posicao} atrás do teclado (${Math.round(sobra)} pt): arrastando o formulário`);
-                    await driver.execute('mobile: dragFromToForDuration',
-                        { fromX: xMeio, fromY: yIni, toX: xMeio, toY: yFim, duration: 0.5 });
+                    await this.arrastar(xMeio, yIni, xMeio, yFim, 500);
                     caixa = await this.rectEstavelIOS(seletor);
                     if (caixa.y + caixa.height > tec.y) {
                         console.log(`⚠ Tentativa ${tentativa}/3: campo nº ${posicao} continua atrás do teclado`);
@@ -119,8 +120,7 @@ export class CadastroPage extends BasePage {
                 }
             }
             const pontoAntes = tecladoAberto && await this.teclaPontoNaTelaIOS();
-            await driver.execute('mobile: tap',
-                { x: Math.round(caixa.x + caixa.width - 40), y: Math.round(caixa.y + caixa.height / 2) });
+            await this.tocarPonto(caixa.x + caixa.width - 40, caixa.y + caixa.height / 2);
             if (!(await $(teclado).waitForExist({ timeout: 5000 }).then(() => true).catch(() => false))) {
                 console.log(`⚠ Toque ${tentativa}/3 no campo nº ${posicao} não abriu o teclado`);
                 continue;
@@ -140,11 +140,11 @@ export class CadastroPage extends BasePage {
 
     // Apaga o campo focado: segura a tecla de apagar (`delete` no teclado alfa, `Delete` no numérico).
     private async limparCampoIOS() {
-        const tecla = await $('-ios predicate string:type == "XCUIElementTypeKey" AND (name == "delete" OR name == "Delete")');
-        if (!(await tecla.waitForExist({ timeout: 5000 }).then(() => true).catch(() => false))) {
+        const seletor = '-ios predicate string:type == "XCUIElementTypeKey" AND (name == "delete" OR name == "Delete")';
+        if (!(await $(seletor).waitForExist({ timeout: 5000 }).then(() => true).catch(() => false))) {
             throw new Error('Criar Conta (iOS): a tecla de apagar (delete/Delete) não está no teclado.');
         }
-        await driver.execute('mobile: touchAndHold', { elementId: tecla.elementId, duration: 3.5 });
+        await this.segurarElemento(seletor, 3500);
         await driver.pause(300);
     }
 
@@ -152,7 +152,7 @@ export class CadastroPage extends BasePage {
         await this.focarCampoIOS(posicao);
         await this.limparCampoIOS();
         for (const caractere of valor) {
-            await driver.execute('mobile: keys', { keys: [caractere] });
+            await this.teclaW3C(caractere);
             await driver.pause(PAUSA_TECLA_IOS);
         }
         await driver.pause(500);

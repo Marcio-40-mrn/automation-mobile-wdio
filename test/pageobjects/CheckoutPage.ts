@@ -162,25 +162,24 @@ export class CheckoutPage extends BasePage {
         return total;
     }
 
-    // Valor com o desconto do Pix mostrado na tela de Pagamento, depois de escolher o Pix. Só o
-    // número é usado ("10% off - R$ 1.349,82"). A partir do build 1.21.7/507 (Android, captura 34 de
-    // captures-2026-10-17-pix-desconto/): com o Pix escolhido o id é `payment-wake-pix-discount`;
-    // antes da escolha era `payment-wake-pix-discount-preview` ("... estimated").
-    // iOS: o `-preview` foi visto no build 352; o id depois da escolha NÃO foi capturado no iOS, por
-    // isso o `-preview` fica como reserva (não verificado no iOS).
+    // Valor com o desconto do Pix na tela de Pagamento, depois de escolher o Pix. Build 1.22.0/509
+    // (Android, captures-2026-10-19-build509-run25/, caps. 25–29): a linha do desconto
+    // (`payment-wake-pix-discount` / `-preview`) NÃO existe mais; o valor com desconto só aparece no
+    // rótulo do `payment-submit-button` ("Prosseguir com a compra • R$ 646,81" = 699,90 + 16,90 − 69,99).
+    // O desconto continua validado no Resumo (passo 29 do spec), que no 509 mostra Descontos 0,00
+    // (BUGS-APP-ANDROID.md item 27): o teste fica vermelho ali enquanto o app não mostrar o desconto
+    // (decisão do Marcio, 2026-10-19). iOS (354): o Pagamento com Pix não foi capturado; o rótulo do
+    // botão é o mesmo do 352 (label), não verificado no 354.
     async lerDescontoPix(): Promise<number> {
-        for (const id of ['payment-wake-pix-discount', 'payment-wake-pix-discount-preview']) {
-            const el = await $(seletorTestId(id));
-            if (!(await el.waitForDisplayed({ timeout: 5000 }).then(() => true).catch(() => false))) continue;
-            const texto = IOS ? `${await el.getAttribute('label')}` : await el.getText();
-            const valor = valorEmReais(texto);
-            if (valor === null) {
-                throw new Error(`Pagamento: o valor com desconto do Pix (${id}) não pôde ser lido como valor em reais ("${texto}").`);
-            }
-            console.log(`💠 Valor com desconto do Pix no Pagamento (${id}): R$ ${valor}`);
-            return valor;
+        const botao = await $(seletorTestId('payment-submit-button'));
+        await this.waitForElement(botao);
+        const rotulo = `${await botao.getAttribute(IOS ? 'label' : 'content-desc')} ${await botao.getText().catch(() => '')}`;
+        const valor = valorEmReais(rotulo);
+        if (valor === null) {
+            throw new Error(`Pagamento: o valor com desconto do Pix não pôde ser lido no botão payment-submit-button ("${rotulo}").`);
         }
-        throw new Error('Pagamento: o valor com desconto do Pix (payment-wake-pix-discount / -preview) não apareceu depois de escolher o Pix.');
+        console.log(`💠 Valor com desconto do Pix no Pagamento (payment-submit-button): R$ ${valor}`);
+        return valor;
     }
 
     async prosseguirParaResumo() {
@@ -469,10 +468,13 @@ export class CheckoutPage extends BasePage {
         await driver.pause(timewhait);
     }
 
-    // Finalizar com cartão: UM toque em `summary-finalize-purchase` e espera o modal antifraude
-    // (`read-all-modal` com o `button-confirm`, cap. 57: na tela 6 s depois). NUNCA repete o toque
-    // (cada toque cria pedido). Antes, o mesmo ajuste do finalizarPedido() do Pix: o UiAutomator2
-    // para de esperar a tela "parar" (as telas seguintes animam), válido até o fim da sessão.
+    // Finalizar com cartão: UM toque em `summary-finalize-purchase` e espera a tela de pagamento
+    // recusado (`wake-order-processing-recusado`, "Não conseguimos aprovar o pagamento"). Build
+    // 1.22.0/509 (Android, captures-2026-10-19-build509-run25/, caps. 44-01..18): a tela vem em ~11 s
+    // e fica; não há modal antifraude (`button-confirm`) nem tela de Pedido Cancelado. iOS (354): a
+    // mesma tela no print de falha do CI Run #25 (iPhone 13); o id no iOS NÃO foi capturado.
+    // NUNCA repete o toque (cada toque cria pedido). Antes, o mesmo ajuste do finalizarPedido() do
+    // Pix: o UiAutomator2 para de esperar a tela "parar", válido até o fim da sessão.
     // iOS: o ajuste é do UiAutomator2 e não é feito (igual ao finalizarPedido do Pix).
     async finalizarPedidoComCartao() {
         if (!IOS) await driver.updateSettings({ waitForIdleTimeout: 0 });
@@ -483,30 +485,15 @@ export class CheckoutPage extends BasePage {
         await finalizar.click();
         console.log('🛒 Finalizar tocado (1 vez)');
 
-        const modal = await $(seletorTestId('button-confirm')).waitForDisplayed({ timeout: 60000 }).then(() => true).catch(() => false);
-        if (!modal) {
+        const recusado = await $(seletorTestId('wake-order-processing-recusado')).waitForDisplayed({ timeout: 60000 }).then(() => true).catch(() => false);
+        if (!recusado) {
             throw new Error(
-                'Finalizar (cartão): o modal antifraude (button-confirm) não apareceu em 60s. O toque NÃO é repetido ' +
-                '(cada toque cria pedido) — conferir no vídeo e em Meus pedidos se o pedido foi criado.'
+                'Finalizar (cartão): a tela de pagamento recusado (wake-order-processing-recusado) não apareceu em 60s. ' +
+                'O toque NÃO é repetido (cada toque cria pedido) — conferir no vídeo e em Meus pedidos se o pedido foi criado.'
             );
         }
-        await anexarPrint('Modal antifraude');
-        console.log('⚠ Modal antifraude na tela');
-    }
-
-    // "Entendi" (`button-confirm`) fecha o modal; destino = tela do pedido em processamento
-    // (`wake-order-processing-aguardando`, cap. 58) ou já cancelado (`-cancelado`, cap. 59).
-    // iOS (349, caps. 45–46): por baixo do modal estava `wake-order-processing-erro` e, depois do
-    // Entendi, `-cancelado`; o `-erro` também conta como chegada (o Cancelado é validado no passo seguinte).
-    async fecharModalAntifraude() {
-        await (await $(seletorTestId('button-confirm'))).click();
-        const estados = ['wake-order-processing-aguardando', 'wake-order-processing-cancelado'];
-        if (IOS) estados.push('wake-order-processing-erro');
-        const destino = await this.algumVisivel(estados.map((id) => seletorTestId(id)), 30000);
-        if (!destino) {
-            throw new Error('Modal antifraude: depois do "Entendi" (button-confirm), a tela do pedido (wake-order-processing-*) não abriu em 30s.');
-        }
-        console.log('✅ Modal antifraude fechado; tela do pedido aberta');
+        await anexarPrint('Pagamento recusado');
+        console.log('❌ Pagamento recusado na tela (cartão fake, esperado)');
     }
 
     // ---- iOS do formulário do cartão (build 1.21.7/352, captures-2026-10-16-build352-compra/, caps. 59–75,
@@ -641,8 +628,8 @@ export class CheckoutPage extends BasePage {
         } else {
             const { width } = await driver.getWindowRect();
             const ponto = { x: Math.round(width / 2), y: Math.round(yFechar + 61) };
-            console.log(`💳 Opções de parcela fora da árvore — mobile: tap na 1ª opção (${ponto.x}, ${ponto.y}), 61 pt abaixo do X`);
-            await driver.execute('mobile: tap', ponto);
+            console.log(`💳 Opções de parcela fora da árvore — toque (W3C) na 1ª opção (${ponto.x}, ${ponto.y}), 61 pt abaixo do X`);
+            await this.tocarPonto(ponto.x, ponto.y);
         }
 
         const fechou = await driver

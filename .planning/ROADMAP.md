@@ -262,6 +262,10 @@ migrado tem o mesmo ReCAPTCHA; o bloqueio abaixo foi medido no app atual.
 pedido do Marcio, finaliza um pedido Pix real e valida os valores do resumo pelos preços lidos na PDP.
 Roda no Device Farm (guarda que o pulava removida em 2026-10-16). Registro: `plans/2026-10-14-compra-pix.md`.
 
+**2026-10-19 — build 1.22.0 (509/354):** a recusa do cartão virou a tela `wake-order-processing-recusado` (sem modal
+nem Pedido Cancelado; o pedido só em Meus pedidos) e o Pagamento do Pix perdeu a linha do desconto. Specs `02` e
+`03` ajustados, não rodados. Registro: `plans/2026-10-19-ci-run25-build509.md`.
+
 **Próximo (Marcio, 2026-10-15): compra com cartão.** Exige capturar antes, no Android, os elementos
 da tela de pagamento com cartão no build atual (a captura de 2026-09-29 parou no formulário, sem
 testID). Cartão de teste e ponto final do fluxo **não estão escritos**. Ver `STATE.md`.

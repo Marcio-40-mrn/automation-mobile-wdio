@@ -1,5 +1,21 @@
 # STATE
 
+**2026-10-19 (noite) — CI Run #25 (18:18, `f5ff5e9`, app 1.22.0: Android 509 / iOS 354): nenhuma compra passou;
+correções ESCRITAS (aprovadas pelo Marcio), NÃO RODADAS, só `tsc`.** Registro completo:
+`plans/2026-10-19-ci-run25-build509.md`. Resultado: `01` Android 5/6, iOS 5/5; `02` 0/11; `03` 0/11; `04` Android 3/6,
+iOS 0/5. Causas: (1) o 509 trocou o modal antifraude + Pedido Cancelado pela tela `wake-order-processing-recusado`, e o
+pedido só aparece em Meus pedidos; (2) o 509 tirou a linha `payment-wake-pix-discount` e o Resumo do Pix mostra
+Descontos 0,00 (bug, `BUGS-APP-ANDROID.md` 27); (3) o host iOS do Device Farm não tem `mobile: keys`/`tap`/
+`dragFromToForDuration`/`touchAndHold`; (4) a `qa160` (S23 Ultra) recusava o login desde o Run #22.
+Mudanças: ações W3C no iOS (`BasePage.tocarPonto/arrastar/segurarElemento/teclaW3C`, 6 pontos); cartão verde = tela de
+recusa + total do 1º pedido de Meus pedidos = total do resumo; `lerDescontoPix` lê o botão do Pagamento e o Resumo
+continua exigindo o desconto (vermelho enquanto o bug existir). Capturas no AVD (509):
+`captures-2026-10-19-build509-run25/` (pedido real #201280, Cancelado) e `captures-2026-10-19-qa160/`. **`qa160`
+RECRIADA** no AVD com a `CLIENT_PASSWORD` (o app aceitou o e-mail e o CPF como novos), login provado, endereço salvo,
+Mochila e Favoritos vazios. Docs Android reescritos para o 509 (`ELEMENTOS-SEM-TESTID.md`, drafts, `BUGS-APP-ANDROID.md`
+26–32, `MASSA-DE-DADOS.md`). Em aberto: `04-criar-conta` no S23+/S26 Ultra (não reproduzido no AVD); ações de teclado
+W3C no host iOS não verificadas; iOS 354 sem captura da recusa, do Pix e de Meus pedidos.
+
 **2026-10-19 (tarde) — `04-criar-conta` iOS: a etapa 1 PASSOU inteira, inclusive o telefone, mas o run estourou os
 15 min do mocha.** O passo da senha `abcdefgh` levou 410 s sem terminar, e a causa não está provada (falta o log do
 terminal). Por ordem do Marcio, o spec valida UMA senha fora da regra por execução, sorteada entre as 4 (`abc`, `abcdefgh`,
@@ -14,8 +30,9 @@ comandos `mobile: tap`/`keys`/`dragFromToForDuration`/`touchAndHold` continuam s
 (xcuitest 7.27.0). No `appium.log` do iPhone 13 (Run #24), `POST /actions` (W3C) responde 200 nesse host.
 
 **2026-10-19 — Contas do CI limpas no AVD (app 1.21.7/508), pedido do Marcio.** Capturas
-`drafts/app-migrado/android/captures-2026-10-19-build508-contas-ci/` (`NOTAS.md`). 10 das 11 contas logaram. Em todas
-elas os Favoritos estão vazios. Em 9 o único favorito era a "Camisa Manga Longa Regular Tech Flex Falso Liso Azul"
+`drafts/app-migrado/android/captures-2026-10-19-build508-contas-ci/` (`NOTAS.md`). 10 das 11 contas logaram; o que segue
+vale SÓ para essas 10 (a `qa160` não logou: sem endereço nem limpeza nesta sessão — recriada depois, ver entrada da
+noite). Nas 10, os Favoritos estão vazios. Em 9 o único favorito era a "Camisa Manga Longa Regular Tech Flex Falso Liso Azul"
 (`favorite-toggle-164803`), removida; a `marciorocha` não tinha favorito. A Mochila ficou vazia e o endereço genérico
 foi cadastrado (CEP 01310-100, Av. Paulista 1000); a `marciorocha` já tinha endereço. Persistência do endereço provada
 na `test150`: logout, force-stop, login e checkout abriram a LISTA de endereços, e o caminho seguiu até o Pagamento,

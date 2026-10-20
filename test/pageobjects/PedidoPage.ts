@@ -198,79 +198,78 @@ export class PedidoPage extends BasePage {
     }
 
     // ---- Pedido com CARTÃO recusado (spec 03-compra-cartao) ------------------------------------
-    // Android, build 1.21.6/506: captures-2026-10-15-compra-cartao/58 (aguardando) e 59 (cancelado,
-    // ~15–20 s depois, sozinho), draft android/33. Nada além dos marcadores tem id: "Order #N" e os
-    // valores são TextViews IRMÃOS planos dos marcadores (conferido com lxml nos dumps 58 e 59):
-    //   - número: 1º TextView irmão depois de `wake-order-processing-<estado>` ("Order #146214");
-    //   - valores: TextViews irmãos depois de `wake-order-processing-valores` que contêm "R$", na
-    //     ordem Frete, Desconto, Juros, Total (4 nos dois dumps) — o Total é o ÚLTIMO.
-    // Só números são lidos (regra: o teste não valida texto).
-    // iOS, build 1.21.6/349 (captures-2026-10-15-compra-cartao/, cap. 46, draft ios/40; o 352 não chegou
-    // a esta tela): os mesmos ids; os marcadores são nós SEM filhos e o texto vem DEPOIS deles no
-    // documento, cada StaticText em 2 nós com o mesmo y (conferido com lxml na cap. 46):
-    //   - número: 1º StaticText depois de `wake-order-processing-<estado>` ("Order #140130");
-    //   - valores: StaticTexts com "R$" depois de `wake-order-processing-valores`, agrupados por y: 4
-    //     (frete, desconto, juros, total), o Total é o último.
+    // Build 1.22.0/509 (Android, captures-2026-10-19-build509-run25/, caps. 44–51): depois do
+    // Finalizar o app fica na tela `wake-order-processing-recusado` (sem número nem valores) e não
+    // existe mais a tela de Pedido Cancelado. A tela recusado é a raiz da pilha: o "Escolher outra
+    // forma de pagamento" leva ao Pagamento (com `retry-payment-methods`), o voltar dele traz de
+    // volta e o BACK de hardware sai do app. O pedido só aparece em Meus pedidos (cap. 51):
+    // "#201280, Cancelado, Valor total R$ 716,80", o 1º da lista.
+    // Por isso: fecha e reabre o app (o login continua, cap. 50), Menu → `menu-card-orders`, e lê o
+    // 1º pedido. Estrutura de Meus pedidos (dump 51, conferido): por pedido, TextViews IRMÃOS planos
+    // na ordem "Pedido Nº <n>", `order-status-container`, status, imagem, "Valor total: R$ …".
+    // Só números são lidos (regra: o teste não valida texto); o "Cancelado" não é comparado.
+    // iOS (354): nenhuma destas telas foi capturada; `menu-card-orders` e `order-status-container`
+    // são os ids das capturas iOS do 352 (Meus pedidos no Pix, caps. 47–49); não verificado no 354.
+    // Risco conhecido: os pedidos anteriores da conta têm o mesmo valor (mesma calça + frete); o
+    // número é anexado ao Allure para conferência.
 
-    // Espera a tela do pedido chegar ao estado CANCELADO (`wake-order-processing-cancelado`), até 90 s
-    // (captura: ~15–20 s depois do aguardando). Cancelado = recusa do cartão fake = o resultado esperado.
-    async validarPedidoCancelado() {
-        const cancelado = await $(seletorTestId('wake-order-processing-cancelado'))
-            .waitForDisplayed({ timeout: 90000 })
-            .then(() => true)
-            .catch(() => false);
-        if (!cancelado) {
-            const aguardando = await $(seletorTestId('wake-order-processing-aguardando')).isDisplayed().catch(() => false);
-            await anexarPrint('Tela do pedido — sem Pedido Cancelado');
-            throw new Error(
-                `O pedido não chegou a Cancelado em 90s (wake-order-processing-cancelado ausente; ` +
-                `${aguardando ? 'a tela continua em aguardando pagamento' : 'nem aguardando nem cancelado na tela'}).`
-            );
+    // Sai da tela de recusa (fecha e reabre o app) e abre Meus pedidos com a lista carregada.
+    async abrirMeusPedidosDepoisDaRecusa() {
+        const app = IOS ? { bundleId: 'com.aramis.ecomm' } : { appId: 'com.aramis.ecomm' };
+        await driver.execute('mobile: terminateApp', app);
+        await driver.execute('mobile: activateApp', app);
+        const menu = await $(seletorTestId('tab-menu'));
+        if (!(await menu.waitForDisplayed({ timeout: 30000 }).then(() => true).catch(() => false))) {
+            await anexarPrint('App reaberto — sem a tab bar');
+            throw new Error('Depois da recusa: o app reaberto não mostrou a tab bar (tab-menu) em 30s.');
         }
-        console.log('❌ Pedido Cancelado na tela (recusa do cartão fake, esperado)');
-        await anexarPrint('Pedido Cancelado');
+        await this.fechaBanner();
+        await menu.click();
+        const pedidos = await $(seletorTestId('menu-card-orders'));
+        if (!(await pedidos.waitForDisplayed({ timeout: 20000 }).then(() => true).catch(() => false))) {
+            await anexarPrint('Menu — sem Meus pedidos');
+            throw new Error('Depois da recusa: o card Meus pedidos (menu-card-orders) não apareceu no Menu em 20s.');
+        }
+        await pedidos.click();
+        const abriu = await $(seletorTestId('order-status-container')).waitForDisplayed({ timeout: 60000 }).then(() => true).catch(() => false);
+        if (!abriu) {
+            await anexarPrint('Meus pedidos — lista não carregou');
+            throw new Error('Meus pedidos: a lista de pedidos (order-status-container) não abriu em 60s.');
+        }
+        await driver.pause(timewhait);
+        await anexarPrint('Meus pedidos depois da recusa');
+        console.log('🧾 Meus pedidos aberto depois da recusa');
     }
 
-    // Número do pedido na tela de processamento/cancelado ("Order #146214" -> "146214").
+    // Número do 1º pedido de Meus pedidos ("Pedido Nº 201280" -> "201280"): o texto com número
+    // longo imediatamente antes do 1º `order-status-container`.
     async numeroDoPedidoComCartao(): Promise<string> {
         const seletor = IOS
-            ? '(//*[@name="wake-order-processing-cancelado" or @name="wake-order-processing-aguardando"]' +
-              '/following::XCUIElementTypeStaticText)[1]'
-            : '//*[@resource-id="wake-order-processing-cancelado" or @resource-id="wake-order-processing-aguardando"]' +
-              '/following-sibling::android.widget.TextView[1]';
+            ? '((//*[@name="order-status-container"])[1]/preceding::XCUIElementTypeStaticText[contains(@label,"Nº") or contains(@label,"#")])[last()]'
+            : '(//*[@resource-id="order-status-container"])[1]/preceding-sibling::android.widget.TextView[1]';
         const el = await $(seletor);
         await this.waitForElement(el);
         const numero = primeiroNumeroLongo(IOS ? `${await el.getAttribute('label')}` : await el.getText());
         if (!numero) {
-            throw new Error('Tela do pedido: o número do pedido não foi encontrado (1º texto depois do marcador de estado).');
+            throw new Error('Meus pedidos: o número do 1º pedido não foi encontrado (texto antes do 1º order-status-container).');
         }
-        console.log(`🧾 Pedido nº ${numero}`);
+        console.log(`🧾 Pedido nº ${numero} (1º de Meus pedidos)`);
+        allure.addAttachment('Número do pedido', `1º de Meus pedidos: ${numero}`, 'text/plain');
         return numero;
     }
 
-    // Total da tela do pedido: o ÚLTIMO valor em reais depois de `wake-order-processing-valores`.
-    // Exige os 4 valores (frete, desconto, juros, total) para não pegar um valor parcial.
+    // Valor total do 1º pedido de Meus pedidos: o 1º texto com "R$" depois do 1º `order-status-container`.
     async totalDoPedidoComCartao(): Promise<number> {
-        const valores: number[] = [];
-        if (IOS) {
-            const porY = new Map<number, number>();
-            for (const el of await $$('//*[@name="wake-order-processing-valores"]/following::XCUIElementTypeStaticText[contains(@label,"R$")]')) {
-                const v = valorEmReais((await el.getAttribute('label').catch(() => '')) ?? '');
-                if (v !== null) porY.set(Math.round((await el.getLocation()).y), v);
-            }
-            valores.push(...[...porY.entries()].sort((a, b) => a[0] - b[0]).map(([, v]) => v));
-        } else {
-            const seletor = '//*[@resource-id="wake-order-processing-valores"]/following-sibling::android.widget.TextView[contains(@text,"R$")]';
-            for (const el of await $$(seletor)) {
-                const v = valorEmReais(await el.getText().catch(() => ''));
-                if (v !== null) valores.push(v);
-            }
+        const seletor = IOS
+            ? '((//*[@name="order-status-container"])[1]/following::XCUIElementTypeStaticText[contains(@label,"R$")])[1]'
+            : '(//*[@resource-id="order-status-container"])[1]/following-sibling::android.widget.TextView[contains(@text,"R$")][1]';
+        const el = await $(seletor);
+        await this.waitForElement(el);
+        const total = valorEmReais(IOS ? `${await el.getAttribute('label')}` : await el.getText());
+        if (total === null) {
+            throw new Error('Meus pedidos: o valor total do 1º pedido não foi encontrado.');
         }
-        if (valores.length !== 4) {
-            throw new Error(`Tela do pedido: esperados 4 valores (frete, desconto, juros, total), encontrados ${valores.length}: ${valores.join(' | ')}.`);
-        }
-        const total = valores[3];
-        console.log(`💰 Tela do pedido: frete ${valores[0]} | desconto ${valores[1]} | juros ${valores[2]} | total ${total}`);
+        console.log(`💰 1º pedido de Meus pedidos: total ${total}`);
         return total;
     }
 
