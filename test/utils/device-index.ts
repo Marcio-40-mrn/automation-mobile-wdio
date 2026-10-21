@@ -28,3 +28,38 @@ export const deviceIndex: Record<'android', Record<string, number>> = {
         "SM-S948": 5,  // Galaxy S26 Ultra
     },
 };
+
+// Posição do produto na listagem que ESTE device compra (0 = 1º card). Os 11 aparelhos do CI
+// (Android e iOS rodam ao mesmo tempo) compravam a mesma 1ª camisa e o estoque acabava no meio
+// do run: CI Run #30 (2026-10-20, app 1.22.2, Android 512), "Size sold out" em 4 iPhones e a
+// camisa tirada do pedido no checkout no S24+ e no iPhone 15. Cada device passa a ter a sua
+// posição, sem nome de produto fixo (REQUIREMENTS.md).
+//   Android: 0–5, o mesmo índice da conta (`deviceModel`, mapa acima).
+//   iOS: 6–10, pelo DEVICE_LABEL que o workflow injeta no .env do run (nome do device no Device
+//   Farm, o mesmo que aparece em "CI iOS Run #N - <nome>"). O host iOS não tem outro sinal.
+//   Local (AVD / Remote Access) ou device fora dos mapas: 0, como era antes.
+const posicaoIOS: Record<string, number> = {
+    "Apple iPhone 13": 6,
+    "Apple iPhone 14": 7,
+    "Apple iPhone 14 Pro Max": 8,
+    "Apple iPhone 15": 9,
+    "Apple iPhone 15 Pro Max": 10,
+};
+
+export function posicaoDoProduto(): { posicao: number; comoAchei: string } {
+    if (!process.env.DEVICEFARM_DEVICE_UDID) return { posicao: 0, comoAchei: 'execução local' };
+
+    if (process.env.PLATFORM === 'ios') {
+        const label = process.env.DEVICE_LABEL ?? '';
+        const posicao = posicaoIOS[label];
+        return posicao === undefined
+            ? { posicao: 0, comoAchei: `DEVICE_LABEL "${label}" fora do mapa (posição 0)` }
+            : { posicao, comoAchei: `DEVICE_LABEL "${label}"` };
+    }
+
+    const model = String((browser?.capabilities as any)?.deviceModel ?? '');
+    const posicao = Object.entries(deviceIndex.android).find(([prefix]) => model.startsWith(prefix))?.[1];
+    return posicao === undefined
+        ? { posicao: 0, comoAchei: `Device model "${model}" fora do mapa (posição 0)` }
+        : { posicao, comoAchei: `Device model "${model}"` };
+}

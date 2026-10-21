@@ -1,5 +1,33 @@
 # STATE
 
+**2026-10-21 — CI Run #30 (20/10 21:00, app 1.22.2) diagnosticado pelo AWS CLI: `01` 11/11; `02` 0/11; `03` 10/11; `04` 11/11.**
+`02`: estoque da 1ª camisa (`164803`), que os 11 aparelhos compram ao mesmo tempo: "Size sold out" em 4 iPhones (13, 14,
+14 Pro Max, 15 Pro Max; o `comprarIOS` não conhece o modal e falha com "sheet fechou"); camisa tirada do pedido no checkout
+sem aviso no S24+ e no iPhone 15 (Resumo "Pacote 1 (1 item)", só o óculos); `getClipboard` vazio no S23+, S25 Ultra e S26
+Ultra (o app mostrou "Copiado"; pedido #215078 no S25 Ultra); S24 Ultra: modal "Erro ao realizar compra" no finalizar, no
+Pix e no cartão (o teste não reconhece, esperou 60 s); S23 Ultra: crash no login. **Decisão do Marcio (A + B; C só se
+voltar):**
+- **B APLICADO, só `tsc`, NÃO RODADO:** cada device compra a camisa da sua posição na listagem —
+  `device-index.ts` `posicaoDoProduto()` (Android 0–5 pelo `deviceModel`; iOS 6–10 pelo `DEVICE_LABEL`; local 0),
+  `ProdutoPage.abrirProdutoNaPosicao(n)` (rola com `arrastar` W3C até o card inteiro na tela; erro explícito se a rolagem
+  não trouxer card novo), `02-compra-pix` passo da camisa. Óculos, `01` e calça do `03` sem mudança. No run: log
+  `👕 Camisa da posição N` e `🛍 PDP aberta (product-card-X, posição N)`, um id diferente por device.
+- **A APLICADO, só `tsc`, NÃO RODADO:** `ProdutoPage.comprarIOS` reconhece o modal de estoque (`alert-modal`), toca
+  `alert-modal-confirm`, valida que fechou, reabre o sheet pelo `pdp-buy-button` e tenta o próximo tamanho; erro final
+  lista os recusados. Android sem mudança. Evidência: captura iOS (Remote Access, **build 1.21.7/352**, não o 1.22.2 do
+  CI) `drafts/app-migrado/ios/captures-2026-10-21-modal-estoque/` 17–18: "Insufficient stock" da 2ª unidade; os dois ids
+  achados com o modal e ausentes com a tela limpa; o sheet de tamanho já fechou quando o modal aparece; OK fecha só o
+  modal; `alert-modal-message` NÃO existe no iOS; conteúdo do sheet continua fora da árvore. O id do "Size sold out" não
+  está verificado em NENHUMA plataforma. No run: `⚠ O app recusou o Nº tamanho (modal de estoque)` + print no Allure.
+- **C pendente (só se o erro voltar depois de A+B):** produto sem tamanho com estoque → `comprar()` tenta o próximo card.
+- Não tratados ainda: `getClipboard` vazio no Android do Device Farm e o modal "Erro ao realizar compra".
+
+**PAROU AQUI (2026-10-20, noite) — AMANHÃ (2026-10-21) COMEÇAR POR AQUI:** o Marcio commitou as mudanças do dia e
+disparou o CI. Validar esse run pelo AWS CLI (`Test spec output` dos 11 aparelhos + print "Falha — <passo>" do Allure no
+`Customer Artifacts`): `02-compra-pix` (prévia e Pix escolhido lidos, 15%), `03-compra-cartao` (modal antifraude OU
+recusa = verde; "Oops"/`error-id` = falha certa, bug do app), `04-criar-conta` no S23+ e S26 Ultra (foco pelo campo
+visível acima). Copiar para o `MASSA-DE-DADOS.md` os pedidos e contas criados pelo run.
+
 **2026-10-20 (noite) — CI Run #29 (18:40, commit `037560c`, app 1.22.2): `01` 11/11; `02` 0/11; `03` 0/11; `04` 9/11.**
 `02`: o run usou o código antigo (10% fixo); a leitura do percentual na tela ainda não estava commitada. `03` Android
 (print do S24+): depois de finalizar, a tela de erro do app "Oops" com `WakeOrderProcessing: Exception in HostFunction:

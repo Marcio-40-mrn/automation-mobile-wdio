@@ -8,6 +8,7 @@ import { ProdutoPage } from "../pageobjects/ProdutoPage";
 import { CheckoutPage, type ValoresResumo, type LinhaPix } from "../pageobjects/CheckoutPage";
 import { PedidoPage } from "../pageobjects/PedidoPage";
 import { getCredentials } from "../utils/credentials";
+import { posicaoDoProduto } from "../utils/device-index";
 import {
     anexarCrashDoAppSeFechou,
     configurarFechadorDeBanner,
@@ -103,10 +104,14 @@ describe('Compra', () => {
             await step('produtoPage.continuarComprando()', () => produtoPage.continuarComprando());
             await step('produtoPage.voltarAteCategorias()', () => produtoPage.voltarAteCategorias());
 
-            // Passos 17 a 21 — Roupas > Camisas, compra a 1ª camisa com tamanho, volta.
+            // Passos 17 a 21 — Roupas > Camisas, compra uma camisa com tamanho, volta. Cada device
+            // compra a camisa da SUA posição na listagem (device-index.ts): com os 11 aparelhos na
+            // 1ª camisa o estoque acabava no meio do run (CI Run #30, app 1.22.2).
+            const { posicao: posicaoCamisa, comoAchei } = posicaoDoProduto();
+            console.log(`👕 Camisa da posição ${posicaoCamisa} da listagem (${comoAchei})`);
             await step('categoriasPage.clickRoupas()', () => categoriasPage.clickRoupas());
             await step('categoriasPage.abrirCamisas()', () => categoriasPage.abrirCamisas());
-            await step('produtoPage.abrirPrimeiroProduto() - camisa', () => produtoPage.abrirPrimeiroProduto());
+            await step(`produtoPage.abrirProdutoNaPosicao(${posicaoCamisa}) - camisa`, () => produtoPage.abrirProdutoNaPosicao(posicaoCamisa));
             await step('produtoPage.lerPrecoDoProduto() - camisa', async () => { precoCamisa = await produtoPage.lerPrecoDoProduto(); });
             await step('produtoPage.comprar() - camisa', () => produtoPage.comprar());
             await step('produtoPage.continuarComprando() - camisa', () => produtoPage.continuarComprando());

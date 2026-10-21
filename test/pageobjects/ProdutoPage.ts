@@ -65,6 +65,70 @@ export class ProdutoPage extends BasePage {
         await driver.pause(timewhait);
     }
 
+    // Abre o card da POSIÇÃO `posicao` da listagem (0 = 1º), na ordem da tela (linha, depois
+    // coluna), rolando a lista até ele aparecer inteiro. Cada device do CI compra um produto
+    // diferente (`posicaoDoProduto()` em device-index.ts; CI Run #30, app 1.22.2: os 11 aparelhos
+    // na mesma camisa esgotavam o estoque). A rolagem é arrasto W3C (`arrastar`), que responde nas
+    // duas plataformas, inclusive no host iOS do Device Farm; cada rolagem tem que trazer card
+    // novo, senão erro explícito. Rolagem da listagem de Camisas NÃO medida no iOS do CI.
+    async abrirProdutoNaPosicao(posicao: number) {
+        if (posicao === 0) return this.abrirPrimeiroProduto();
+        await this.fechaBanner();
+        await this.waitForElement(await $(SELETOR_CARD_PRODUTO));
+        const atributo = IOS ? 'name' : 'resource-id';
+        const { width, height } = await driver.getWindowRect();
+        const vistos: string[] = [];
+
+        for (let rolagem = 0; rolagem <= 12; rolagem++) {
+            const visiveis: { id: string; x: number; y: number; h: number; el: WebdriverIO.Element }[] = [];
+            for (const el of await $$(SELETOR_CARD_PRODUTO)) {
+                if (!(await el.isDisplayed().catch(() => false))) continue;
+                const id = await el.getAttribute(atributo).catch(() => null);
+                if (!id || visiveis.some((v) => v.id === id)) continue;
+                const r = await driver.getElementRect(el.elementId);
+                visiveis.push({ id, x: r.x, y: r.y, h: r.height, el });
+            }
+            visiveis.sort((a, b) => (Math.abs(a.y - b.y) > 10 ? a.y - b.y : a.x - b.x));
+            const novos = visiveis.filter((v) => !vistos.includes(v.id));
+            if (rolagem > 0 && novos.length === 0 && vistos.length <= posicao) {
+                await anexarPrint('Listagem — rolagem sem card novo');
+                throw new Error(
+                    `Produto da posição ${posicao}: a listagem não trouxe card novo depois da rolagem ` +
+                    `${rolagem} (${vistos.length} cards vistos: ${vistos.join(', ')}).`
+                );
+            }
+            for (const v of novos) vistos.push(v.id);
+
+            if (vistos.length > posicao) {
+                const alvo = visiveis.find((v) => v.id === vistos[posicao]);
+                // Card cortado (embaixo, ou em cima por baixo do cabeçalho): rola um pouco e relê,
+                // para o toque no centro cair nele.
+                if (alvo && alvo.y >= height * 0.12 && alvo.y + alvo.h <= height * 0.92) {
+                    await alvo.el.click();
+                    const abriu = await $(seletorTestId('pdp-buy-button')).waitForDisplayed({ timeout: 30000 }).then(() => true).catch(() => false);
+                    if (!abriu) {
+                        throw new Error(`PDP não abriu: depois de tocar em ${alvo.id} (posição ${posicao}), o pdp-buy-button não apareceu em 30s.`);
+                    }
+                    console.log(`🛍 PDP aberta (${alvo.id}, posição ${posicao} da listagem)`);
+                    await driver.pause(timewhait);
+                    return;
+                }
+                if (!alvo) {
+                    await anexarPrint('Listagem — card da posição saiu da tela');
+                    throw new Error(`Produto da posição ${posicao}: o card ${vistos[posicao]} saiu da tela antes do toque.`);
+                }
+                // Cortado em cima: rola para baixo; cortado embaixo: rola para cima.
+                if (alvo.y < height * 0.12) await this.arrastar(width / 2, height * 0.45, width / 2, height * 0.7);
+                else await this.arrastar(width / 2, height * 0.7, width / 2, height * 0.45);
+            } else {
+                await this.arrastar(width / 2, height * 0.8, width / 2, height * 0.3);
+            }
+            await driver.pause(1500);
+        }
+        await anexarPrint('Listagem — card da posição não alcançado');
+        throw new Error(`Produto da posição ${posicao}: não alcançado em 12 rolagens (${vistos.length} cards vistos).`);
+    }
+
     // Comprar: abre o sheet de tamanho, escolhe o 1º tamanho disponível e adiciona à Mochila.
     // - O `size-button` (adicionar) fica enabled=false até escolher um tamanho, inclusive o UN do
     //   óculos (rodada 2, capturas 05b e 07e).
@@ -303,6 +367,13 @@ export class ProdutoPage extends BasePage {
     // fica cinza (print 23) e o toque não deveria fazer nada (não verificado: os tamanhos
     // indisponíveis não foram tocados nas capturas). Se o sheet de tamanho fechar sem abrir o de
     // "produto adicionado", o teste para com print, em vez de seguir tocando às cegas.
+    // Modal de ESTOQUE (CI Run #30, app 1.22.2: "Size sold out" em 4 iPhones, com os 11 devices na
+    // mesma camisa): igual ao Android, toca OK, reabre o sheet e tenta o PRÓXIMO tamanho. Captura
+    // iOS do build 1.21.7/352 (captures-2026-10-21-modal-estoque/, 17 e 18, "Insufficient stock" da
+    // 2ª unidade): `alert-modal` e `alert-modal-confirm` existem (found+displayed com o modal, não
+    // achados com a tela limpa); o sheet de tamanho JÁ FECHOU quando o modal aparece e o OK por
+    // element click fecha só o modal, de volta à PDP. O "Size sold out" não foi capturado: presume-se
+    // o mesmo `alert-modal` — NÃO VERIFICADO (como no Android).
     private async comprarIOS() {
         await this.fechaBanner();
         this.contadorAntesIOS = await this.contadorSacolaIOS();
@@ -319,16 +390,52 @@ export class ProdutoPage extends BasePage {
         }
         await driver.pause(1500); // o sheet ainda está subindo
 
+        const modalEstoque = seletorTestId('alert-modal');
+        const recusados: string[] = [];
         for (let i = 0; i < FRACOES_TAMANHO_IOS.length; i++) {
             const tamanho = `${i + 1}º tamanho da esquerda`;
             await this.tapProporcional(FRACOES_TAMANHO_IOS[i], FRACAO_Y_TAMANHO_IOS, tamanho);
             await driver.pause(800);
             await this.tapProporcional(...FRACAO_ADICIONAR_IOS, '"Add to cart"');
 
-            const adicionou = await driver
-                .waitUntil(async () => (await this.sheetAbertoIOS()) === 'adicionado', { timeout: 8000, interval: 500 })
-                .then(() => true)
-                .catch(() => false);
+            let resultado: 'adicionado' | 'modal' | null = null;
+            await driver
+                .waitUntil(async () => {
+                    if (await $(modalEstoque).isDisplayed().catch(() => false)) resultado = 'modal';
+                    else if ((await this.sheetAbertoIOS()) === 'adicionado') resultado = 'adicionado';
+                    return resultado !== null;
+                }, { timeout: 8000, interval: 500 })
+                .catch(() => undefined);
+            const adicionou = resultado === 'adicionado';
+
+            if (resultado === 'modal') {
+                await anexarPrint(`Comprar (iOS) — modal de estoque no ${tamanho}`);
+                console.log(`⚠ O app recusou o ${tamanho} (modal de estoque) — tocando OK e tentando o próximo tamanho`);
+                await (await $(seletorTestId('alert-modal-confirm'))).click();
+                const fechou = await driver
+                    .waitUntil(async () => !(await $(modalEstoque).isDisplayed().catch(() => false)), { timeout: 10000, interval: 500 })
+                    .then(() => true)
+                    .catch(() => false);
+                if (!fechou) {
+                    throw new Error(`Comprar (iOS): o modal de estoque (alert-modal) não fechou depois do OK (alert-modal-confirm), ${tamanho}.`);
+                }
+                recusados.push(tamanho);
+                if (i === FRACOES_TAMANHO_IOS.length - 1) break;
+                // O OK volta à PDP sem sheet (captura 18): reabre o sheet para o próximo tamanho.
+                if ((await this.sheetAbertoIOS()) !== 'tamanho') {
+                    await (await $(seletorTestId('pdp-buy-button'))).click();
+                    const reabriu = await driver
+                        .waitUntil(async () => (await this.sheetAbertoIOS()) === 'tamanho', { timeout: 15000, interval: 500 })
+                        .then(() => true)
+                        .catch(() => false);
+                    if (!reabriu) {
+                        await anexarPrint('Comprar (iOS) — sheet não reabriu depois do modal de estoque');
+                        throw new Error('Comprar (iOS): depois do OK no modal de estoque, o sheet de tamanho não reabriu em 15s.');
+                    }
+                    await driver.pause(1500);
+                }
+                continue;
+            }
             if (adicionou) {
                 const depois = await this.contadorSacolaIOS();
                 if (depois !== this.contadorAntesIOS + 1) {
@@ -355,7 +462,8 @@ export class ProdutoPage extends BasePage {
         await anexarPrint('Sheet de tamanho');
         throw new Error(
             `Comprar (iOS): nenhum dos ${FRACOES_TAMANHO_IOS.length} tamanhos tocados adicionou o produto ` +
-            '(o sheet de produto adicionado não abriu). Print do sheet anexado.'
+            '(o sheet de produto adicionado não abriu). Print do sheet anexado.' +
+            (recusados.length ? ` Recusados pelo app (modal de estoque): ${recusados.join(', ')}.` : '')
         );
     }
 
