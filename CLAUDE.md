@@ -243,6 +243,6 @@ o `ELEMENTOS-SEM-TESTID-IOS.md` e os drafts são **reescritos no lugar**: o que 
 lista, o build anterior é descartado, sem seção ou coluna por build. Regra completa no `REQUIREMENTS.md`;
 ao briefar o `mobile-draft-writer`, mandar **reescrever**, nunca "acrescentar uma seção do build X".
 
-O **app migrado** (marco M5 do `ROADMAP.md`) é um levantamento novo, nas duas plataformas,
+O **app migrado** (levantamento contínuo, a cada build — seção do topo do `ROADMAP.md`) é um levantamento novo, nas duas plataformas,
 com drafts em `.planning/drafts/app-migrado/<plataforma>/` — nunca misturar com os do app
 atual. O Marcio avisa quando o build estiver instalado e a sessão aberta; só então capturar.

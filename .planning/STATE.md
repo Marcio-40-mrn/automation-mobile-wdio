@@ -1,5 +1,28 @@
 # STATE
 
+**2026-10-21 (tarde) — CI Run #31 (11:10, A+B no ar): `01` 11/11; `02` 0/11; `03` 7/11; `04` 11/11.** O B funcionou (cada
+device numa camisa diferente, nenhum "Size sold out"), mas 7 devices pararam no `voltarAteCategorias()`: com a lista
+rolada o cabeçalho (`header-back-button`) sai da árvore e a volta da PDP mantém a rolagem — provado no AVD 1.22.2/512
+(`captures-2026-10-21-listagem-rolada/`, draft Android 11). Efeito do B, não bug do app. Clipboard vazio de novo em
+3 Androids. `03`: crash no login (S23 Ultra, S24 Ultra), Mochila com 0 itens (S25 Ultra), finalizar sem destino em 60 s
+(iPhone 15 Pro Max) — não investigados. S25 Ultra `02`: carrossel não rolou. **Correções, só `tsc`, NÃO RODADAS:**
+`ProdutoPage.voltarAteCategorias` → `mostrarCabecalhoDaListagem()` (arrasto curto para baixo até 5x até o
+`header-back-button` voltar; print se falhar), nas duas plataformas; `PedidoPage.copiarCodigo` com UMA regra para as
+duas (vazio = aviso; com conteúdo = igual; código começa com 000201) — a decisão de 18/10 tinha ficado só no iOS.
+Nova regra no `REQUIREMENTS.md`: mesmo fluxo e mesma validação nas duas plataformas; diferença só com decisão do Marcio
+na tabela de diferenças.
+**Investigação do `03` no Run #31 (aprovada pelo Marcio), só `tsc`, NÃO RODADO:** (1) crash no login S23 Ultra
+(SIGSEGV nativo em `libreanimated.so`, variante nova) e S24 Ultra (`RetryableMountingLayerException` tag 718) = bug
+do app, registrado no `BUG-CRASH-ANDROID.md`; (2) S25 Ultra "Mochila com 0 itens" = erro do TESTE: o
+`abrirMochila` rolava até o botão antes de contar e o card saía da árvore (print: 1 item) → agora conta os cards
+primeiro (espera até 30 s), nas duas plataformas; (3) iPhone 15 Pro Max = modal do app "Erro ao realizar compra"
+(o mesmo do S24 Ultra no Run #30), que o teste não reconhece; id nunca capturado → o finalizar (Pix e cartão) anexa a
+árvore da tela (`getPageSource`) ao Allure quando estoura os 60 s, para levantar o id no próximo run em que aparecer.
+(4) S25 Ultra `02`, carrossel que "não rolou" = banner do Insider (polos 3POR2) abriu POR CIMA do sheet no meio do
+passo, depois da tentativa do `step()`, e o gesto caiu nele (print da falha) → `validarCarrosselDeIndicacao` fecha o
+banner imediatamente antes de cada gesto e repete o gesto 1 vez se não vier card novo (só Android: no iOS o
+carrossel não é validado, decisão do Marcio de 2026-10-15). Todas as falhas do Run #31 têm causa conhecida.
+
 **2026-10-21 — CI Run #30 (20/10 21:00, app 1.22.2) diagnosticado pelo AWS CLI: `01` 11/11; `02` 0/11; `03` 10/11; `04` 11/11.**
 `02`: estoque da 1ª camisa (`164803`), que os 11 aparelhos compram ao mesmo tempo: "Size sold out" em 4 iPhones (13, 14,
 14 Pro Max, 15 Pro Max; o `comprarIOS` não conhece o modal e falha com "sheet fechou"); camisa tirada do pedido no checkout
@@ -31,7 +54,8 @@ visível acima). Copiar para o `MASSA-DE-DADOS.md` os pedidos e contas criados p
 **2026-10-20 (noite) — CI Run #29 (18:40, commit `037560c`, app 1.22.2): `01` 11/11; `02` 0/11; `03` 0/11; `04` 9/11.**
 `02`: o run usou o código antigo (10% fixo); a leitura do percentual na tela ainda não estava commitada. `03` Android
 (print do S24+): depois de finalizar, a tela de erro do app "Oops" com `WakeOrderProcessing: Exception in HostFunction:
-__next_prime overflow` (ID `41cbead3c84c48028710de2902602781`); reprodução pedida no Android 16 (Remote Access).
+__next_prime overflow` (ID `41cbead3c84c48028710de2902602781`); NÃO reproduziu no Android 16 (Galaxy S26, Remote Access,
+20/10: antifraude + Pedido Cancelado #214832).
 `03` iOS (print do iPhone 15): veio o modal antifraude ("Entendi"), não a tela de recusa. `04` S23+ e S26 Ultra
 (prints): o erro do telefone estava na tela; falhou o toque em `create-account-email` para tirar o foco, porque o
 formulário rolou e o e-mail saiu da árvore. **Mudanças (Marcio), só `tsc`:** `CheckoutPage.esperarDestinoDoFinalizar`
@@ -39,10 +63,12 @@ formulário rolou e o e-mail saiu da árvore. **Mudanças (Marcio), só `tsc`:**
 a tela de erro do app (`error-id`/`error-name`); o cartão aceita `wake-order-processing-recusado|aguardando|cancelado|erro`.
 `CadastroPage.validarErroNoCampo` Android tira o foco pelo campo visível mais próximo acima.
 
-**2026-10-20 (noite) — AVD no build 1.22.2/512 (targetSdk 36, PR do Android 16).** Captura
-`drafts/app-migrado/android/captures-2026-10-20-android16/` + `RELATORIO-PR-ANDROID16.md` (texto para a PR). **O AVD é
-Android 14 (API 34): a validação de edge-to-edge da PR NÃO vale**; falta um AVD API 36 (decisão do Marcio em aberto). Voltar
-do Android OK em 14 fluxos. `ELEMENTOS-SEM-TESTID.md` e drafts 12/13/15/17 reescritos para o 512; os demais drafts seguem no
+**2026-10-20 (noite) — PR do Android 16 (build 1.22.2/512, targetSdk 36) VALIDADA em Android 16 / API 36:** Samsung Galaxy
+S26 (SM-S942U1), navegação por gestos, Remote Access do Device Farm aberto pelo Marcio. Evidência
+`drafts/app-migrado/android/captures-2026-10-20-android16-remoto/` (68 prints + árvores, `NOTAS.md`); texto para a PR em
+`captures-2026-10-20-android16/RELATORIO-PR-ANDROID16.md`. A captura do AVD (API 34, `captures-2026-10-20-android16/`) NÃO
+é evidência da PR. No S26, finalizar com cartão deu modal antifraude + Pedido Cancelado (#214832); o `__next_prime overflow`
+do Run #29 não reproduziu (`BUGS-APP-ANDROID.md` item 38). Voltar do Android OK em 14 fluxos. `ELEMENTOS-SEM-TESTID.md` e drafts 12/13/15/17 reescritos para o 512; os demais drafts seguem no
 511 (ids comparados, iguais). **`ProdutoPage.comprar()` Android vale no 512, sem mudança de código:** a captura
 `captures-2026-10-20-build512-comprar/` (óculos e camisa, 2/2) provou `pdp-buy-button` → sheet "Select size"
 (`size-option-*`, `size-button` enabled=false) → tamanho → `size-button` enabled → `bag-continue-shopping` em ≤9 s.
@@ -379,7 +405,8 @@ o `install-apk.mjs` cai em `development` em silêncio quando o secret vem vazio.
      errado, validade vencida, CVV incompleto, CPF inválido, campos vazios), que faltaram no iOS.
    - **Casos inválidos do formulário no iOS:** precisam de nova sessão de Remote Access (o Marcio abre e
      atualiza o `.env`).
-   - **Cartão aprovado:** depende de cartão de teste do gateway, que tem que vir do time do app.
+   - **Cartão aprovado: NUNCA será implementado** (Marcio, 2026-10-21): segurança e inviabilidade de cartão válido
+     neste ambiente. O cartão fica coberto só pela recusa/antifraude (`03-compra-cartao`).
    - **Ramo iOS do `02-compra-pix`: ESCRITO em 2026-10-15 (noite), NÃO RODADO.** Rodar:
      `npx cross-env PLATFORM=ios wdio run ./wdio.conf.ts --spec test/specs/02-compra-pix.spec.ts` (Remote Access). Seletores do build 349 conferidos
      com lxml nas árvores das capturas, não numa sessão. Mudou também o onboarding iOS (`welcome-start-button`,
@@ -433,12 +460,9 @@ migrado, em andamento**: o app Aramis está sendo migrado por módulos, com `tes
 com a 2ª leva capturada e drafts escritos, iOS com a 1ª leva incompleta (ver "Pendências
 abertas").
 
-**Próximo marco: M6 — Cenários Gherkin da seção 3 no app migrado** (decidido em 2026-09-29):
-os 101 cenários da seção 3 de `cenarios-gherkin-2026-09-28.pdf` (raiz do repo), escritos
-como teste WDIO + Mocha com os testIDs do M5, em 8 etapas (0 a 7). Com isso os marcos
-seguintes foram renumerados: a suíte atual no app migrado passou de M6 para **M7**, e o
-fluxo de compra (cobertura além do favoritar, adiado) de M7 para **M8**. Etapas e o que
-ainda não está definido: `ROADMAP.md`.
+**M6, M7 e M8 concluídos em 2026-10-21 (Marcio)**: a suíte é a de 4 testes (`01`–`04`) no app migrado,
+nas duas plataformas, com compra Pix e cartão. O levantamento deixou de ser o M5: é contínuo, a cada build
+(topo do `ROADMAP.md`, com a última versão levantada). Próximo marco: M9 (novos cenários, só planejamento).
 
 Lembrete do que o M3 é, porque é fácil de distorcer: **uma suíte só**. O
 `test/specs/test.spec.ts` não muda, nenhum page object novo é criado, e o `if` de

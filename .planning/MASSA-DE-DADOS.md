@@ -87,8 +87,8 @@ Pontos a decidir quando for planejado:
   `test/utils/massa.ts`, que hoje é um módulo puro sem imports. Foi assim que os valores acima foram gerados.
 - **Aleatório × reproduzível.** Gerar a cada execução e registrar o valor usado no Allure, para que uma falha
   possa ser repetida com o mesmo dado.
-- **Cartão aprovado.** Um número só válido pelo Luhn leva à recusa do pagamento. Para testar a aprovação é
-  preciso um cartão de teste do gateway, que não se gera: tem que vir do time do app.
+- **Cartão aprovado: NUNCA será testado** (Marcio, 2026-10-21), por segurança e por ser inviável usar cartão
+  válido neste ambiente. Só cartão fake, que leva à recusa/antifraude.
 
 ## Pedidos reais criados pela automação e pelas capturas
 

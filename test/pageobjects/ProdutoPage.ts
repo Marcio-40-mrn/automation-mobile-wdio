@@ -301,22 +301,36 @@ export class ProdutoPage extends BasePage {
         }
         console.log(`🎠 Carrossel antes do scroll: ${antes.join(', ')}`);
 
-        const primeiro = await $(SELETOR_CARD_PRODUTO);
-        const { y } = await primeiro.getLocation();
-        const { height } = await primeiro.getSize();
-        const { width } = await driver.getWindowRect();
-        await driver.execute('mobile: swipeGesture', {
-            left: Math.round(width * 0.1),
-            top: Math.round(y + height * 0.25),
-            width: Math.round(width * 0.8),
-            height: Math.round(height * 0.5),
-            direction: 'left',
-            percent: 0.75,
-        });
-        await driver.pause(1500);
+        // O banner do Insider pode abrir POR CIMA do sheet no meio do passo, depois da tentativa do
+        // step() (CI Run #31, S25 Ultra, app 1.22.2: banner "polos 3POR2" cobriu o carrossel e o gesto
+        // caiu nele; antes e depois, os mesmos 3 cards). Por isso o banner é fechado imediatamente antes
+        // de cada gesto, e o gesto é refeito 1 vez se não trouxer card novo.
+        const rolar = async () => {
+            await this.fechaBanner();
+            const primeiro = await $(SELETOR_CARD_PRODUTO);
+            const { y } = await primeiro.getLocation();
+            const { height } = await primeiro.getSize();
+            const { width } = await driver.getWindowRect();
+            await driver.execute('mobile: swipeGesture', {
+                left: Math.round(width * 0.1),
+                top: Math.round(y + height * 0.25),
+                width: Math.round(width * 0.8),
+                height: Math.round(height * 0.5),
+                direction: 'left',
+                percent: 0.75,
+            });
+            await driver.pause(1500);
+        };
 
-        const depois = await this.idsDosCardsVisiveis();
-        const novos = depois.filter((id) => !antes.includes(id));
+        await rolar();
+        let depois = await this.idsDosCardsVisiveis();
+        let novos = depois.filter((id) => !antes.includes(id));
+        if (novos.length === 0) {
+            console.log('⚠ Scroll lateral sem card novo — fechando o banner (se houver) e repetindo o gesto 1 vez');
+            await rolar();
+            depois = await this.idsDosCardsVisiveis();
+            novos = depois.filter((id) => !antes.includes(id));
+        }
         console.log(`🎠 Carrossel depois do scroll: ${depois.join(', ')}`);
         if (novos.length === 0) {
             throw new Error(
@@ -524,8 +538,10 @@ export class ProdutoPage extends BasePage {
             await this.fechaBanner();
             const naPdp = await $(SETA_VOLTAR_PDP).isDisplayed().catch(() => false);
             const seletor = naPdp ? SETA_VOLTAR_PDP : seletorTestId('header-back-button');
+            if (!naPdp) await this.mostrarCabecalhoDaListagem();
             const botao = await $(seletor);
             if (!(await botao.isDisplayed().catch(() => false))) {
+                await anexarPrint('Voltar até Categorias — sem seta de voltar');
                 throw new Error('Voltar até Categorias: a tela atual não tem seta de voltar (nem a da PDP nem o header-back-button).');
             }
             await botao.click();
@@ -534,6 +550,26 @@ export class ProdutoPage extends BasePage {
         }
 
         throw new Error('Voltar até Categorias: 6 toques em voltar e a tela de Categorias (category-button + tab-categories) não apareceu.');
+    }
+
+    // Listagem ROLADA: o cabeçalho com o `header-back-button` rola junto com a lista e sai da árvore, e
+    // a volta da PDP mantém a lista rolada (AVD, app 1.22.2/512, captures-2026-10-21-listagem-rolada/
+    // 10–16; CI Run #31: 7 devices pararam aqui depois do `abrirProdutoNaPosicao`). Dois arrastos curtos
+    // para baixo (45% → 70% da altura) trouxeram o botão de volta sem chegar ao topo (captura 16). Mesmo
+    // mecanismo nas duas plataformas (arrasto W3C); no iOS, inferido (mesmo app RN e mesmo erro no CI).
+    private async mostrarCabecalhoDaListagem() {
+        const voltar = seletorTestId('header-back-button');
+        if (await $(voltar).isDisplayed().catch(() => false)) return;
+        if (!(await $(SELETOR_CARD_PRODUTO).isDisplayed().catch(() => false))) return;
+        const { width, height } = await driver.getWindowRect();
+        for (let i = 1; i <= 5; i++) {
+            await this.arrastar(width / 2, height * 0.45, width / 2, height * 0.7);
+            await driver.pause(1000);
+            if (await $(voltar).isDisplayed().catch(() => false)) {
+                console.log(`↕ Cabeçalho da listagem de volta depois de ${i} arrasto(s) para baixo`);
+                return;
+            }
+        }
     }
 
     private async estaEmCategorias(): Promise<boolean> {

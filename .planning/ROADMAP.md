@@ -1,5 +1,29 @@
 # ROADMAP
 
+## Levantamento contínuo do app 🔄 (sem fim — fora da sequência de marcos)
+
+O app está em desenvolvimento: cada versão nova traz features e mudanças que precisam ser verificadas e validadas.
+Por isso o levantamento de elementos não é um marco com fim (deixou de ser o M5 em 2026-10-21, decisão do Marcio).
+A cada build novo: captura nas duas plataformas (`mobile-ui-inspector` + `mobile-draft-writer`), docs reescritos para
+esse build (regra "um build só" do `REQUIREMENTS.md`) e esta tabela atualizada — só a ÚLTIMA versão de cada plataforma.
+
+Como funciona a cada versão nova (Marcio, 2026-10-21):
+1. O time do app avisa o Marcio das modificações da versão; ele testa essas mudanças na mão.
+2. O Marcio passa para o Claude o que mudou. Só ele avisa quando algo foge do padrão.
+3. **Premissa:** a versão nova deriva da anterior e segue os mesmos padrões (ids, fluxos, telas). O Claude não refaz
+   o levantamento do zero nem trata como suspeito o que não foi avisado.
+4. O Claude levanta as telas/fluxos das modificações informadas, ajusta a automação que elas afetam e confere o
+   caminho dos 4 testes no build novo, para pegar o que pode ter passado no teste manual (regressão de id, fluxo ou
+   comportamento); o que divergir vai para o Marcio, com a evidência.
+
+| Plataforma | Versão | Build | Profile (EAS) | Data | Evidência |
+|---|---|---|---|---|---|
+| Android | 1.22.2 | 512 | production | 2026-10-20 | `drafts/app-migrado/android/captures-2026-10-20-android16-remoto/` (Galaxy S26, Android 16) e `captures-2026-10-20-build512-comprar/` (AVD) |
+| iOS | 1.21.7 | 352 | production | 2026-10-21 | `drafts/app-migrado/ios/captures-2026-10-21-modal-estoque/` (Remote Access) |
+
+Profile conferido no EAS (API GraphQL `api.expo.dev`, `EXPO_TOKEN`/`EXPO_PROJECT_ID` do `.env`, campo `buildProfile`).
+Defasagem conhecida: o último iOS no EAS é o **1.22.2 / 356 / production** (2026-10-20), que ainda não tem levantamento.
+
 ## M1 — Suíte Android estável ✅
 
 Concluído em 2026-09-03.
@@ -140,52 +164,11 @@ que segue com o mapa por modelo do `deviceIndex.android`. Ver `STATE.md`.
 Validado: `CI iOS Run #7` (5 runs, 5 contas distintas, os 5 aparelhos executaram) e
 `CI Run #14` (fluxo inteiro verde nas duas plataformas).
 
-## M5 — Levantamento do app migrado (Android e iOS) 🔄 em andamento
+## M6 — Cenários Gherkin da seção 3 no app migrado ✅
 
-Decidido em 2026-09-11. O app Aramis está sendo **migrado por módulos** para uma versão
-nova, com `testID` nos elementos. O Marcio entrega o build; a partir dele, este marco
-captura os elementos das telas **nas duas plataformas**, pelo mesmo procedimento do M2/M3
-(`mobile-ui-inspector` captura, `mobile-draft-writer` redige), para que depois os cenários
-Gherkin (M6), a suíte atual (M7) e os testes futuros rodem nesse app. Estado em 2026-09-29:
-Android com 2ª leva capturada e drafts escritos; iOS com a 1ª leva incompleta e sem draft.
-
-O que está definido:
-
-- **Escopo da captura:** o fluxo da suíte atual (onboarding → login → categorias → camisas
-  → favoritar → favoritos → desfavoritar → logout) **e o fluxo de compra completo**, até
-  onde o app deixar. Só levantamento de elementos — **nenhum cenário de teste é criado
-  neste marco.**
-- **Nem tudo está ativo.** A migração é por módulos; explorar só as partes que já
-  funcionam (o Marcio indica quais). O que não funcionar entra no draft como lacuna do
-  módulo, não como anomalia do app.
-- **Procedimento:** o Marcio instala o app, abre a sessão e avisa; o Claude passa para o
-  `mobile-ui-inspector`, que refaz os mesmos passos do levantamento de 2026-09-04. O
-  Marcio acompanha na tela e recupera a conexão quando cair. Valem as regras de Remote
-  Access do `STATE.md`: capturar primeiro, documentar depois; um `getPageSource()` por
-  tela; fechar a sessão ao final.
-- **Primeira plataforma: iOS** — 1ª leva feita em 2026-09-11 (37 capturas, deslogado, sem
-  draft ainda); login bloqueado pelo backend e PDP não aberta. Ver `STATE.md`.
-- **Android: 1ª leva feita em 2026-09-22** — AVD local via `adb`, build 1.20.8 (483), 32
-  capturas, fluxo da suíte de ponta a ponta. Login OK (a conta foi cadastrada no app migrado
-  nesse dia, o que também explica o bloqueio do iOS); favoritar falha no app ("Falha ao
-  carregar"). Sem draft ainda. Ver `STATE.md`.
-- **Android: 2ª leva feita em 2026-09-29** — build 1.20.10 (492), capturas `00`–`51`, fluxo da suíte
-  inteiro funcionando (favoritar/desfavoritar OK) + compra até a escolha de pagamento. App agora em
-  pt-BR. testIDs consolidados em `captures-2026-09-29/TESTIDS.md`. 28 drafts em
-  `.planning/drafts/app-migrado/android/` (índice `00-INDICE.md`). Ver `STATE.md`.
-- **Destino dos drafts:** `.planning/drafts/app-migrado/ios/` e
-  `.planning/drafts/app-migrado/android/`, mesmo formato e mesmo `00-INDICE.md` dos drafts
-  atuais. Os drafts do app atual (`.planning/drafts/ios/`) ficam como estão, como base de
-  comparação tela a tela.
-
-Não está escrito ainda — definir quando o build chegar:
-
-- Identificador do app novo (bundle id / package), versão e origem do build.
-- Se o app migrado vai viver neste repositório ou em outro. **Decisão adiada em
-  2026-09-11.**
-- ~~Como o Android será capturado~~ — **AVD local via `adb`**, como no M2 (usado em 2026-09-22).
-
-## M6 — Cenários Gherkin da seção 3 no app migrado 🔄 em andamento
+**Concluído em 2026-10-21 (Marcio).** O escopo final é a suíte de 4 testes (`01-fluxo-favoritar`, `02-compra-pix`,
+`03-compra-cartao`, `04-criar-conta`), decisão de 2026-10-16; os 16 planos e os 101 cenários abaixo ficam como registro.
+CI Run #30 (2026-10-20, app 1.22.2): `01` 11/11, `03` 10/11, `04` 11/11; o `02` segue em ajuste de estoque (`STATE.md`).
 
 **Em execução desde 2026-10-01** (`/gsd-execute-phase 6`): 5/16 planos concluídos — 06-01 (DEC-A +
 captura iOS), 06-02 e 06-03 (POC migrada, Etapa 0) **verde local no Android e no iOS**. CI do Device Farm pendente. Ver `STATE.md`.
@@ -238,7 +221,11 @@ Não está escrito ainda — definir antes da etapa correspondente:
   repositório novo) — a decisão de repositório adiada no M5.
 - Se os cenários entram no CI (Device Farm) já na etapa em que são escritos ou só ao final.
 
-## M7 — A suíte atual rodando no app migrado ⬜
+## M7 — A suíte atual rodando no app migrado ✅
+
+**Concluído em 2026-10-21 (Marcio).** A POC do favoritar migrou para o app migrado no M6 (06-02/06-03) e é o
+`01-fluxo-favoritar`, verde nos 11 aparelhos do CI Run #30. A decisão de repositório deixou de existir: o app migrado
+vive neste repositório.
 
 Era o M6 até 2026-09-29, renumerado quando os cenários Gherkin entraram como próximo passo.
 
@@ -247,7 +234,11 @@ testes que vierem depois — a partir dos drafts do M5. Como isso entra no códi
 ramo nos page objects, suíte separada ou repositório novo) depende da decisão de
 repositório adiada no M5; **não está escrito**.
 
-## M8 — Cobertura além do favoritar ⬜
+## M8 — Cobertura além do favoritar ✅
+
+**Concluído em 2026-10-21 (Marcio).** A compra está coberta pelo `02-compra-pix` (até o QR code) e pelo
+`03-compra-cartao` (até a recusa/antifraude), nas duas plataformas, com pedidos reais finalizados — o bloqueio de
+ReCAPTCHA abaixo foi medido no app antigo e não ocorre no app migrado. O texto abaixo fica como registro.
 
 Era o M7 até 2026-09-29. **Sobreposição com o M6:** adicionar à sacola, escolher tamanho e
 cadastrar endereço passam a ser cobertos pelas etapas 2, 3 e 4 do M6; o que sobra aqui é
@@ -280,3 +271,90 @@ documentado (drafts `25`–`32`). Encaminhamento: pedir ao time de backend um al
 bypass de ReCAPTCHA para o ambiente de QA/Device Farm; até lá, o critério de sucesso
 possível é a chegada ao Summary. **O M1, o M3 e o M7 não são afetados** — não passam por
 compra.
+
+## M9 — Ampliar a cobertura com novos cenários ⬜ planejamento
+
+Aberto em 2026-10-21 (Marcio): os 4 testes (`01`–`04`) cobrem boa parte do app, e outras funcionalidades serão
+validadas no futuro. **Nenhum cenário deste marco está escolhido nem escrito ainda.** A lista abaixo é o backlog de
+partida, tirado da seção 3 do `cenarios-gherkin-2026-09-28.pdf` (funcionalidades que os 4 testes não percorrem) e das
+pendências registradas; quais entram, em que ordem e com que massa é decisão do Marcio, cenário a cenário.
+
+Regras que valem para cada cenário novo (`REQUIREMENTS.md`):
+- **um teste por decisão**; o que repete o caminho de um dos 4 testes vira asserção dentro dele, e nenhum teste é
+  juntado ou removido sem ordem do Marcio para aquele spec;
+- cada teste roda em todos os devices do CI (11 hoje), então o tempo se multiplica: o custo entra na escolha;
+- **captura antes de escrever** (inspector + draft-writer, nas duas plataformas, no build atual);
+- uma suíte só, sem texto/idioma, sem produto fixo, sem coordenada fora das exceções do iOS.
+
+### Backlog (o que os 4 testes NÃO cobrem hoje)
+
+| Área (PDF, nº de cenários) | Coberto hoje | Falta | Dependência |
+|---|---|---|---|
+| Login — Recuperação de senha (parte dos 7) | login válido e e-mail inválido (`02`) | "Esqueci a senha", senha errada, conta inexistente | e-mail Gmail plus que recebe a redefinição |
+| Busca por palavra-chave (3) | 1 busca com resultado (`02`) | busca sem resultado, limpar busca | `search-input`/`search-clear-button` sem testID no Android |
+| Filtros de busca (7) | nada | combinar, contar e limpar filtros | captura das telas de filtro |
+| PDP (7) | tamanho, adicionar, carrossel (`02`/`03`) | casos restantes do PDF (a mapear) | — |
+| Mochila (16) | só adicionar | quantidade (+/−), remover, estado vazio | — |
+| Mochila — cupom (6, pendentes de massa) | nada | válido, inexistente, expirado, condicional | cupons de teste do time do app |
+| Mochila — estoque (2) e frete grátis (3), pendentes de massa | nada | limite de estoque, barra de frete grátis | produto com estoque conhecido; valor mínimo do frete |
+| Checkout — Cadastro de endereço (7) | nada (as contas do CI já têm endereço) | novo endereço, CEP inválido, campos obrigatórios | conta sem endereço ou excluir endereço; campos sem testID |
+| Menu — Meus Dados (9, sem o de conectividade) | nada | editar e validar campos | captura da edição |
+| Menu — Configurações de comunicação (parte dos 4) | nada | 4 toggles de comunicação | a tela existe (draft iOS 48), mas os toggles estão fora da árvore no iOS; Android não capturado no 512 |
+| Menu — Estado vazio de Meus pedidos e Favoritos (2) | Favoritos vazio ao final do `01` | Meus pedidos vazio | conta sem pedido |
+
+Fora do backlog (decisões já tomadas): Exibição em pt-BR (5, idioma não é validado), Seção DEV (2), falha de
+conectividade em Meus Dados (1), "Voltar" no onboarding. **Pagamento com cartão APROVADO: nunca será implementado**
+(Marcio, 2026-10-21) — por segurança e por ser inviável usar cartão válido neste ambiente; o cartão é coberto só pela
+recusa/antifraude do `03-compra-cartao`, com cartão fake. Não planejar nem perguntar. **Exclusão de conta: fora** —
+o app não tem a opção (Marcio, 2026-10-21; a captura de Meus dados, draft Android 25, também não mostra exclusão).
+
+### Não está escrito ainda
+- Quais áreas entram primeiro e quantos testes novos (o limite de tempo do CI por device).
+- Se os cenários novos entram no CI a cada teste ou em bloco.
+- A origem da massa: cupons, estoque, frete, conta sem endereço/sem pedido.
+
+
+## Histórico do levantamento (era o M5, 2026-09-11 a 2026-10-21)
+
+Decidido em 2026-09-11. O app Aramis está sendo **migrado por módulos** para uma versão
+nova, com `testID` nos elementos. O Marcio entrega o build; a partir dele, este marco
+captura os elementos das telas **nas duas plataformas**, pelo mesmo procedimento do M2/M3
+(`mobile-ui-inspector` captura, `mobile-draft-writer` redige), para que depois os cenários
+Gherkin (M6), a suíte atual (M7) e os testes futuros rodem nesse app. Estado em 2026-09-29:
+Android com 2ª leva capturada e drafts escritos; iOS com a 1ª leva incompleta e sem draft.
+
+O que está definido:
+
+- **Escopo da captura:** o fluxo da suíte atual (onboarding → login → categorias → camisas
+  → favoritar → favoritos → desfavoritar → logout) **e o fluxo de compra completo**, até
+  onde o app deixar. Só levantamento de elementos — **nenhum cenário de teste é criado
+  neste marco.**
+- **Nem tudo está ativo.** A migração é por módulos; explorar só as partes que já
+  funcionam (o Marcio indica quais). O que não funcionar entra no draft como lacuna do
+  módulo, não como anomalia do app.
+- **Procedimento:** o Marcio instala o app, abre a sessão e avisa; o Claude passa para o
+  `mobile-ui-inspector`, que refaz os mesmos passos do levantamento de 2026-09-04. O
+  Marcio acompanha na tela e recupera a conexão quando cair. Valem as regras de Remote
+  Access do `STATE.md`: capturar primeiro, documentar depois; um `getPageSource()` por
+  tela; fechar a sessão ao final.
+- **Primeira plataforma: iOS** — 1ª leva feita em 2026-09-11 (37 capturas, deslogado, sem
+  draft ainda); login bloqueado pelo backend e PDP não aberta. Ver `STATE.md`.
+- **Android: 1ª leva feita em 2026-09-22** — AVD local via `adb`, build 1.20.8 (483), 32
+  capturas, fluxo da suíte de ponta a ponta. Login OK (a conta foi cadastrada no app migrado
+  nesse dia, o que também explica o bloqueio do iOS); favoritar falha no app ("Falha ao
+  carregar"). Sem draft ainda. Ver `STATE.md`.
+- **Android: 2ª leva feita em 2026-09-29** — build 1.20.10 (492), capturas `00`–`51`, fluxo da suíte
+  inteiro funcionando (favoritar/desfavoritar OK) + compra até a escolha de pagamento. App agora em
+  pt-BR. testIDs consolidados em `captures-2026-09-29/TESTIDS.md`. 28 drafts em
+  `.planning/drafts/app-migrado/android/` (índice `00-INDICE.md`). Ver `STATE.md`.
+- **Destino dos drafts:** `.planning/drafts/app-migrado/ios/` e
+  `.planning/drafts/app-migrado/android/`, mesmo formato e mesmo `00-INDICE.md` dos drafts
+  atuais. Os drafts do app atual (`.planning/drafts/ios/`) ficam como estão, como base de
+  comparação tela a tela.
+
+Não está escrito ainda — definir quando o build chegar:
+
+- Identificador do app novo (bundle id / package), versão e origem do build.
+- Se o app migrado vai viver neste repositório ou em outro. **Decisão adiada em
+  2026-09-11.**
+- ~~Como o Android será capturado~~ — **AVD local via `adb`**, como no M2 (usado em 2026-09-22).

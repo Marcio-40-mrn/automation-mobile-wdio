@@ -1,6 +1,7 @@
 import { BasePage, timewhait, seletorTestId, scrollUntilVisible } from "./BasePage";
 import { driver, $, $$ } from '@wdio/globals'
 import { anexarPrint } from "../utils/allure-helpers";
+import allure from '@wdio/allure-reporter';
 
 // Mochila -> endereço -> entrega -> pagamento (Pix) -> resumo -> finalizar. Seletores medidos em
 // Android: .planning/drafts/app-migrado/android/captures-2026-10-14-compra-pix(-rodada2)/;
@@ -56,14 +57,24 @@ export class CheckoutPage extends BasePage {
         await this.waitForElement(aba);
         await aba.click();
 
+        // Os itens são contados ANTES de rolar até o botão de finalizar: rolar tira os cards de cima da
+        // árvore. CI Run #31 (app 1.22.2, S25 Ultra): a Mochila demorou a montar, o scroll levou a tela
+        // ao fim e a contagem deu 0 com 1 item na Mochila (print: "Finish purchase (1)", aba com 1).
+        let itens = 0;
+        await driver
+            .waitUntil(async () => {
+                itens = await $$(CARD_MOCHILA).length;
+                return itens >= minimoDeItens;
+            }, { timeout: 30000, interval: 1000 })
+            .catch(() => undefined);
+        if (itens < minimoDeItens) {
+            await anexarPrint('Mochila — itens não encontrados');
+            throw new Error(`Mochila: esperados pelo menos ${minimoDeItens} produtos (wake-product-card-bag-*), encontrados ${itens} em 30s.`);
+        }
+
         const finalizar = await $(seletorTestId('bag-checkout-button'));
         if (!(await scrollUntilVisible(finalizar, 6))) {
             throw new Error('Mochila: o botão de finalizar compra (bag-checkout-button) não apareceu.');
-        }
-
-        const itens = await $$(CARD_MOCHILA).length;
-        if (itens < minimoDeItens) {
-            throw new Error(`Mochila: esperados pelo menos ${minimoDeItens} produtos (wake-product-card-bag-*), encontrados ${itens}.`);
         }
         console.log(`🎒 Mochila com ${itens} produto(s)`);
         return itens;
@@ -317,12 +328,21 @@ export class CheckoutPage extends BasePage {
 
         const pix = await this.esperarDestinoDoFinalizar(['wake-pix-aguardando']);
         if (!pix) {
+            await this.anexarArvoreDaTela('Finalizar (Pix) — árvore da tela sem destino');
             throw new Error(
                 'Finalizar: a tela do pedido com Pix (wake-pix-aguardando) não abriu em 60s. O toque NÃO é repetido ' +
                 '(cada toque cria pedido) — conferir no vídeo e em Meus pedidos se o pedido foi criado.'
             );
         }
         console.log('✅ Pedido criado: tela do Pix aberta');
+    }
+
+    // Árvore de elementos da tela, anexada quando o finalizar não chega a destino nenhum. Serve para
+    // levantar o id do modal "Erro ao realizar compra" (CI Run #30 S24 Ultra e Run #31 iPhone 15 Pro
+    // Max, app 1.22.2), que nunca foi capturado: o teste ainda não o reconhece e espera os 60 s.
+    private async anexarArvoreDaTela(nome: string) {
+        const arvore = await driver.getPageSource().catch((e) => `getPageSource falhou: ${e}`);
+        allure.addAttachment(nome, arvore, 'text/xml');
     }
 
     // Depois do toque em finalizar (Pix ou cartão), espera até 60 s por uma das telas de `destinos`.
@@ -569,6 +589,7 @@ export class CheckoutPage extends BasePage {
         ], true);
         if (!destino) {
             await anexarPrint('Finalizar (cartão) — sem recusa e sem modal antifraude');
+            await this.anexarArvoreDaTela('Finalizar (cartão) — árvore da tela sem destino');
             throw new Error(
                 'Finalizar (cartão): nem a tela de pagamento recusado nem o modal antifraude (nem wake-order-processing-*) apareceram em 60s. ' +
                 'O toque NÃO é repetido (cada toque cria pedido) — conferir no vídeo e em Meus pedidos se o pedido foi criado.'

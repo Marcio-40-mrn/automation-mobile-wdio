@@ -18,9 +18,11 @@ TypeScript com WebdriverIO + Appium.
 ## App migrado (a partir de 2026-09-11)
 
 O app está sendo **migrado por módulos** para uma versão nova, com `testID` nos elementos.
-O levantamento de elementos dessa versão é o marco M5 do `ROADMAP.md`; os drafts vão para
-`.planning/drafts/app-migrado/<plataforma>/`. Identificador do app, origem do build e se ele
-vai viver neste repositório **não estão escritos** — ver M5.
+O levantamento de elementos é **contínuo**, a cada build novo (seção "Levantamento contínuo do app" do
+`ROADMAP.md`, com a última versão levantada de cada plataforma); os drafts vão para
+`.planning/drafts/app-migrado/<plataforma>/`. O app migrado mantém o id `com.aramis.ecomm` e vive neste
+repositório. O profile de cada build se confere no EAS (campo `buildProfile` da API GraphQL, com `EXPO_TOKEN`/
+`EXPO_PROJECT_ID` do `.env`, a mesma consulta do `scripts/install-apk.mjs`).
 
 ## Ambientes de execução
 

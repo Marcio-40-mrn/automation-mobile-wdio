@@ -95,57 +95,44 @@ export class PedidoPage extends BasePage {
     // ser um código Pix (começa com "000201", o cabeçalho do padrão do Banco Central). Rodada 2:
     // 218 caracteres. A cópia não é validada pelo "Copiado" do botão (texto).
     async copiarCodigo() {
-        // iOS, build 1.21.7/352 (captures-2026-10-18-pix-ate-pedido/, pedido #178710): o código é um
-        // StaticText SEM id dentro do `wake-pix-aguardando` [29,616 302x17], label começando com 000201
-        // (217 caracteres); `wake-pix-copiar` [339,611 72x28]. No Remote Access o getClipboard voltou
-        // vazio antes e depois do Copiar (2x): com a área de transferência vazia só se registra aviso
-        // (decisão do Marcio, 2026-10-18); com conteúdo, ela tem que ser igual ao código.
+        // Regra ÚNICA nas duas plataformas (decisão do Marcio, 2026-10-18 no iOS, estendida ao Android em
+        // 2026-10-21): com a área de transferência VAZIA só se registra aviso (o Appium não consegue lê-la
+        // no Remote Access iOS nem nos Androids do Device Farm — CI Runs #30 e #31, 0 caracteres em 6/6,
+        // com o app mostrando "Copiado"; o Marcio confirmou a cópia no aparelho dele); com conteúdo, ela
+        // tem que ser igual ao código da tela. O código tem que ser um Pix (começa com 000201).
+        // Só a LEITURA do código difere por plataforma:
+        // - iOS, build 1.21.7/352 (captures-2026-10-18-pix-ate-pedido/, pedido #178710): StaticText SEM id
+        //   dentro do `wake-pix-aguardando`, label começando com 000201; `wake-pix-copiar`.
+        // - Android: `CODIGO_PIX`.
+        let codigo: string;
         if (IOS) {
             const elCodigo = await $('//*[@name="wake-pix-aguardando"]//XCUIElementTypeStaticText[starts-with(@label,"000201")]');
             await this.waitForElement(elCodigo);
-            const codigoIOS = ((await elCodigo.getAttribute('label')) ?? '').trim();
-            await (await $(COPIAR)).click();
-
-            let copiadoIOS = '';
-            await driver
-                .waitUntil(async () => {
-                    copiadoIOS = Buffer.from(await driver.getClipboard('plaintext'), 'base64').toString('utf8').trim();
-                    return copiadoIOS === codigoIOS;
-                }, { timeout: 10000, interval: 1000 })
-                .catch(() => false);
-            if (!copiadoIOS) {
-                console.warn(`⚠ Copiar código Pix (iOS): área de transferência vazia; a cópia não foi conferida (código na tela: ${codigoIOS.length} caracteres).`);
-            } else if (copiadoIOS !== codigoIOS) {
-                throw new Error(
-                    `Copiar código Pix: a área de transferência (${copiadoIOS.length} caracteres) não ficou igual ao código ` +
-                    `exibido (${codigoIOS.length} caracteres) em 10s.`
-                );
-            }
-            console.log(`📋 Código Pix na tela (${codigoIOS.length} caracteres)${copiadoIOS ? ', copiado e conferido' : ''}`);
-            allure.addAttachment('Código Pix copiado', codigoIOS, 'text/plain');
-            return;
+            codigo = ((await elCodigo.getAttribute('label')) ?? '').trim();
+        } else {
+            codigo = (await (await $(CODIGO_PIX)).getText()).trim();
         }
-        const codigo = (await (await $(CODIGO_PIX)).getText()).trim();
+        if (!codigo.startsWith('000201')) {
+            throw new Error(`Copiar código Pix: o código na tela não é um código Pix (não começa com 000201; ${codigo.length} caracteres).`);
+        }
         await (await $(COPIAR)).click();
 
         let copiado = '';
-        const ok = await driver
+        await driver
             .waitUntil(async () => {
                 copiado = Buffer.from(await driver.getClipboard('plaintext'), 'base64').toString('utf8').trim();
                 return copiado === codigo;
             }, { timeout: 10000, interval: 1000 })
-            .then(() => true)
             .catch(() => false);
-        if (!ok) {
+        if (!copiado) {
+            console.warn(`⚠ Copiar código Pix: área de transferência vazia; a cópia não foi conferida (código na tela: ${codigo.length} caracteres).`);
+        } else if (copiado !== codigo) {
             throw new Error(
                 `Copiar código Pix: a área de transferência (${copiado.length} caracteres) não ficou igual ao código ` +
                 `exibido (${codigo.length} caracteres) em 10s.`
             );
         }
-        if (!codigo.startsWith('000201')) {
-            throw new Error(`Copiar código Pix: o código copiado não é um código Pix (não começa com 000201; ${codigo.length} caracteres).`);
-        }
-        console.log(`📋 Código Pix copiado (${codigo.length} caracteres)`);
+        console.log(`📋 Código Pix na tela (${codigo.length} caracteres)${copiado ? ', copiado e conferido' : ''}`);
         allure.addAttachment('Código Pix copiado', codigo, 'text/plain');
     }
 

@@ -72,6 +72,20 @@ Cada uma custou um incidente. Detalhes no `CLAUDE.md`.
   plataforma (`process.env.PLATFORM === 'ios'`) e escolhe o seletor **dentro do método** —
   o padrão que o `ativarApp()` de `test/pageobjects/HomePage.ts` inaugurou. Duplicar a suíte
   dobra o custo de cada mudança de fluxo e faz as duas versões divergirem em silêncio.
+- **Mesmo fluxo e mesma regra de validação nas duas plataformas** (Marcio, reforçada em 2026-10-21).
+  O `if` de plataforma serve só para **ler/tocar** o elemento (seletor, gesto); o que o teste valida, quando
+  falha e quando só avisa é o mesmo nos dois sistemas, de preferência no mesmo bloco de código. Toda decisão
+  tomada para uma plataforma vale para a outra, salvo ordem explícita. **Qualquer diferença de fluxo ou de
+  validação entre Android e iOS só existe com decisão do Marcio sobre o porquê**, informada a ele e registrada
+  na tabela abaixo (e no comentário do método). Diferença sem linha na tabela é defeito a corrigir.
+  Caso que motivou: a regra da área de transferência do Pix (vazia = aviso) foi decidida para o iOS em
+  2026-10-18 e ficou só no iOS; o Android falhou em 6/6 devices nos CI Runs #30 e #31 até ser igualado.
+
+  | Diferença Android × iOS | Onde | Porquê | Decisão |
+  |---|---|---|---|
+  | Tamanho e "Add to cart" da PDP tocados por fração da janela no iOS | `ProdutoPage.comprarIOS` | conteúdo do sheet fora da árvore XCUITest (drafts iOS 13, 14, 49) | Marcio, 2026-10-15 |
+  | Carrossel de indicação sem validação no iOS | `ProdutoPage.validarCarrosselDeIndicacao` | filhos do sheet fora da árvore | Marcio, 2026-10-15 |
+  | CTA das Boas-vindas e alerta de localização por fração (só se faltar id) | `BasePage.iniciaAppIOS` | sem elemento na árvore; no build 349+ o CTA tem id | REQUIREMENTS (exceção obrigatória no iOS) |
 - **Nenhum passo de teste no `wdio.conf.ts`, em hipótese alguma** (decisão do Marcio,
   2026-10-02). O `wdio.conf.ts` só configura o ambiente: conexão, device, app, reporters, timeouts.
   Todo comportamento do teste mora no page object: aceitar ou negar diálogo/alerta, conceder
