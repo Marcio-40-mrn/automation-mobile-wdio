@@ -33,6 +33,14 @@ const BACK_TO_TOP = IOS
     ? '-ios predicate string:label == "Back to top"'
     : '//*[.//*[@resource-id="product-list"]]/preceding-sibling::*/*[@clickable="true"][not(@resource-id="header-back-button")]';
 
+// Preço promocional da PDP: irmão imediatamente anterior ao `price`, com "R$" ("R$" é marcador de
+// moeda, não validação de texto). Só existe com promoção. Android conferido nos dumps 12 (1 nó) e
+// 14 (0 nó) de captures-2026-10-22-preco-promocional/ (1.22.2/513); iOS INFERIDO da estrutura do
+// `price` no 349, sem PDP em promoção capturada.
+const PRECO_PROMOCIONAL = IOS
+    ? '//XCUIElementTypeStaticText[@name="price"]/preceding-sibling::XCUIElementTypeStaticText[1][starts-with(@label,"R$")]'
+    : '//*[@resource-id="price"]/preceding-sibling::*[1][starts-with(@text,"R$")]';
+
 // ---- iOS: sheets da PDP FORA da árvore -----------------------------------------------------
 // No iOS (build 349) o conteúdo dos dois bottom sheets da PDP não aparece no getPageSource():
 // do sheet de tamanho só existe o casco (`bottom-sheet-close`, backdrop), sem os tamanhos nem o
@@ -227,13 +235,23 @@ export class ProdutoPage extends BasePage {
     // (escolher tamanho não cria nada). Os do sheet são os da linha MAIS BAIXA da tela (cada
     // size-option-* pode existir também na PDP, por trás).
     // Lê o PREÇO do produto na PDP, antes do clique em comprar, e devolve o número. O valor é lido
-    // da tela a CADA execução (nunca fixo no código): o nó é o `price`, único na PDP (capturas de
-    // 2026-10-14). O spec guarda o valor numa variável por produto e, no resumo do pedido, valida
-    // a soma — a base para calcular cupom/desconto quando o teste aplicar um.
+    // da tela a CADA execução (nunca fixo no código). O spec guarda o valor numa variável por produto
+    // e, no resumo do pedido, valida a soma — a base para calcular cupom/desconto quando o teste
+    // aplicar um.
+    // Produto em promoção (build 1.22.2/513, captures-2026-10-22-preco-promocional/ 12 × 14): o
+    // `price` é o preço CORTADO e o promocional (o que o cliente paga) é o irmão imediatamente
+    // anterior, sem id, com "R$". Sem promoção o `price` é o único preço. Lê o promocional quando
+    // existir. Causa: `02` no iPhone 15 Pro Max (Runs #34/#35) e no S26 Ultra (Run #34) leu o
+    // cortado. iOS: mesma regra pela estrutura do 349 (`price` = StaticText), PDP em promoção NÃO
+    // capturada no iOS.
     async lerPrecoDoProduto(): Promise<number> {
         const el = await $(seletorTestId('price'));
         await this.waitForElement(el);
-        const texto = await el.getText();
+        const emPromocao = (await $$(PRECO_PROMOCIONAL).length) > 0;
+        const texto = emPromocao ? await $(PRECO_PROMOCIONAL).getText() : await el.getText();
+        if (emPromocao) {
+            console.log(`🏷 Produto em promoção: preço cortado ${await el.getText()}, promocional ${texto}`);
+        }
         const preco = valorEmReais(texto);
         if (preco === null) {
             throw new Error(`PDP: o preço (price) não pôde ser lido como valor em reais ("${texto}").`);

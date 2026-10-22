@@ -1,5 +1,13 @@
 # STATE
 
+**2026-10-22 (noite) — CI Run #35 (14:55): `04` Android 0/6, iOS 5/5; `02` falhou no iPhone 15 Pro Max (e no S26 Ultra).**
+`04` Android: os 6 campos válidos no print e o `create-account-submit` desabilitado — mesmo comportamento da captura
+do 513 de manhã (`captures-2026-10-22-build513/` 95–100): app 513 não habilita o envio; causa não provada. `02`: o teste
+leu o preço CORTADO. Captura no AVD (513, `captures-2026-10-22-preco-promocional/`, 12 com promoção × 14 sem): na PDP em
+promoção o `price` é o cortado e o promocional é o irmão anterior, sem id. **Correção, só `tsc`, NÃO RODADA:**
+`ProdutoPage.lerPrecoDoProduto` lê o promocional (`PRECO_PROMOCIONAL`, XPath conferido com lxml: 1 nó no 12, 0 no 14)
+quando existir, senão o `price`; iOS pela mesma estrutura, INFERIDO (PDP em promoção não capturada no iOS).
+
 **2026-10-22 (tarde) — AVD no build 1.22.3/514 (`npm run wdio:fresh`, rodado pelo Claude a pedido do Marcio): 0/4, os 4
 no onboarding.** O Continue dos Tópicos não foi achado (`onboarding-topics-continue`); no `03` o mesmo botão depois de
 negar. Run anterior do Marcio (12:37, 512): `01`–`03` não abriram sessão (`Unable to connect` na 4723; causa não
