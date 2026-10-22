@@ -22,7 +22,8 @@ Como funciona a cada versão nova (Marcio, 2026-10-21):
 | iOS | 1.21.7 | 352 | production | 2026-10-21 | `drafts/app-migrado/ios/captures-2026-10-21-modal-estoque/` (Remote Access) |
 
 Profile conferido no EAS (API GraphQL `api.expo.dev`, `EXPO_TOKEN`/`EXPO_PROJECT_ID` do `.env`, campo `buildProfile`).
-Defasagem conhecida: o último iOS no EAS é o **1.22.2 / 356 / production** (2026-10-20), que ainda não tem levantamento.
+O Android 1.22.3/514 (production, 2026-10-22) é build de ROLLBACK, não de teste (Marcio, 2026-10-22): não entra
+nesta tabela nem na documentação de elementos. Defasagem conhecida: o último iOS no EAS é o **1.22.2 / 356 / production** (2026-10-20), que ainda não tem levantamento.
 
 ## M1 — Suíte Android estável ✅
 

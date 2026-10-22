@@ -223,6 +223,23 @@ export const config: WebdriverIO.Config = {
         }, null, 2));
     },
 
+    // Só onde o Appium é o do @wdio/appium-service (mesma condição do buildServices): antes de cada
+    // spec, espera a 4723 responder. No run local de 2026-10-22 12:37 os 3 primeiros specs falharam
+    // com "Unable to connect to http://127.0.0.1:4723/" sem executar nada, e o 4º conectou.
+    onWorkerStart: async function (cid: string) {
+        if (isDeviceFarm || isRemote) return;
+        const url = 'http://127.0.0.1:4723/status';
+        const inicio = Date.now();
+        while (Date.now() - inicio < 60000) {
+            const ok = await fetch(url).then(r => r.ok).catch(() => false);
+            if (ok) return;
+            await new Promise(r => setTimeout(r, 1000));
+        }
+        // O WDIO só registra o erro deste hook e inicia o worker mesmo assim (run local de
+        // 2026-10-22 17:04): a mensagem serve para apontar a causa da falha de sessão que vem depois.
+        throw new Error(`[${cid}] Appium não respondeu em ${url} em 60s — a sessão deste spec vai falhar.`);
+    },
+
     before: async function () {
         console.log("\n⏳ Aguardando 10 segundos para o aplicativo carregar...\n");
         await driver.pause(10000);
@@ -241,8 +258,11 @@ export const config: WebdriverIO.Config = {
             // sumia do relatório (404). 720p reduz drásticamente o tamanho sem perder
             // a legibilidade do fluxo. priority é prioridade da thread de captura
             // (não mexe na qualidade/tamanho) — mantido em 'high' para não perder frames.
+            // 2026-10-22: 1280x720 ainda dava 55–105 MB por spec no CI Run #34 (S24+), e o que
+            // passa de 95 MB é apagado na publicação. 720x480 é a resolução seguinte aceita pelo
+            // MediaProjection.
             await driver.execute('mobile: startMediaProjectionRecording', {
-                resolution: '1280x720',
+                resolution: '720x480',
                 maxDurationSec: 600,
                 priority: 'high',
             });
@@ -259,7 +279,9 @@ export const config: WebdriverIO.Config = {
                 videoQuality: 'low',
                 videoFps: 8,
                 videoScale: '720:-2',
-                timeLimit: 180,
+                // 180 s cortava o vídeo em 3 min (CI Run #34: specs de 3,5 a 7,5 min). 600 = o
+                // maxDurationSec do Android; a 8 fps/low o vídeo de 3 min tinha 2,5–4 MB.
+                timeLimit: 600,
             } as any);
         } else {
             // AVD local. timeLimit era 180 s e cortava o vídeo em 3 min; o teste de compra com Pix

@@ -1,4 +1,4 @@
-import { BasePage, timewhait, seletorTestId } from "./BasePage";
+import { BasePage, timewhait, seletorTestId, seletorIdsAndroid } from "./BasePage";
 import { driver, $ } from '@wdio/globals'
 import { anexarPrint } from "../utils/allure-helpers";
 
@@ -60,7 +60,12 @@ export class HomePage extends BasePage {
     async validarHome() {
         // fonte: android/06-home (captures-2026-09-29/09-home.xml); ios/06-home (captures-m6-sessao-a/10-home-deslogada)
         const aba = seletorTestId('tab-home');
-        const raiz = seletorTestId('editorial-home-root');
+        // Android 1.22.3/514: o `editorial-home-root` sumiu (captures-2026-10-22-build514/10–12, Home
+        // carregada, árvore igual em 5 s e 20 s). O que só a Home tem ali é o cabeçalho com `bell`
+        // (sino), ausente das outras telas nos dumps. Vale qualquer um dos dois (id antigo e novo).
+        const raiz = process.env.PLATFORM === 'ios'
+            ? seletorTestId('editorial-home-root')
+            : seletorIdsAndroid('editorial-home-root|bell');
 
         const abaVisivel = await $(aba).waitForDisplayed({ timeout: 30000 }).then(() => true).catch(() => false);
         const raizExiste = await $(raiz).waitForExist({ timeout: 10000 }).then(() => true).catch(() => false);
@@ -80,12 +85,12 @@ export class HomePage extends BasePage {
                 );
             }
             throw new Error(
-                `Home não apareceu: tab-home visível=${abaVisivel}, editorial-home-root presente=${raizExiste} ` +
+                `Home não apareceu: tab-home visível=${abaVisivel}, marcador da Home (editorial-home-root / bell) presente=${raizExiste} ` +
                 '(esperados em 30s/10s depois do onboarding). O app pode ter ficado numa tela do ' +
                 'onboarding ou com um modal por cima.'
             );
         }
-        console.log('🏠 Home confirmada (tab-home + editorial-home-root)');
+        console.log('🏠 Home confirmada (tab-home + marcador da Home)');
     }
 
     // Alerta do pedido na Home ("aguardando pagamento"). O id leva o número do pedido no sufixo

@@ -28,6 +28,29 @@ if (!EXPO_PROJECT_ID) {
 }
 
 const TARGET_BUNDLE_ID = 'com.aramis.ecomm';
+
+// Espera o emulador ficar pronto antes do `adb install`. Se o adb estava parado (ex.: `adb
+// kill-server` ao fim de uma captura), o 1º comando sobe o daemon e o emulador aparece como
+// `offline` por alguns segundos — o install imediato falhava com "adb.exe: device offline"
+// (2026-10-22, 2x). Critério: `adb get-state` = device e `sys.boot_completed` = 1.
+function esperarEmuladorPronto(timeoutMs = 90000) {
+    const inicio = Date.now();
+    while (Date.now() - inicio < timeoutMs) {
+        try {
+            const estado = execSync('adb get-state', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+            const boot = execSync('adb shell getprop sys.boot_completed', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+            if (estado === 'device' && boot === '1') {
+                console.log(`Emulador pronto (${Math.round((Date.now() - inicio) / 1000)}s)`);
+                return;
+            }
+        } catch {
+            // offline, sem device ou daemon subindo: tenta de novo
+        }
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 2000);
+    }
+    console.error(`Emulador não ficou pronto em ${timeoutMs / 1000}s (adb get-state ≠ device ou boot incompleto). Confira 'adb devices'.`);
+    process.exit(1);
+}
 const noInstall = process.argv.includes('--no-install');
 const platformUpper = (() => {
     const idx = process.argv.indexOf('--platform');
@@ -334,6 +357,7 @@ if (isIpa) {
     const appApk = path.join(projectRoot, 'app.apk');
     renameSync(tmpArtifact, appApk);
     if (!noInstall) {
+        esperarEmuladorPronto();
         console.log('Instalando no emulador via adb...');
         execSync(`adb install -r "${appApk}"`, { stdio: 'inherit' });
     }
@@ -416,6 +440,7 @@ if (isIpa) {
     renameSync(universalApk, appApk);
     rmSync(tmpApksDir, { recursive: true, force: true });
     if (!noInstall) {
+        esperarEmuladorPronto();
         console.log('Instalando no emulador via adb...');
         execSync(`adb install -r "${appApk}"`, { stdio: 'inherit' });
     }

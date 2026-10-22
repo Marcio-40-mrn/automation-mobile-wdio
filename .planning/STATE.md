@@ -1,5 +1,24 @@
 # STATE
 
+**2026-10-22 (tarde) — AVD no build 1.22.3/514 (`npm run wdio:fresh`, rodado pelo Claude a pedido do Marcio): 0/4, os 4
+no onboarding.** O Continue dos Tópicos não foi achado (`onboarding-topics-continue`); no `03` o mesmo botão depois de
+negar. Run anterior do Marcio (12:37, 512): `01`–`03` não abriram sessão (`Unable to connect` na 4723; causa não
+levantada, não se repetiu neste run) e o `04` passou; o cartão "quebrado no onboarding" do report local era do run de
+21/10 16:49 (a `allure-results/` acumula). Captura do onboarding no 514 (`drafts/app-migrado/android/
+captures-2026-10-22-build514/`, 00–12, só permitindo; drafts 01–05 reescritos): Continue, aceite da Política e dos Termos
+= `accept-button` (sem `onboarding-topics-continue`/`privacy-accept`/`terms-accept`); Home sem `editorial-home-root`
+(marcador: `bell` do cabeçalho, só nos dumps da Home). **Correção, só `tsc`, NÃO RODADA:** `ACEITE_ONBOARDING_ANDROID`
+(`onboarding-topics-continue|accept-button`, `resourceIdMatches`) em `BasePage.continua/termo1/termos2` e no
+`OnboardingPage` (Tópicos do `03`); `HomePage.validarHome` Android aceita `editorial-home-root|bell`. iOS sem mudança.
+**O 514 é build de ROLLBACK, não de teste (Marcio, 2026-10-22):** o build de teste continua o 513, e o código acima
+segue valendo nele (aceita os ids do 513). Os drafts 01–05 e o `ELEMENTOS-SEM-TESTID.md` voltaram para o 513; as
+capturas do 514 ficam só como registro. O `install-apk.mjs` pega o `production` mais recente (o 514); o secret do CI
+foi ajustado pelo Marcio. Também no dia (só local, não rodado): `install-apk.mjs` espera o emulador (`device` +
+boot) antes do `adb install`; `wdio.conf.ts` `onWorkerStart` espera a 4723 (o WDIO NÃO aborta o spec com erro nesse
+hook, só registra). CI (não rodado): vídeo iOS `timeLimit` 180 → 600 (cortava em 3 min); Android `startMediaProjection`
+1280x720 → 720x480 (55–105 MB por spec no Run #34, >95 MB é apagado na publicação). Vídeo Android ausente no relatório
+do Run #34: causa não fechada, falta o log do `publish-report`.
+
 **2026-10-22 — CI Run #33 (21/10 17:43; Android baixou o build NOVO 1.22.2/513): Android 0/24; iOS `01`, `03`, `04` 5/5,
 `02` 0/5.** Android: os 4 specs pararam no onboarding (`privacy-accept` não achado em 45 swipes; o botão estava na tela).
 iOS: `02` parou no `voltarAteCategorias` com a listagem rolada; o "Back to top" estava na tela (print do iPhone 13) e o

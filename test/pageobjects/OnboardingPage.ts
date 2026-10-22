@@ -1,4 +1,4 @@
-import { BasePage, seletorTestId, timewhait } from "./BasePage";
+import { BasePage, seletorTestId, seletorIdsAndroid, ACEITE_ONBOARDING_ANDROID, timewhait } from "./BasePage";
 import { driver, $ } from '@wdio/globals'
 
 // Onboarding passo a passo, usado pelo 03-compra-cartao (que nega as permissões). Os specs que
@@ -103,9 +103,9 @@ export class OnboardingPage extends BasePage {
                 .waitForDisplayed({ timeout: 20000 })
                 .then(() => true)
                 .catch(() => false)
-            : await this.esperarTelaRespondendoPermissoesAndroid(seletorTestId('onboarding-topics-continue'), 'negar');
+            : await this.esperarTelaRespondendoPermissoesAndroid(seletorIdsAndroid(ACEITE_ONBOARDING_ANDROID), 'negar');
         if (!topicos) {
-            throw new Error('Depois de negar localização e notificação, a tela de Tópicos (onboarding-topics-continue) não apareceu sem diálogo por cima.');
+            throw new Error('Depois de negar localização e notificação, a tela de Tópicos (onboarding-topics-continue / accept-button) não apareceu sem diálogo por cima.');
         }
         console.log('✅ 1ª solicitação: permissões negadas; Tópicos na tela');
     }
@@ -137,7 +137,7 @@ export class OnboardingPage extends BasePage {
             return;
         }
 
-        const continuar = await $(seletorTestId('onboarding-topics-continue'));
+        const continuar = await $(seletorIdsAndroid(ACEITE_ONBOARDING_ANDROID));
         await this.waitForElement(continuar);
         await continuar.click();
         console.log('👆 Tópicos: Continue');

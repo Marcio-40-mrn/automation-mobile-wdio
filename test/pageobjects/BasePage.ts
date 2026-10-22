@@ -16,6 +16,17 @@ export function seletorTestId(id: string): string {
     : `-android uiautomator:new UiSelector().resourceId("${id}")`;
 }
 
+// Android: aceite do onboarding (Continue dos Tópicos, aceite da Política e dos Termos). O id muda
+// entre builds e o teste passa com qualquer um (ordem do Marcio, 2026-10-22): até o 512 o Continue
+// era `onboarding-topics-continue` e os aceites `privacy-accept`/`terms-accept`; no 1.22.2/513 os
+// três eram `onboarding-topics-continue`; no 1.22.3/514 os três são `accept-button`
+// (captures-2026-10-22-build514/04-topicos, 07-politica-fim, 09-termos-fim).
+export const ACEITE_ONBOARDING_ANDROID = 'onboarding-topics-continue|accept-button';
+
+export function seletorIdsAndroid(regex: string): string {
+  return `-android uiautomator:new UiSelector().resourceIdMatches("${regex}")`;
+}
+
 
 export class BasePage {
   private defaultTimeout = 20000;
@@ -394,7 +405,7 @@ export class BasePage {
     // depois do de localização, já por cima dos Tópicos, e esconde o `permission-topic`. Por isso a
     // espera e a saída respondem os diálogos de permissão que aparecerem no caminho.
     const topico = seletorTestId('permission-topic');
-    const aceite = seletorTestId('onboarding-topics-continue');
+    const aceite = seletorIdsAndroid(ACEITE_ONBOARDING_ANDROID);
 
     const apareceu = await this.esperarTelaRespondendoPermissoesAndroid(topico, 'permitir');
     if (!apareceu) {
@@ -422,7 +433,7 @@ export class BasePage {
       console.log(`⚠ Tópicos: toque ${toque}/3 no Continue não saiu da tela`);
     }
     throw new Error(
-      'Onboarding Android travado em "Tópicos de permissão": 3 toques em onboarding-topics-continue ' +
+      `Onboarding Android travado em "Tópicos de permissão": 3 toques em ${ACEITE_ONBOARDING_ANDROID} ` +
       'e a tela não trocou.'
     );
   }
@@ -482,12 +493,12 @@ export class BasePage {
   // orçamento é 45 e a parada é o isDisplayed(), nunca uma contagem fixa).
   async termo1() {
     // fonte: captures-2026-09-29/05-politica.xml e 06-politica-fim.xml (draft android/04)
-    await this.aceitarTelaLongaAndroid('Política de Privacidade', 'privacy-accept|onboarding-topics-continue');
+    await this.aceitarTelaLongaAndroid('Política de Privacidade', `privacy-accept|${ACEITE_ONBOARDING_ANDROID}`);
   }
 
   // Termos e condições de compra e uso: mesmo desenho.
   async termos2() {
-    await this.aceitarTelaLongaAndroid('Termos e condições', 'terms-accept|onboarding-topics-continue');
+    await this.aceitarTelaLongaAndroid('Termos e condições', `terms-accept|${ACEITE_ONBOARDING_ANDROID}`);
   }
 
   // O aceite vale com qualquer um dos dois ids (ordem do Marcio, 2026-10-22): até o 512 era
