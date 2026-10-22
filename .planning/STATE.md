@@ -1,5 +1,19 @@
 # STATE
 
+**2026-10-22 — CI Run #33 (21/10 17:43; Android baixou o build NOVO 1.22.2/513): Android 0/24; iOS `01`, `03`, `04` 5/5,
+`02` 0/5.** Android: os 4 specs pararam no onboarding (`privacy-accept` não achado em 45 swipes; o botão estava na tela).
+iOS: `02` parou no `voltarAteCategorias` com a listagem rolada; o "Back to top" estava na tela (print do iPhone 13) e o
+`mostrarCabecalhoDaListagem` saiu sem arrastar (guarda "card visível" deu false). Captura no AVD (513,
+`drafts/app-migrado/android/captures-2026-10-22-build513/`, 00–21): no 513 o aceite da Política e dos Termos é
+`onboarding-topics-continue` (sem `privacy-accept`/`terms-accept`); "Back to top" sem id, tocado 3x: lista ao topo e
+`header-back-button` de volta. **Correções, só `tsc`, NÃO RODADAS:** `BasePage.termo1/termos2` (Android) aceitam os
+dois ids (`privacy-accept|onboarding-topics-continue`, `terms-accept|onboarding-topics-continue`, `resourceIdMatches`;
+ordem do Marcio: passar com o id antigo e com o novo); iOS segue em `privacy-accept`/`terms-accept` (o IPA do Run #33
+passou o onboarding), sem tolerância ao id novo até haver captura iOS; `ProdutoPage.mostrarCabecalhoDaListagem` toca o "Back to top" (`BACK_TO_TOP`: Android XPath
+estrutural conferido nos dumps; **iOS `label == "Back to top"`, inferido, sem árvore capturada**) e só depois arrasta;
+saiu a guarda do card. Pendente: árvore iOS da listagem rolada (Remote Access) para confirmar o seletor iOS; o resto do
+513 além do onboarding e da listagem não foi conferido.
+
 **2026-10-21 (tarde) — CI Run #31 (11:10, A+B no ar): `01` 11/11; `02` 0/11; `03` 7/11; `04` 11/11.** O B funcionou (cada
 device numa camisa diferente, nenhum "Size sold out"), mas 7 devices pararam no `voltarAteCategorias()`: com a lista
 rolada o cabeçalho (`header-back-button`) sai da árvore e a volta da PDP mantém a rolagem — provado no AVD 1.22.2/512

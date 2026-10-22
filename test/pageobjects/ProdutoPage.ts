@@ -23,6 +23,16 @@ const SETA_VOLTAR_PDP = IOS
     ? '//*[@name="image-header"]/following-sibling::*[1]'
     : '//*[@resource-id="image-header"]/following-sibling::*[1][@clickable="true"]';
 
+// "Back to top" da listagem rolada: SEM id. Android (app 1.22.2/513, captures-2026-10-22-build513/
+// 13, 15, 17, 19): o único clicável do irmão anterior ao bloco que contém o `product-list`; com a
+// lista no topo o mesmo caminho dá o `header-back-button`, por isso ele é excluído. Conferido com
+// lxml: 1 nó nas 4 listagens roladas, 0 nas demais telas; tocado 3x, a lista foi ao topo e o
+// `header-back-button` voltou nas 3 (16, 18, 20). iOS: aparece no print do CI Run #33 (iPhone 13),
+// mas a árvore nunca foi capturada; o label é INFERIDO (accessibilityLabel do RN), NÃO VERIFICADO.
+const BACK_TO_TOP = IOS
+    ? '-ios predicate string:label == "Back to top"'
+    : '//*[.//*[@resource-id="product-list"]]/preceding-sibling::*/*[@clickable="true"][not(@resource-id="header-back-button")]';
+
 // ---- iOS: sheets da PDP FORA da árvore -----------------------------------------------------
 // No iOS (build 349) o conteúdo dos dois bottom sheets da PDP não aparece no getPageSource():
 // do sheet de tamanho só existe o casco (`bottom-sheet-close`, backdrop), sem os tamanhos nem o
@@ -553,14 +563,26 @@ export class ProdutoPage extends BasePage {
     }
 
     // Listagem ROLADA: o cabeçalho com o `header-back-button` rola junto com a lista e sai da árvore, e
-    // a volta da PDP mantém a lista rolada (AVD, app 1.22.2/512, captures-2026-10-21-listagem-rolada/
-    // 10–16; CI Run #31: 7 devices pararam aqui depois do `abrirProdutoNaPosicao`). Dois arrastos curtos
-    // para baixo (45% → 70% da altura) trouxeram o botão de volta sem chegar ao topo (captura 16). Mesmo
-    // mecanismo nas duas plataformas (arrasto W3C); no iOS, inferido (mesmo app RN e mesmo erro no CI).
+    // a volta da PDP mantém a lista rolada (AVD 512 e 513; CI Run #31 e #33). Primeiro o "Back to top"
+    // (BACK_TO_TOP), que leva a lista ao topo; se ele não estiver na tela, arrastos curtos para baixo
+    // (45% → 70% da altura), que no AVD trouxeram o botão sem chegar ao topo. Mesmo mecanismo nas duas
+    // plataformas. A guarda antiga "sem card visível = sai" derrubou os 5 iPhones no Run #33 (o
+    // `product-card-*` veio displayed=false e a função saiu sem arrastar); saiu.
     private async mostrarCabecalhoDaListagem() {
         const voltar = seletorTestId('header-back-button');
         if (await $(voltar).isDisplayed().catch(() => false)) return;
-        if (!(await $(SELETOR_CARD_PRODUTO).isDisplayed().catch(() => false))) return;
+
+        const topo = await $(BACK_TO_TOP);
+        if (await topo.isDisplayed().catch(() => false)) {
+            await topo.click();
+            const voltou = await $(voltar).waitForDisplayed({ timeout: 10000 }).then(() => true).catch(() => false);
+            if (voltou) {
+                console.log('⬆ "Back to top" tocado: lista no topo, header-back-button de volta');
+                return;
+            }
+            console.log('⚠ "Back to top" tocado, mas o header-back-button não voltou em 10 s — tentando arrastar');
+        }
+
         const { width, height } = await driver.getWindowRect();
         for (let i = 1; i <= 5; i++) {
             await this.arrastar(width / 2, height * 0.45, width / 2, height * 0.7);

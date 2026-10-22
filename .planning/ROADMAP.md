@@ -18,7 +18,7 @@ Como funciona a cada versão nova (Marcio, 2026-10-21):
 
 | Plataforma | Versão | Build | Profile (EAS) | Data | Evidência |
 |---|---|---|---|---|---|
-| Android | 1.22.2 | 512 | production | 2026-10-20 | `drafts/app-migrado/android/captures-2026-10-20-android16-remoto/` (Galaxy S26, Android 16) e `captures-2026-10-20-build512-comprar/` (AVD) |
+| Android | 1.22.2 | 513 | production (APK do CI Run #33) | 2026-10-22 | `drafts/app-migrado/android/captures-2026-10-22-build513/` (AVD; sem finalizar pedido nem enviar cadastro: bloqueado pelo classificador do Claude Code) |
 | iOS | 1.21.7 | 352 | production | 2026-10-21 | `drafts/app-migrado/ios/captures-2026-10-21-modal-estoque/` (Remote Access) |
 
 Profile conferido no EAS (API GraphQL `api.expo.dev`, `EXPO_TOKEN`/`EXPO_PROJECT_ID` do `.env`, campo `buildProfile`).

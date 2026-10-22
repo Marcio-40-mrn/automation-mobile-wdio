@@ -482,21 +482,23 @@ export class BasePage {
   // orçamento é 45 e a parada é o isDisplayed(), nunca uma contagem fixa).
   async termo1() {
     // fonte: captures-2026-09-29/05-politica.xml e 06-politica-fim.xml (draft android/04)
-    await this.aceitarTelaLongaAndroid('Política de Privacidade', 'privacy-accept');
+    await this.aceitarTelaLongaAndroid('Política de Privacidade', 'privacy-accept|onboarding-topics-continue');
   }
 
-  // Termos e condições de compra e uso: mesmo desenho; o nº de swipes não foi capturado.
+  // Termos e condições de compra e uso: mesmo desenho.
   async termos2() {
-    // fonte: captures-2026-09-29/07-termos.xml e 08-termos-fim.xml (draft android/05)
-    await this.aceitarTelaLongaAndroid('Termos e condições', 'terms-accept');
+    await this.aceitarTelaLongaAndroid('Termos e condições', 'terms-accept|onboarding-topics-continue');
   }
 
-  // Cada tela de leitura longa tem o seu aceite (`privacy-accept`, `terms-accept`), que só entra
-  // na árvore depois de rolar até o fim (rodada 2 de 2026-10-14: 15 swipes na Política, 5 nos
-  // Termos). Depois do clique, a prova de que a tela trocou é o botão sair da tela.
+  // O aceite vale com qualquer um dos dois ids (ordem do Marcio, 2026-10-22): até o 512 era
+  // `privacy-accept`/`terms-accept`; no 1.22.2/513 (AVD, captures-2026-10-22-build513/ 05–09; CI
+  // Run #33 parou aqui nos 6 Androids) os dois usam o id do Continue dos Tópicos,
+  // `onboarding-topics-continue`. Nos dois builds o botão só entra na árvore depois de rolar até o
+  // fim (no 513, ausente no início das duas telas, 05 e 07). Depois do clique, a prova de que a
+  // tela trocou é o botão sair da tela.
   private async aceitarTelaLongaAndroid(tela: string, idAceite: string) {
     const maxSwipes = 45;
-    const aceite = seletorTestId(idAceite);
+    const aceite = `-android uiautomator:new UiSelector().resourceIdMatches("${idAceite}")`;
     const element = await $(aceite);
 
     const achou = await scrollUntilVisible(element, maxSwipes);
