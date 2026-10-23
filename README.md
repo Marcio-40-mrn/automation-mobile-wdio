@@ -43,6 +43,10 @@ BUILD_PROFILE_IOS=development
 BUILD_SELECTION=latest
 BUILD_FROM=YYYY-MM-DD
 BUILD_TO=YYYY-MM-DD
+BUILD_VERSION_ANDROID=
+BUILD_NUMBER_ANDROID=
+BUILD_VERSION_IOS=
+BUILD_NUMBER_IOS=
 
 # iOS local via Device Farm Remote Access (apenas para npm run wdio:ios)
 REMOTE_HOST=<hostname da sessão remota>
@@ -62,13 +66,23 @@ profile `development` e o build **FINISHED mais recente**.
 | `BUILD_PROFILE_ANDROID` | nome do profile no `eas.json` (`development`, `preview`, `production`…) | `development` | Profile usado nas execuções Android |
 | `BUILD_PROFILE_IOS` | idem | `development` | Profile usado com `--platform ios` (Android e iOS podem estar em profiles diferentes) |
 | `BUILD_PROFILE` | idem | — | Fallback comum às duas plataformas, quando a variável específica não está definida |
-| `BUILD_SELECTION` | `latest` ou `date` | `latest` | `latest`: build mais recente. `date`: mais recente dentro do intervalo |
+| `BUILD_SELECTION` | `latest`, `date` ou `version` | `latest` | `latest`: build mais recente. `date`: mais recente dentro do intervalo. `version`: o build da versão/número pedidos |
 | `BUILD_FROM` | `YYYY-MM-DD` | — | Início do intervalo (inclusivo). Só vale com `BUILD_SELECTION=date` |
 | `BUILD_TO` | `YYYY-MM-DD` | — | Fim do intervalo (inclusivo, até 23:59:59 do dia) |
+| `BUILD_VERSION_ANDROID` | versão do app, ex.: `1.22.2` | — | Só vale com `BUILD_SELECTION=version`, nas execuções Android |
+| `BUILD_NUMBER_ANDROID` | número do build (versionCode), ex.: `513` | — | Idem |
+| `BUILD_VERSION_IOS` | versão do app, ex.: `1.21.7` | — | Só vale com `BUILD_SELECTION=version`, com `--platform ios` |
+| `BUILD_NUMBER_IOS` | número do build, ex.: `352` | — | Idem |
+| `BUILD_VERSION` / `BUILD_NUMBER` | idem | — | Fallback comum às duas plataformas |
 
 O literal `YYYY-MM-DD` (e valores vazios) conta como **não preenchido** — dá para deixar o
 placeholder no `.env` sem afetar o modo `latest`. Com `BUILD_SELECTION=date` é obrigatório
 preencher `BUILD_FROM` e/ou `BUILD_TO`; para um dia único, use a mesma data nos dois.
+
+Com `BUILD_SELECTION=version` é obrigatório preencher a versão e/ou o número **da plataforma
+que roda** (senão o script falha, em vez de baixar outro build). Com os dois, os dois têm que
+bater; só a versão traz o build mais recente dela. O profile continua valendo: o build pedido
+tem que estar no `BUILD_PROFILE_*` configurado.
 
 > **Limitação do modo `date`:** a consulta ao EAS traz os **20 builds mais recentes** da
 > plataforma. Se o intervalo for antigo demais para caber nesses 20, o script encerra com erro
@@ -161,7 +175,8 @@ O workflow `.github/workflows/mobile_test.yml` executa dois jobs em paralelo a c
 
 As variáveis de seleção de build também são **secrets** (Settings → Secrets and variables →
 Actions → aba **Secrets**): `BUILD_PROFILE_ANDROID`, `BUILD_PROFILE_IOS`, `BUILD_SELECTION`,
-`BUILD_FROM` e `BUILD_TO`. Todas opcionais — secret não cadastrado chega vazio ao script e cai
+`BUILD_FROM`, `BUILD_TO`, `BUILD_VERSION_ANDROID`, `BUILD_NUMBER_ANDROID`, `BUILD_VERSION_IOS` e
+`BUILD_NUMBER_IOS`. Todas opcionais — secret não cadastrado chega vazio ao script e cai
 no default (`development` + build mais recente), então a esteira roda sem configuração nova.
 
 Elas ficaram um tempo como `${{ vars.X }}` no workflow enquanto estavam cadastradas na aba

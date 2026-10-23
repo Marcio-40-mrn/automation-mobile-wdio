@@ -1,5 +1,11 @@
 # STATE
 
+**2026-10-23 — `scripts/install-apk.mjs` ganhou `BUILD_SELECTION=version`** (pedido do Marcio, modelo: o
+`installArys-apk.mjs` dele). Variáveis `BUILD_VERSION_ANDROID`/`BUILD_NUMBER_ANDROID`/`BUILD_VERSION_IOS`/
+`BUILD_NUMBER_IOS` (fallback `BUILD_VERSION`/`BUILD_NUMBER`), passadas pelo `mobile_test.yml` como secrets; sem a
+variável da plataforma, falha explícito. `latest`/`date` sem mudança. Testado só o erro e a busca sem match (sem
+download). Achado na listagem do EAS: o **513 está no profile `development`**, não `production`.
+
 **2026-10-22 (noite) — CI Run #36 (18:55, app Android 1.22.2/513): Android `04` 0/6 (botão desabilitado), `01` falhou
 no S23+ e no S26 Ultra ("continua logada"); iOS `02` falhou no iPhone 15 Pro Max (banner).**
 - **`04` (ordem do Marcio), só `tsc`, NÃO RODADO:** `CadastroPage.conferirBotao`: com a etapa válida, botão

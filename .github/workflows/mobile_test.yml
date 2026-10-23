@@ -38,6 +38,8 @@ jobs:
           BUILD_SELECTION: ${{ secrets.BUILD_SELECTION }}
           BUILD_FROM: ${{ secrets.BUILD_FROM }}
           BUILD_TO: ${{ secrets.BUILD_TO }}
+          BUILD_VERSION_ANDROID: ${{ secrets.BUILD_VERSION_ANDROID }}
+          BUILD_NUMBER_ANDROID: ${{ secrets.BUILD_NUMBER_ANDROID }}
         run: |
           node scripts/install-apk.mjs --no-install
           echo "APP_VERSION=$(jq -r '.appVersion' .build-info.json)" >> $GITHUB_ENV
@@ -296,6 +298,8 @@ jobs:
           BUILD_SELECTION: ${{ secrets.BUILD_SELECTION }}
           BUILD_FROM: ${{ secrets.BUILD_FROM }}
           BUILD_TO: ${{ secrets.BUILD_TO }}
+          BUILD_VERSION_IOS: ${{ secrets.BUILD_VERSION_IOS }}
+          BUILD_NUMBER_IOS: ${{ secrets.BUILD_NUMBER_IOS }}
         run: |
           node scripts/install-apk.mjs --no-install --platform ios
           echo "APP_VERSION=$(jq -r '.appVersion' .build-info.json)" >> $GITHUB_ENV

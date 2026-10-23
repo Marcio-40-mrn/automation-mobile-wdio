@@ -80,16 +80,43 @@ const BUILD_PROFILE = (platformUpper === 'IOS'
     ?? envValue('BUILD_PROFILE')
     ?? 'development';
 
-// latest -> build FINISHED mais recente do profile/bundle
-// date   -> mais recente dentro do intervalo BUILD_FROM..BUILD_TO (inclusivo nas duas pontas)
+// latest  -> build FINISHED mais recente do profile/bundle
+// date    -> mais recente dentro do intervalo BUILD_FROM..BUILD_TO (inclusivo nas duas pontas)
+// version -> build com a versão e/ou o número de build pedidos (BUILD_VERSION_*/BUILD_NUMBER_*)
 const BUILD_SELECTION = (envValue('BUILD_SELECTION') ?? 'latest').toLowerCase();
 const BUILD_FROM = envDate('BUILD_FROM');
 const BUILD_TO   = envDate('BUILD_TO');
 
-if (!['latest', 'date'].includes(BUILD_SELECTION)) {
-    console.error(`BUILD_SELECTION inválido: '${BUILD_SELECTION}'. Use 'latest' ou 'date'.`);
+if (!['latest', 'date', 'version'].includes(BUILD_SELECTION)) {
+    console.error(`BUILD_SELECTION inválido: '${BUILD_SELECTION}'. Use 'latest', 'date' ou 'version'.`);
     process.exit(1);
 }
+
+// Android e iOS têm versão e número de build próprios (ex.: Android 1.22.2/513, iOS 1.21.7/352),
+// daí uma variável por plataforma, com BUILD_VERSION/BUILD_NUMBER de fallback comum.
+// Com as duas preenchidas, as duas têm que bater; só a versão -> o build mais recente dela.
+const BUILD_VERSION = (platformUpper === 'IOS'
+    ? envValue('BUILD_VERSION_IOS')
+    : envValue('BUILD_VERSION_ANDROID'))
+    ?? envValue('BUILD_VERSION');
+const BUILD_NUMBER = (platformUpper === 'IOS'
+    ? envValue('BUILD_NUMBER_IOS')
+    : envValue('BUILD_NUMBER_ANDROID'))
+    ?? envValue('BUILD_NUMBER');
+
+// Sem versão nem número para a plataforma, falha aqui: cair em outro build em silêncio
+// faria o teste rodar num app diferente do pedido.
+if (BUILD_SELECTION === 'version' && !BUILD_VERSION && !BUILD_NUMBER) {
+    const sufixo = platformUpper === 'IOS' ? 'IOS' : 'ANDROID';
+    console.error(`BUILD_SELECTION=version exige BUILD_VERSION_${sufixo} e/ou BUILD_NUMBER_${sufixo} preenchidos (ou BUILD_VERSION/BUILD_NUMBER).`);
+    process.exit(1);
+}
+
+const matchesVersion = (b) =>
+    BUILD_SELECTION !== 'version' || (
+        (!BUILD_VERSION || String(b.appVersion ?? '').trim() === BUILD_VERSION) &&
+        (!BUILD_NUMBER  || String(b.appBuildVersion ?? '').trim() === BUILD_NUMBER)
+    );
 
 // Converte 'YYYY-MM-DD' para timestamp local. endOfDay=true -> 23:59:59.999 do mesmo dia.
 function parseLocalDate(value, label, endOfDay) {
@@ -137,7 +164,10 @@ const rangeLabel = BUILD_SELECTION === 'date'
         : BUILD_FROM
             ? `a partir de ${BUILD_FROM}`
             : `até ${BUILD_TO}`)
-    : 'mais recente';
+    : BUILD_SELECTION === 'version'
+        ? [BUILD_VERSION && `versão ${BUILD_VERSION}`, BUILD_NUMBER && `build ${BUILD_NUMBER}`]
+            .filter(Boolean).join(', ')
+        : 'mais recente';
 
 function graphqlRequest(query, variables = {}) {
     return new Promise((resolve, reject) => {
@@ -224,7 +254,7 @@ const declaredVars = [
     hasOffset   ? '$offset: Int!'             : null,
 ].filter(Boolean).join(', ');
 
-const data = await graphqlRequest(`
+const BUILDS_QUERY = `
     query(${declaredVars}) {
         app {
             ${appByIdField.name}(${appIdArgName}: $${appIdArgName}) {
@@ -242,28 +272,52 @@ const data = await graphqlRequest(`
             }
         }
     }
-`, {
-    [appIdArgName]: EXPO_PROJECT_ID,
-    ...(hasLimit    ? { limit: 20 }          : {}),
-    ...(hasPlatform ? { platform: platformUpper } : {}),
-    ...(hasStatus   ? { status: 'FINISHED' }  : {}),
-    ...(hasOffset   ? { offset: 0 }           : {}),
-});
+`;
 
-const appBuilds = data?.app?.[appByIdField.name]?.builds ?? [];
+async function fetchBuildsPage(limit, offset) {
+    const data = await graphqlRequest(BUILDS_QUERY, {
+        [appIdArgName]: EXPO_PROJECT_ID,
+        ...(hasLimit    ? { limit }                   : {}),
+        ...(hasPlatform ? { platform: platformUpper } : {}),
+        ...(hasStatus   ? { status: 'FINISHED' }      : {}),
+        ...(hasOffset   ? { offset }                  : {}),
+    });
+    return data?.app?.[appByIdField.name]?.builds ?? [];
+}
+
+const matchesSelection = (b) =>
+    b.status === 'FINISHED' &&
+    b.buildProfile === BUILD_PROFILE &&
+    b.appIdentifier === TARGET_BUNDLE_ID &&
+    isInRange(b.createdAt) &&
+    matchesVersion(b) &&
+    (platformUpper === 'IOS'
+        ? b.artifacts?.buildUrl?.endsWith('.ipa')
+        : (b.artifacts?.buildUrl?.endsWith('.apk') || b.artifacts?.buildUrl?.endsWith('.aab')));
+
+// latest e date: uma página de 20, como sempre foi. version: a versão pedida pode estar
+// semanas atrás no histórico, então pagina (até 10 x 50) e para no 1º match — a lista vem
+// do mais novo para o mais antigo.
+const appBuilds = [];
+if (BUILD_SELECTION !== 'version') {
+    appBuilds.push(...await fetchBuildsPage(20, 0));
+} else if (!hasOffset) {
+    console.log('API não expõe offset — buscando os 200 builds mais recentes de uma vez...');
+    appBuilds.push(...await fetchBuildsPage(200, 0));
+} else {
+    const PAGE_SIZE = 50;
+    for (let page = 0; page < 10; page++) {
+        const pageBuilds = await fetchBuildsPage(PAGE_SIZE, page * PAGE_SIZE);
+        appBuilds.push(...pageBuilds);
+        console.log(`  página ${page + 1}: ${pageBuilds.length} build(s) (total ${appBuilds.length})`);
+        if (pageBuilds.length < PAGE_SIZE || pageBuilds.some(matchesSelection)) break;
+    }
+}
 
 // Sort newest first, then filter for the right build type
 const build = appBuilds
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    .find(b =>
-        b.status === 'FINISHED' &&
-        b.buildProfile === BUILD_PROFILE &&
-        b.appIdentifier === TARGET_BUNDLE_ID &&
-        isInRange(b.createdAt) &&
-        (platformUpper === 'IOS'
-            ? b.artifacts?.buildUrl?.endsWith('.ipa')
-            : (b.artifacts?.buildUrl?.endsWith('.apk') || b.artifacts?.buildUrl?.endsWith('.aab')))
-    );
+    .find(matchesSelection);
 
 if (!build) {
     console.error(`Nenhum build '${BUILD_PROFILE}'/FINISHED com .apk ou .aab encontrado para ${TARGET_BUNDLE_ID} (${rangeLabel}).`);
@@ -273,7 +327,7 @@ if (!build) {
             .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
             .forEach(b => {
                 const ext = b.artifacts?.buildUrl?.split('.').pop() ?? '?';
-                console.error(`  ${b.createdAt} | ${b.buildProfile} | ${b.status} | .${ext} | ${b.id}`);
+                console.error(`  ${b.createdAt} | ${b.buildProfile} | ${b.appVersion ?? '?'} (${b.appBuildVersion ?? '?'}) | ${b.status} | .${ext} | ${b.id}`);
             });
     }
     process.exit(1);
