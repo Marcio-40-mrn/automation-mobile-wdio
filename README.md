@@ -81,8 +81,8 @@ preencher `BUILD_FROM` e/ou `BUILD_TO`; para um dia único, use a mesma data nos
 
 Com `BUILD_SELECTION=version` é obrigatório preencher a versão e/ou o número **da plataforma
 que roda** (senão o script falha, em vez de baixar outro build). Com os dois, os dois têm que
-bater; só a versão traz o build mais recente dela. O profile continua valendo: o build pedido
-tem que estar no `BUILD_PROFILE_*` configurado.
+bater; só a versão traz o build mais recente dela. Nesse modo o `BUILD_PROFILE_*` é **ignorado**
+(a versão + número já identificam o build); o profile em que ele foi achado sai no log.
 
 > **Limitação do modo `date`:** a consulta ao EAS traz os **20 builds mais recentes** da
 > plataforma. Se o intervalo for antigo demais para caber nesses 20, o script encerra com erro

@@ -237,7 +237,9 @@ const hasPlatform = buildsField.args?.some(a => a.name === 'platform');
 const hasStatus   = buildsField.args?.some(a => a.name === 'status');
 const hasOffset   = buildsField.args?.some(a => a.name === 'offset');
 
-console.log(`Caminho: app.${appByIdField.name}(${appIdArgName}: ...).${buildsField.name}(...) — buscando build '${BUILD_PROFILE}' (${rangeLabel}, .apk ou .aab) para ${TARGET_BUNDLE_ID}...`);
+const profileLabel = BUILD_SELECTION === 'version' ? 'qualquer profile' : BUILD_PROFILE;
+
+console.log(`Caminho: app.${appByIdField.name}(${appIdArgName}: ...).${buildsField.name}(...) — buscando build '${profileLabel}' (${rangeLabel}, .apk ou .aab) para ${TARGET_BUNDLE_ID}...`);
 
 const buildsArgs = [
     hasLimit    ? 'limit: $limit'       : null,
@@ -285,9 +287,12 @@ async function fetchBuildsPage(limit, offset) {
     return data?.app?.[appByIdField.name]?.builds ?? [];
 }
 
+// No modo version o profile é ignorado: versão + número já identificam um build só no EAS
+// (ex.: 513 só existe em development, 515 só em production), e exigir o profile só fazia a
+// busca falhar quando o secret apontava para o outro (CI Run #38, 2026-10-23).
 const matchesSelection = (b) =>
     b.status === 'FINISHED' &&
-    b.buildProfile === BUILD_PROFILE &&
+    (BUILD_SELECTION === 'version' || b.buildProfile === BUILD_PROFILE) &&
     b.appIdentifier === TARGET_BUNDLE_ID &&
     isInRange(b.createdAt) &&
     matchesVersion(b) &&
@@ -320,7 +325,7 @@ const build = appBuilds
     .find(matchesSelection);
 
 if (!build) {
-    console.error(`Nenhum build '${BUILD_PROFILE}'/FINISHED com .apk ou .aab encontrado para ${TARGET_BUNDLE_ID} (${rangeLabel}).`);
+    console.error(`Nenhum build '${profileLabel}'/FINISHED com .apk ou .aab encontrado para ${TARGET_BUNDLE_ID} (${rangeLabel}).`);
     if (appBuilds.length) {
         console.error('Builds disponíveis (mais recentes primeiro):');
         [...appBuilds]

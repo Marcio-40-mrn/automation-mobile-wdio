@@ -27,16 +27,19 @@ const SETA_VOLTAR_PDP = IOS
 // 13, 15, 17, 19): o único clicável do irmão anterior ao bloco que contém o `product-list`; com a
 // lista no topo o mesmo caminho dá o `header-back-button`, por isso ele é excluído. Conferido com
 // lxml: 1 nó nas 4 listagens roladas, 0 nas demais telas; tocado 3x, a lista foi ao topo e o
-// `header-back-button` voltou nas 3 (16, 18, 20). iOS: aparece no print do CI Run #33 (iPhone 13),
-// mas a árvore nunca foi capturada; o label é INFERIDO (accessibilityLabel do RN), NÃO VERIFICADO.
+// `header-back-button` voltou nas 3 (16, 18, 20). iOS (app 1.22.3/359, ios/captures-2026-10-23-
+// pendencias-ios/ 17–22): DOIS nós com esse label na lista rolada (wrapper 440 pt e botão 156 pt,
+// mesmo centro), 0 com a lista no topo; o $() pega o wrapper, e o element click nele levou a lista
+// ao topo e trouxe o `header-back-button` de volta (18 → 19).
 const BACK_TO_TOP = IOS
     ? '-ios predicate string:label == "Back to top"'
     : '//*[.//*[@resource-id="product-list"]]/preceding-sibling::*/*[@clickable="true"][not(@resource-id="header-back-button")]';
 
 // Preço promocional da PDP: irmão imediatamente anterior ao `price`, com "R$" ("R$" é marcador de
 // moeda, não validação de texto). Só existe com promoção. Android conferido nos dumps 12 (1 nó) e
-// 14 (0 nó) de captures-2026-10-22-preco-promocional/ (1.22.2/513); iOS INFERIDO da estrutura do
-// `price` no 349, sem PDP em promoção capturada.
+// 14 (0 nó) de captures-2026-10-22-preco-promocional/ (1.22.2/513); iOS conferido com lxml no
+// 1.22.3/359 (ios/captures-2026-10-23-pendencias-ios/): 1 nó na PDP em promoção (21, o `price` é o
+// cortado), 0 na PDP sem promoção (23).
 const PRECO_PROMOCIONAL = IOS
     ? '//XCUIElementTypeStaticText[@name="price"]/preceding-sibling::XCUIElementTypeStaticText[1][starts-with(@label,"R$")]'
     : '//*[@resource-id="price"]/preceding-sibling::*[1][starts-with(@text,"R$")]';

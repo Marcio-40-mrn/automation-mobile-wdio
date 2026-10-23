@@ -1,10 +1,29 @@
 # STATE
 
+**2026-10-23 (14:13) — CI Run #39: `BUILD_SELECTION=version` validado no CI** (os dois downloads passaram e o Device
+Farm rodou). Android 23/24: só o `01` no S25 Ultra falhou (banner do Insider na hora de favoritar levou a uma tela sem
+os elementos). iOS 18/20: `03-compra-cartao` falhou no iPhone 15 e no 14 Pro Max (tela demorou a carregar). Causas
+levantadas pelo Marcio; nenhuma mudança decidida.
+
+**2026-10-23 (tarde) — Pendências iOS validadas no Remote Access, app 1.22.3/359** (janela 440x956;
+`drafts/app-migrado/ios/captures-2026-10-23-pendencias-ios/`, 00–26; sessão fechada, Mochila e Favoritos vazios,
+nada finalizado). Onboarding: `welcome-start-button` → `onboarding-topics-continue` → `privacy-accept` →
+`terms-accept` valem (sem `accept-button`). Home: `editorial-home-root` existe (visible=false; o teste checa
+existência), `bell` visível. "Back to top": 2 nós (wrapper + botão), o 1º tocado leva a lista ao topo e traz o
+`header-back-button`, que some da árvore com a lista rolada; voltar da PDP mantém a rolagem. PDP em promoção: `price` =
+cortado, promocional = irmão anterior sem id (XPath `PRECO_PROMOCIONAL` iOS: 1 nó na 21, 0 na 23). Menu deslogado
+rolado: Button `login` do rodapé visível, `menu-login-button` não; 0 nós `login` no logado. **Nenhuma mudança de lógica
+nos testes** (só comentários do `ProdutoPage` de "inferido" para conferido). Não alcançado: banner do Insider (marcador
+iOS continua sem medição), "Size sold out", "Erro ao realizar compra".
+
 **2026-10-23 — `scripts/install-apk.mjs` ganhou `BUILD_SELECTION=version`** (pedido do Marcio, modelo: o
 `installArys-apk.mjs` dele). Variáveis `BUILD_VERSION_ANDROID`/`BUILD_NUMBER_ANDROID`/`BUILD_VERSION_IOS`/
 `BUILD_NUMBER_IOS` (fallback `BUILD_VERSION`/`BUILD_NUMBER`), passadas pelo `mobile_test.yml` como secrets; sem a
 variável da plataforma, falha explícito. `latest`/`date` sem mudança. Testado só o erro e a busca sem match (sem
 download). Achado na listagem do EAS: o **513 está no profile `development`**, não `production`.
+CI Run #38 (15:01) caiu nos dois downloads (12–14 s, nenhum run no Device Farm): `version` exigia o profile, e o
+`.env` pedia 1.22.3/515 e /359 em `development` (estão em `production`). Correção (Marcio): no modo `version` o
+profile é ignorado; conferido localmente (Android com `development` achou o 515 `production`), sem download.
 
 **2026-10-22 (noite) — CI Run #36 (18:55, app Android 1.22.2/513): Android `04` 0/6 (botão desabilitado), `01` falhou
 no S23+ e no S26 Ultra ("continua logada"); iOS `02` falhou no iPhone 15 Pro Max (banner).**
