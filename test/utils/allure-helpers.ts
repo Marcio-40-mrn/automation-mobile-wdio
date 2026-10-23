@@ -3,6 +3,7 @@ import { Status } from 'allure-js-commons';
 import { getCredentials } from './credentials';
 import { friendlyDeviceName } from './device-name';
 import { driver } from '@wdio/globals';
+import { bannerDoInsiderNaTela } from '../pageobjects/BasePage';
 
 // Helpers de Allure compartilhados pelos specs. Antes moravam dentro do test.spec.ts; saíram
 // para cá no 06-02 (M6, Etapa 0) para que cada spec novo não copie o mesmo bloco.
@@ -23,13 +24,27 @@ export function configurarFechadorDeBanner(fn: (() => Promise<void>) | null): vo
 // Na falha, anexa o print da tela no próprio step (2026-10-18: o 03-compra-cartao iOS falhou na
 // parcela sem print, porque o print dependia de cada método lembrar de chamar anexarPrint). Se o
 // print falhar (sessão caída), só loga: nunca troca o erro do teste.
+//
+// Banner na falha (Marcio, 2026-10-22, depois do CI Run #36): nenhum passo falha com o banner do
+// Insider aberto na frente. Antes de relançar o erro, confere o banner; se estiver na tela, anexa o
+// print (prova de que era ele), fecha e repete o passo UMA vez. Só a 2ª falha sobe. Vale para os
+// 4 specs nas duas plataformas.
 export async function step(nome: string, fn: () => Promise<void>): Promise<void> {
     allure.startStep(nome);
     try {
         if (fechadorDeBanner) {
             await fechadorDeBanner();
         }
-        await fn();
+        try {
+            await fn();
+        } catch (e) {
+            if (!fechadorDeBanner || !(await bannerDoInsiderNaTela())) throw e;
+            console.log(`🟡 "${nome}" falhou com o banner do Insider na tela — fechando e repetindo o passo (${e instanceof Error ? e.message : e})`);
+            await anexarPrint(`Banner na tela na falha — ${nome}`).catch(() => undefined);
+            await fechadorDeBanner();
+            await fn();
+            console.log(`✅ "${nome}" passou depois de fechar o banner`);
+        }
         allure.endStep(Status.PASSED);
     } catch (e) {
         try {

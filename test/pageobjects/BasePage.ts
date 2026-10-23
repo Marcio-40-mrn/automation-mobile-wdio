@@ -21,7 +21,18 @@ export function seletorTestId(id: string): string {
 // era `onboarding-topics-continue` e os aceites `privacy-accept`/`terms-accept`; no 1.22.2/513 os
 // três eram `onboarding-topics-continue`; no 1.22.3/514 os três são `accept-button`
 // (captures-2026-10-22-build514/04-topicos, 07-politica-fim, 09-termos-fim).
-export const ACEITE_ONBOARDING_ANDROID = 'onboarding-topics-continue|accept-button';
+// Banner do Insider na tela AGORA (uma consulta). iOS pela WebView "Insider WebView Content" (o
+// marcador do fechaBannerIOS); Android pelo botão de fechar do criativo, porque o insiderLayout
+// sobra na árvore com a tela limpa (ver fechaBanner). Usado pelo esperarFechandoBanner e pelo
+// step() (allure-helpers), que confere o banner antes de deixar qualquer passo falhar.
+export async function bannerDoInsiderNaTela(): Promise<boolean> {
+  const presenca = process.env.PLATFORM === 'ios'
+    ? '-ios predicate string:label == "Insider WebView Content"'
+    : '-android uiautomator:new UiSelector().resourceIdMatches(".*wrap-close-button.*")';
+  return $(presenca).isDisplayed().catch(() => false);
+}
+
+export const ACEITE_ONBOARDING_ANDROID ='onboarding-topics-continue|accept-button';
 
 export function seletorIdsAndroid(regex: string): string {
   return `-android uiautomator:new UiSelector().resourceIdMatches("${regex}")`;
@@ -268,6 +279,34 @@ export class BasePage {
     return el.isDisplayed().catch(() => false);
   }
 
+  // Espera `chegou()` conferindo o banner do Insider A CADA VOLTA, não só antes do toque. Caso que
+  // motivou: CI Run #36 (iPhone 15 Pro Max, 2026-10-22): o fechaBanner() antes do Buy não viu
+  // nada, o banner "polos 3POR2" abriu ~6 s depois da PDP, por cima dela, e a espera de 15 s pelo
+  // sheet terminou com o banner na tela (vídeo e print da falha). Se o banner abrir, fecha, roda
+  // `aoFecharBanner` (ex.: repetir o toque que ele engoliu) e recomeça o prazo; no máximo 2 vezes.
+  // Presença: bannerDoInsiderNaTela() (topo do arquivo).
+  protected async esperarFechandoBanner(
+    chegou: () => Promise<boolean>,
+    timeout: number,
+    aoFecharBanner?: () => Promise<void>
+  ): Promise<boolean> {
+    let limite = Date.now() + timeout;
+    let fechados = 0;
+    while (Date.now() < limite) {
+      if (await chegou()) return true;
+      if (fechados < 2 && (await bannerDoInsiderNaTela())) {
+        fechados++;
+        console.log(`🟡 Banner do Insider abriu durante a espera — fechando (${fechados}/2)`);
+        await this.fechaBanner();
+        if (aoFecharBanner) await aoFecharBanner();
+        limite = Date.now() + timeout;
+        continue;
+      }
+      await driver.pause(500);
+    }
+    return chegou();
+  }
+
 
   // Seletor do acesso ao Login no Menu deslogado. Compartilhado entre LoginPage (abrir o Login) e
   // PerfilPage (validar que deslogou).
@@ -292,9 +331,15 @@ export class BasePage {
     }
     // Desde o build 500 o acesso ao Login tem testID próprio (`menu-login-button`); o `menu-card`
     // usado como âncora antes não existe mais. fonte: captures-2026-10-14-compra-pix/02a-menu-deslogado.xml
+    // Rodapé (botão "login", sem id): o clicável logo antes das abas que NÃO é item do Menu e está
+    // ativo. Era `[@resource-id=""]`, que casa no dump do AVD (513, caps. 34 e 85) mas não casou no
+    // S23+ e no S26 Ultra do CI Run #36 com o botão na tela (prints da falha) — provável árvore do
+    // Appium sem o atributo vazio, não provado. Nos dumps do 513, logado o mesmo ponto é sempre um
+    // `menu-item-*` (rate-app, control-panel; caps. 41, 83, 25), então não há falso positivo.
     return chave === 'menu.acessoLogin'
       ? seletorTestId('menu-login-button')
-      : '(//*[@resource-id="tab-home"])[1]/preceding::*[@clickable="true"][1][@resource-id=""]';
+      : '(//*[@resource-id="tab-home"])[1]/preceding::*[@clickable="true"][1]' +
+        '[not(starts-with(@resource-id,"menu-"))][@enabled="true"]';
   }
 
   // Espera até `timeout` por qualquer um dos seletores ficar displayed. Devolve o primeiro que

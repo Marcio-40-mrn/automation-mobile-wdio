@@ -173,8 +173,13 @@ export class ProdutoPage extends BasePage {
             await this.waitForElement(comprar);
             await comprar.click();
 
-            const sheet = await $(adicionar).waitForDisplayed({ timeout: 15000 }).then(() => true).catch(() => false);
+            const sheet = await this.esperarFechandoBanner(
+                () => $(adicionar).isDisplayed().catch(() => false),
+                15000,
+                async () => { await (await $(seletorTestId('pdp-buy-button'))).click(); }
+            );
             if (!sheet) {
+                allure.addAttachment('Comprar — árvore da tela (sheet não abriu)', await driver.getPageSource(), 'text/xml');
                 throw new Error('Comprar: o sheet de tamanho (size-button) não abriu em 15s depois de tocar no pdp-buy-button.');
             }
 
@@ -185,14 +190,13 @@ export class ProdutoPage extends BasePage {
                 await (await $(adicionar)).click();
                 // 45s: no build 507 o sheet chega ~30s depois do toque, com a PDP "parada" no meio
                 // (bug 22 do BUGS-APP-ANDROID.md, run de 2026-10-17 01:33). Era 20s.
+                // Banner que abrir nesta espera é fechado sem repetir o toque (repetir adicionaria 2x).
                 let resultado: 'adicionado' | 'modal' | null = null;
-                await driver
-                    .waitUntil(async () => {
-                        if (await $(seletorTestId('bag-continue-shopping')).isDisplayed().catch(() => false)) resultado = 'adicionado';
-                        else if (await $(modalEstoque).isDisplayed().catch(() => false)) resultado = 'modal';
-                        return resultado !== null;
-                    }, { timeout: 45000, interval: 1000 })
-                    .catch(() => undefined);
+                await this.esperarFechandoBanner(async () => {
+                    if (await $(seletorTestId('bag-continue-shopping')).isDisplayed().catch(() => false)) resultado = 'adicionado';
+                    else if (await $(modalEstoque).isDisplayed().catch(() => false)) resultado = 'modal';
+                    return resultado !== null;
+                }, 45000);
                 if (resultado === 'adicionado') {
                     console.log(`✅ Produto adicionado à Mochila (tamanho ${tamanho})`);
                     await driver.pause(timewhait);
@@ -423,11 +427,13 @@ export class ProdutoPage extends BasePage {
         await this.waitForElement(comprar);
         await comprar.click();
 
-        const abriu = await driver
-            .waitUntil(async () => (await this.sheetAbertoIOS()) === 'tamanho', { timeout: 15000, interval: 500 })
-            .then(() => true)
-            .catch(() => false);
+        const abriu = await this.esperarFechandoBanner(
+            async () => (await this.sheetAbertoIOS()) === 'tamanho',
+            15000,
+            async () => { await (await $(seletorTestId('pdp-buy-button'))).click(); }
+        );
         if (!abriu) {
+            allure.addAttachment('Comprar (iOS) — árvore da tela (sheet não abriu)', await driver.getPageSource(), 'text/xml');
             throw new Error('Comprar (iOS): o sheet de tamanho não abriu em 15s depois de tocar no pdp-buy-button.');
         }
         await driver.pause(1500); // o sheet ainda está subindo
@@ -440,14 +446,13 @@ export class ProdutoPage extends BasePage {
             await driver.pause(800);
             await this.tapProporcional(...FRACAO_ADICIONAR_IOS, '"Add to cart"');
 
+            // Banner que abrir nesta espera é fechado sem repetir o toque (repetir adicionaria 2x).
             let resultado: 'adicionado' | 'modal' | null = null;
-            await driver
-                .waitUntil(async () => {
-                    if (await $(modalEstoque).isDisplayed().catch(() => false)) resultado = 'modal';
-                    else if ((await this.sheetAbertoIOS()) === 'adicionado') resultado = 'adicionado';
-                    return resultado !== null;
-                }, { timeout: 8000, interval: 500 })
-                .catch(() => undefined);
+            await this.esperarFechandoBanner(async () => {
+                if (await $(modalEstoque).isDisplayed().catch(() => false)) resultado = 'modal';
+                else if ((await this.sheetAbertoIOS()) === 'adicionado') resultado = 'adicionado';
+                return resultado !== null;
+            }, 8000);
             const adicionou = resultado === 'adicionado';
 
             if (resultado === 'modal') {
@@ -466,10 +471,11 @@ export class ProdutoPage extends BasePage {
                 // O OK volta à PDP sem sheet (captura 18): reabre o sheet para o próximo tamanho.
                 if ((await this.sheetAbertoIOS()) !== 'tamanho') {
                     await (await $(seletorTestId('pdp-buy-button'))).click();
-                    const reabriu = await driver
-                        .waitUntil(async () => (await this.sheetAbertoIOS()) === 'tamanho', { timeout: 15000, interval: 500 })
-                        .then(() => true)
-                        .catch(() => false);
+                    const reabriu = await this.esperarFechandoBanner(
+                        async () => (await this.sheetAbertoIOS()) === 'tamanho',
+                        15000,
+                        async () => { await (await $(seletorTestId('pdp-buy-button'))).click(); }
+                    );
                     if (!reabriu) {
                         await anexarPrint('Comprar (iOS) — sheet não reabriu depois do modal de estoque');
                         throw new Error('Comprar (iOS): depois do OK no modal de estoque, o sheet de tamanho não reabriu em 15s.');

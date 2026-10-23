@@ -35,6 +35,7 @@ UMA senha sorteada por execução entre `abc`, `abcdefgh`, `Abcdefgh` e `Abcdefg
 | 2026-10-18 ~21:30 | CI Run #24, Device Farm, Samsung Galaxy S24+ | `informatica.mrn+cadastro-samsung-galaxy-s24-mveje2sh-slz0@gmail.com` | Teste | Automacao | `621.911.278-43` | 26/03/1973 | (11) 97659-3433 | `Aramis@EFGK5a` | conta criada (spec 04 PASSED neste device; dados do `Test spec output`) |
 | 2026-10-18 ~21:30 | CI Run #24, Device Farm, Samsung Galaxy S25 Ultra | `informatica.mrn+cadastro-samsung-galaxy-s25-u-mvejfjfj-cmq2@gmail.com` | Teste | Automacao | `416.503.081-32` | 12/02/1997 | (11) 95025-0667 | `Aramis@LQZB9a` | conta criada (spec 04 PASSED neste device; dados do `Test spec output`) |
 | 2026-10-19 | captura Android (AVD-S24, build 1.22.0/509, `captures-2026-10-19-qa160/`), conta do CI recriada | `aaliyahrochanascimento087+qa160@gmail.com` | Aaliyah | Rocha Nascimento | `384.915.267-73` | 01/01/1990 | (11) 98765-4321 | não registrada (= `CLIENT_PASSWORD`) | conta criada; Home logada direto após o 2º toque em finalizar; logout e novo login funcionaram |
+| 2026-10-22 ~19:52 | captura AVD (build 1.22.2/513, `captures-2026-10-22-cadastro-513-conta-criada/`) | `informatica.mrn+cadastro513-1792709262@gmail.com` | Teste | Automacao | `213.176.296-80` | 15/05/1990 | (11) 98765-4321 | `Aramis@qa513x1` | conta criada; os botões das duas etapas estavam `enabled=false` no dump e o 2º toque em cada um avançou (etapa 1 → 2; etapa 2 → Home logada, cap. 24); Menu mostrou "TA, Teste Automacao" (cap. 25). Estado final: `pm clear` |
 
 ## Compra
 

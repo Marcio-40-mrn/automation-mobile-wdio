@@ -1,8 +1,39 @@
 # STATE
 
+**2026-10-22 (noite) — CI Run #36 (18:55, app Android 1.22.2/513): Android `04` 0/6 (botão desabilitado), `01` falhou
+no S23+ e no S26 Ultra ("continua logada"); iOS `02` falhou no iPhone 15 Pro Max (banner).**
+- **`04` (ordem do Marcio), só `tsc`, NÃO RODADO:** `CadastroPage.conferirBotao`: com a etapa válida, botão
+  desabilitado = AVISO (log + print "Aviso — … não habilitou" no Allure), e o teste toca mesmo assim; habilitado com
+  dado inválido continua sendo falha. `enviarEtapa1`/`finalizar` tocam até 2x nas duas plataformas (`tocarAteAvancar`),
+  com o destino validado pela tela.
+- **`02` iPhone 15 Pro Max:** o vídeo mostra a PDP limpa por cerca de 6 s; depois o banner "polos 3POR2" abre e fica até a falha. O
+  `fechaBanner()` roda só ANTES do toque no Buy e a espera de 15 s pelo sheet não olha o banner. No log não há "🟡"
+  (o banner nunca foi detectado). **Corrigido (ordem do Marcio), só `tsc`, NÃO RODADO, nas duas plataformas:**
+  (a) `step()` (`allure-helpers.ts`): todo passo que falhar com o banner na tela anexa o print "Banner na tela na
+  falha", fecha o banner e repete o passo 1 vez; só a 2ª falha sobe (4 specs). (b) `BasePage.esperarFechandoBanner`
+  + `bannerDoInsiderNaTela()`: as esperas do `ProdutoPage.comprar()`/`comprarIOS()` conferem o banner a cada volta;
+  na espera do sheet de tamanho, fecha e toca o Buy de novo; na espera do "adicionado", só fecha (sem repetir o
+  toque). Sheet que não abriu anexa a árvore da tela. Risco: repetir um passo não idempotente (ex.: finalizar
+  pedido) se o banner estiver na tela na falha; marcador iOS do banner não medido no app migrado.
+- **`01` S23+/S26 Ultra:** os prints mostram o app DESLOGADO (Menu rolado, botão "login" do rodapé). O teste procura
+  `menu-card-*` enabled=false (fora da tela com o Menu rolado) ou o rodapé pelo XPath "último clicável antes do
+  tab-home", que casa no dump do AVD (513, cap. 85) e não casou nesses 2 aparelhos (sem árvore anexada; causa
+  não provada). Falso negativo do teste. **Corrigido (Marcio: "o botão login ativo na tela basta"), só `tsc`, NÃO
+  RODADO:** `BasePage.seletorAcessoLogin('menu.acessoLoginRodape')` Android = clicável antes do `tab-home` que não é
+  `menu-*` e está `enabled=true` (sem depender de `resource-id=""`); conferido com lxml nos dumps do 513: acha só nos
+  deslogados rolados (34, 85), nada nos logados (41, 83, 25). Sem rolar a tela. Falha anexa a árvore (`PerfilPage`).
+
 **2026-10-22 (noite) — CI Run #35 (14:55): `04` Android 0/6, iOS 5/5; `02` falhou no iPhone 15 Pro Max (e no S26 Ultra).**
 `04` Android: os 6 campos válidos no print e o `create-account-submit` desabilitado — mesmo comportamento da captura
-do 513 de manhã (`captures-2026-10-22-build513/` 95–100): app 513 não habilita o envio; causa não provada. `02`: o teste
+do 513 de manhã (`captures-2026-10-22-build513/` 95–100): app 513 não habilita o envio. Captura com logcat
+(`captures-2026-10-22-cadastro-513-logcat/`, autorizada pelo Marcio): preenchido por toque + `input text`, sem Appium,
+o botão segue `enabled=false`, nada escondido ao rolar, logcat sem validação; o ENTER do teclado no telefone avançou
+para a etapa 2 (cap. 23) com o botão desabilitado. **Conta REAL criada (autorizada pelo Marcio,
+`captures-2026-10-22-cadastro-513-conta-criada/`, `MASSA-DE-DADOS.md`):** os dois botões ficam `enabled=false` no dump,
+mas o 2º toque avança (1º só fecha o teclado): etapa 1 → 2 (cap. 19), etapa 2 → Home logada (24) e Menu com
+`menu-user-header` (25). O cadastro FUNCIONA; o defeito do app é o estado `enabled` errado (`BUGS-APP-ANDROID.md` 39).
+O `04` falha por esperar `enabled=true`. Teste NÃO alterado: proposta (validar pelo destino da tela, nas duas
+plataformas) aguarda decisão do Marcio. Toque via Appium (`element click`) não testado; só `input tap`. `02`: o teste
 leu o preço CORTADO. Captura no AVD (513, `captures-2026-10-22-preco-promocional/`, 12 com promoção × 14 sem): na PDP em
 promoção o `price` é o cortado e o promocional é o irmão anterior, sem id. **Correção, só `tsc`, NÃO RODADA:**
 `ProdutoPage.lerPrecoDoProduto` lê o promocional (`PRECO_PROMOCIONAL`, XPath conferido com lxml: 1 nó no 12, 0 no 14)

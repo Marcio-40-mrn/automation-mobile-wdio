@@ -130,6 +130,7 @@ export class PerfilPage extends BasePage {
             20000
         );
         if (!deslogou) {
+            allure.addAttachment('Logout — árvore da tela', await driver.getPageSource(), 'text/xml');
             throw new Error(
                 `Logout: a conta continua logada 20s depois (diálogo de confirmação ${apareceu ? 'confirmado' : 'não apareceu'}) — ` +
                 'o Menu não voltou ao estado deslogado.'

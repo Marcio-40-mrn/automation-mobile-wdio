@@ -1,5 +1,6 @@
 import { BasePage, timewhait, seletorTestId } from "./BasePage";
 import { driver, $, $$ } from '@wdio/globals'
+import allure from '@wdio/allure-reporter';
 
 // Criar Conta (cadastro), a partir da tela de Login. Seletores medidos no Android, build
 // 1.21.6/506: .planning/drafts/app-migrado/android/captures-2026-10-16-criar-conta/ (drafts 34–37).
@@ -27,6 +28,11 @@ import { driver, $, $$ } from '@wdio/globals'
 //   2. senha e confirmação → `create-account-security-submit`, que cria a conta e cai na Home
 //      LOGADO (cap. 29), sem tela de sucesso nem verificação de e-mail.
 // Os dois botões ficam enabled=false até a etapa inteira estar válida: é o assert sem texto.
+// Build 1.22.2/513 (Android): com a etapa VÁLIDA o botão continua enabled=false, mas o toque
+// avança (BUGS-APP-ANDROID.md 39; captures-2026-10-22-cadastro-513-conta-criada/). Por ordem do
+// Marcio (2026-10-22), nas duas plataformas: botão que não habilitou com a etapa válida é só AVISO
+// (log + print no Allure) e o teste toca mesmo assim; quem decide é o destino da tela. Botão
+// HABILITADO com dado inválido continua sendo falha.
 
 export type CampoCadastro = 'email' | 'firstName' | 'lastName' | 'document' | 'birthDate' | 'phone';
 
@@ -168,7 +174,9 @@ export class CadastroPage extends BasePage {
     }
 
     // Toca até 2 vezes (o 1º toque com teclado aberto só fecha o teclado) até `chegou()` ser verdade.
-    private async tocarAteAvancarIOS(id: string, chegou: () => Promise<boolean>, timeoutFinal: number): Promise<boolean> {
+    // Nas duas plataformas: no Android 513 o 1º toque também só fechou o teclado (cap. 19 da captura
+    // da conta criada).
+    private async tocarAteAvancar(id: string, chegou: () => Promise<boolean>, timeoutFinal: number): Promise<boolean> {
         for (let toque = 1; toque <= 2; toque++) {
             const botao = await $(seletorTestId(id));
             if (!(await botao.isExisting().catch(() => false))) break;
@@ -323,35 +331,37 @@ export class CadastroPage extends BasePage {
         console.log(`✅ Campo "${campo}" ${comErro ? 'com' : 'sem'} mensagem de erro, como esperado`);
     }
 
-    async validarEnviarEtapa1(habilitado: boolean) {
-        const real = isIOS() ? await this.botaoHabilitadoIOS(ID_ENVIAR_ETAPA1) : await this.botaoHabilitado(ID_ENVIAR_ETAPA1);
-        if (real !== habilitado) {
-            throw new Error(`create-account-submit: esperado ${habilitado ? 'HABILITADO' : 'DESABILITADO'}, está ${real ? 'habilitado' : 'desabilitado'}.`);
-        }
-        console.log(`✅ Enviar da etapa 1 ${habilitado ? 'habilitado' : 'desabilitado'}, como esperado`);
-    }
-
-    // Etapa 1 → etapa 2 (senha). Destino conferido pelo campo de senha.
-    async enviarEtapa1() {
-        if (isIOS()) {
-            // Destino: o botão da etapa 2 na árvore (cap. 33).
-            const chegou = () => $(seletorTestId(ID_FINALIZAR)).isExisting().catch(() => false);
-            if (!(await this.tocarAteAvancarIOS(ID_ENVIAR_ETAPA1, chegou, 20000))) {
-                throw new Error('Etapa 2 (senha) não abriu: create-account-security-submit não apareceu depois de 2 toques em create-account-submit.');
-            }
-            console.log('🔒 Etapa 2 (senha) aberta');
+    // Habilitado esperado e não veio = só aviso (ver o topo do arquivo); o contrário é falha.
+    private async conferirBotao(id: string, nome: string, habilitado: boolean) {
+        const real = isIOS() ? await this.botaoHabilitadoIOS(id) : await this.botaoHabilitado(id);
+        if (real === habilitado) {
+            console.log(`✅ ${nome} ${habilitado ? 'habilitado' : 'desabilitado'}, como esperado`);
             return;
         }
-        await this.fecharTeclado();
-        await this.fechaBanner();
-        await (await $(seletorTestId(ID_ENVIAR_ETAPA1))).click();
+        if (!habilitado) {
+            throw new Error(`${id}: esperado DESABILITADO, está habilitado.`);
+        }
+        console.log(`⚠ ${nome} (${id}) NÃO habilitou com a etapa válida — tocando mesmo assim (bug do app)`);
+        allure.addAttachment(
+            `Aviso — ${id} não habilitou com a etapa válida`,
+            Buffer.from(await driver.takeScreenshot(), 'base64'),
+            'image/png'
+        );
+    }
 
-        const abriu = await $(seletorTestId(ID_SENHA))
-            .waitForDisplayed({ timeout: 20000 })
-            .then(() => true)
-            .catch(() => false);
-        if (!abriu) {
-            throw new Error('Etapa 2 (senha) não abriu: create-account-security-password não ficou visível em 20s depois do toque em create-account-submit.');
+    async validarEnviarEtapa1(habilitado: boolean) {
+        await this.conferirBotao(ID_ENVIAR_ETAPA1, 'Enviar da etapa 1', habilitado);
+    }
+
+    // Etapa 1 → etapa 2 (senha). Destino: iOS, o botão da etapa 2 na árvore (cap. 33); Android, o
+    // campo de senha visível.
+    async enviarEtapa1() {
+        const chegou = isIOS()
+            ? () => $(seletorTestId(ID_FINALIZAR)).isExisting().catch(() => false)
+            : () => $(seletorTestId(ID_SENHA)).isDisplayed().catch(() => false);
+        if (!isIOS()) await this.fecharTeclado();
+        if (!(await this.tocarAteAvancar(ID_ENVIAR_ETAPA1, chegou, 20000))) {
+            throw new Error('Etapa 2 (senha) não abriu depois de 2 toques em create-account-submit.');
         }
         console.log('🔒 Etapa 2 (senha) aberta');
     }
@@ -372,39 +382,21 @@ export class CadastroPage extends BasePage {
     // Senha fora das regras = finalizar desabilitado. As mensagens da etapa 2 não são conferidas:
     // o XPath do draft 35 não foi verificado nesta etapa (draft 36).
     async validarFinalizar(habilitado: boolean) {
-        const real = isIOS() ? await this.botaoHabilitadoIOS(ID_FINALIZAR) : await this.botaoHabilitado(ID_FINALIZAR);
-        if (real !== habilitado) {
-            throw new Error(`create-account-security-submit: esperado ${habilitado ? 'HABILITADO' : 'DESABILITADO'}, está ${real ? 'habilitado' : 'desabilitado'}.`);
-        }
-        console.log(`✅ Finalizar ${habilitado ? 'habilitado' : 'desabilitado'}, como esperado`);
+        await this.conferirBotao(ID_FINALIZAR, 'Finalizar', habilitado);
     }
 
-    // UM toque: cria a conta. Destino: Home (cap. 29). Quem chama valida a Home e o Menu logado.
+    // Cria a conta. Destino: a etapa 2 sai da tela e a barra de abas aparece (Home logada; iOS cap.
+    // 42, Android cap. 24 da conta criada no 513). Quem chama valida a Home e o Menu logado.
     async finalizar() {
-        if (isIOS()) {
-            // Destino: a etapa 2 sai da árvore e a barra de abas aparece (Home logada, cap. 42).
-            const chegou = async () =>
-                !(await $(seletorTestId(ID_FINALIZAR)).isExisting().catch(() => false)) &&
-                (await $(seletorTestId('tab-menu')).isDisplayed().catch(() => false));
-            if (!(await this.tocarAteAvancarIOS(ID_FINALIZAR, chegou, 30000))) {
-                throw new Error('Cadastro não concluído: a etapa 2 continuou na tela depois de 2 toques em create-account-security-submit (conferir o vídeo: e-mail/CPF já cadastrado?).');
-            }
-            console.log('🎉 Cadastro enviado: saiu da etapa 2');
-            return;
-        }
-        await this.fecharTeclado();
-        await this.fechaBanner();
-        await (await $(seletorTestId(ID_FINALIZAR))).click();
-
-        const saiu = await driver
-            .waitUntil(async () => !(await $(seletorTestId(ID_FINALIZAR)).isDisplayed().catch(() => false)), {
-                timeout: 30000,
-                interval: 500,
-            })
-            .then(() => true)
-            .catch(() => false);
-        if (!saiu) {
-            throw new Error('Cadastro não concluído: a etapa 2 continuou na tela 30s depois do toque em create-account-security-submit (conferir o vídeo: e-mail/CPF já cadastrado?).');
+        // iOS: fora da árvore (como passou no CI Run #36); Android: fora da tela.
+        const chegou = async () =>
+            !(await (isIOS()
+                ? $(seletorTestId(ID_FINALIZAR)).isExisting()
+                : $(seletorTestId(ID_FINALIZAR)).isDisplayed()).catch(() => false)) &&
+            (await $(seletorTestId('tab-menu')).isDisplayed().catch(() => false));
+        if (!isIOS()) await this.fecharTeclado();
+        if (!(await this.tocarAteAvancar(ID_FINALIZAR, chegou, 30000))) {
+            throw new Error('Cadastro não concluído: a etapa 2 continuou na tela depois de 2 toques em create-account-security-submit (conferir o vídeo: e-mail/CPF já cadastrado?).');
         }
         console.log('🎉 Cadastro enviado: saiu da etapa 2');
     }
