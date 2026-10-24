@@ -1,0 +1,9 @@
+Device: Samsung Galaxy S23+
+E-mail: informatica.mrn+cadastro-samsung-galaxy-s23-mvl8ugma-6czn@gmail.com
+Nome: Teste
+Sobrenome: Automacao
+CPF: 235.694.303-08
+Nascimento: 25/04/1976
+Telefone: (11) 93834-8545
+Senha: Aramis@EBNN2a
+Conta criada: sim (finalizar saiu da etapa 2)

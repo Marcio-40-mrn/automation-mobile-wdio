@@ -1,0 +1,13 @@
+Preço óculos (PDP): 699.9
+Preço camisa (PDP): 799.9
+Soma dos produtos: 1499.8
+Desconto de cupom: 0
+Entrega (resumo): 0
+Base do desconto do Pix (sem entrega): 1499.8 - 0 = 1499.8
+Prévia do Pix (antes de escolher): 15% · R$ 1274.83 | esperado 1499.8 + 0 - 224.97 = 1274.83
+Pix escolhido: 15% · R$ 1274.83
+Desconto do Pix (15%): 224.97
+Total esperado com desconto do Pix: 1499.8 + 0 - 224.97 = 1274.83
+
+Resumo — Produtos: 1499.8 | Entrega: 0 | Descontos: 224.97 | Total: 1274.83
+Total no botão do pagamento: 1274.83

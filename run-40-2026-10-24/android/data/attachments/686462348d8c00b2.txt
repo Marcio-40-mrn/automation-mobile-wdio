@@ -1,0 +1,9 @@
+Device: Samsung Galaxy S24+
+E-mail: informatica.mrn+cadastro-samsung-galaxy-s24-mvlmtu5v-m2bc@gmail.com
+Nome: Teste
+Sobrenome: Automacao
+CPF: 142.163.947-52
+Nascimento: 15/01/1974
+Telefone: (11) 90985-4736
+Senha: Aramis@TQZV0a
+Conta criada: sim (finalizar saiu da etapa 2)

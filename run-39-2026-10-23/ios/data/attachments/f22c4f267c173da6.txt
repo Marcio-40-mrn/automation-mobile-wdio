@@ -1,0 +1,9 @@
+Device: Apple iPhone 14
+E-mail: informatica.mrn+cadastro-apple-iphone-14-mvl8z1h3-jvpo@gmail.com
+Nome: Teste
+Sobrenome: Automacao
+CPF: 016.048.397-24
+Nascimento: 10/02/1990
+Telefone: (11) 99985-7896
+Senha: Aramis@FUJC3a
+Conta criada: sim (finalizar saiu da etapa 2)

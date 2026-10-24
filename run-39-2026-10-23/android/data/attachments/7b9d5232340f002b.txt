@@ -1,0 +1,11 @@
+Preço óculos (lido na PDP): 699.9
+Preço camisa (lido na PDP): 799.9
+Soma dos produtos: 1499.8
+Desconto de cupom: 0
+Prévia do Pix (antes de escolher): 15% · R$ 1274.83
+Pix escolhido: 15% · R$ 1274.83
+Desconto do Pix esperado: 224.97
+Total esperado com desconto do Pix: 1274.83
+Total no botão da tela de pagamento: 1274.83
+Resumo — Produtos: 1499.8 | Entrega: 0 | Descontos: 224.97 | Total: 1274.83
+Pedido nº: 263203

@@ -1,0 +1,9 @@
+Device: Apple iPhone 15
+E-mail: informatica.mrn+cadastro-apple-iphone-15-mvlmklv2-e25o@gmail.com
+Nome: Teste
+Sobrenome: Automacao
+CPF: 732.788.970-13
+Nascimento: 04/06/1975
+Telefone: (11) 90620-7063
+Senha: Aramis@TEQH7a
+Conta criada: sim (finalizar saiu da etapa 2)
