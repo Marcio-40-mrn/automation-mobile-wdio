@@ -1,5 +1,18 @@
 # STATE
 
+**2026-10-26 — Produto diferente por teste e por device (ordem do Marcio), só `tsc`, NÃO RODADO.** Causa: CI Run #41
+(app Android 1.22.8/519), S26 Ultra, `02`: a camisa da posição 5 estava sem P e M; depois do OK no modal do M, o toque em
+Comprar abriu direto o "Size sold out" (`alert-modal`, agora confirmado no Android) e o teste só esperava o sheet.
+Mudanças, nas duas plataformas: `device-index.ts` `posicoesDoProduto(blocos)` = posição do device + 11 × bloco
+(Camisas: `01` bloco 1, `02` blocos 0/2/3; bermuda e calça: 0/1/2); `02` troca o óculos (só 4 na busca) por **bermuda**
+(busca); `03` calça pela posição; `01` `CategoriasPage.favoritarProdutoNaPosicao` (coração = `action-button` dentro do
+card, conferido no draft android/11 e na captura iOS 2026-10-17/04) e "Back to top" antes do `voltar()`;
+`ProdutoPage.comprarNaPosicao` (sem tamanho com estoque = `SemEstoqueError` → volta à listagem e tenta o próximo
+bloco), modal de estoque ao tocar em Comprar tratado, tamanhos com/sem estoque no log (Android: sem estoque tem o "+"
+SvgView, conferido no 513 cap. 64). Riscos: busca "bermuda" com ≥ 33 resultados e "Back to top" na tela de busca não
+verificados; rolagem até a posição 43 não medida. CI: single-file do Allure gerado sem os vídeos (OutOfMemoryError no
+outro repositório); o Pages continua com vídeo.
+
 **2026-10-23 (14:13) — CI Run #39: `BUILD_SELECTION=version` validado no CI** (os dois downloads passaram e o Device
 Farm rodou). Android 23/24: só o `01` no S25 Ultra falhou (banner do Insider na hora de favoritar levou a uma tela sem
 os elementos). iOS 18/20: `03-compra-cartao` falhou no iPhone 15 e no 14 Pro Max (tela demorou a carregar). Causas

@@ -29,7 +29,8 @@ export const deviceIndex: Record<'android', Record<string, number>> = {
     },
 };
 
-// Posição do produto na listagem que ESTE device compra (0 = 1º card). Os 11 aparelhos do CI
+// Posição do produto na listagem que ESTE device usa (0 = 1º card), no 1º bloco (ver
+// `posicoesDoProduto`). Os 11 aparelhos do CI
 // (Android e iOS rodam ao mesmo tempo) compravam a mesma 1ª camisa e o estoque acabava no meio
 // do run: CI Run #30 (2026-10-20, app 1.22.2, Android 512), "Size sold out" em 4 iPhones e a
 // camisa tirada do pedido no checkout no S24+ e no iPhone 15. Cada device passa a ter a sua
@@ -45,6 +46,18 @@ const posicaoIOS: Record<string, number> = {
     "Apple iPhone 15": 9,
     "Apple iPhone 15 Pro Max": 10,
 };
+
+// Quantos devices rodam ao mesmo tempo no CI (Android 0–5 + iOS 6–10). Cada listagem é dividida
+// em blocos de 11 posições: o bloco N dá ao device a posição `posicao + 11 * N`, então dois devices
+// nunca caem no mesmo card. Cada TESTE usa os seus blocos na listagem que compartilha com outro
+// teste (Marcio, 2026-10-26: produto diferente por teste e por device), e os blocos seguintes são o
+// próximo produto quando o primeiro não tem tamanho com estoque (CI Run #41, app 1.22.8/519).
+export const DEVICES_NO_CI = 11;
+
+export function posicoesDoProduto(blocos: number[]): { posicoes: number[]; comoAchei: string } {
+    const { posicao, comoAchei } = posicaoDoProduto();
+    return { posicoes: blocos.map((bloco) => posicao + DEVICES_NO_CI * bloco), comoAchei };
+}
 
 export function posicaoDoProduto(): { posicao: number; comoAchei: string } {
     if (!process.env.DEVICEFARM_DEVICE_UDID) return { posicao: 0, comoAchei: 'execução local' };

@@ -7,6 +7,7 @@ import { ProdutoPage } from "../pageobjects/ProdutoPage";
 import { CheckoutPage, type DadosCartao, type ValoresResumo } from "../pageobjects/CheckoutPage";
 import { PedidoPage } from "../pageobjects/PedidoPage";
 import { getCredentials } from "../utils/credentials";
+import { posicoesDoProduto } from "../utils/device-index";
 import {
     anexarCrashDoAppSeFechou,
     configurarFechadorDeBanner,
@@ -102,13 +103,17 @@ describe('Compra', () => {
             await step('homePage.abrirPerfil() - logado', () => homePage.abrirPerfil());
             await step('perfilPage.validarLogado()', () => perfilPage.validarLogado());
 
-            // Categorias → Roupas → Calças: a 1ª calça, com tamanho, e volta até Categorias.
+            // Categorias → Roupas → Calças: a calça da posição DESTE device, com tamanho, e volta até
+            // Categorias. Produto diferente por teste e por device (device-index.ts): blocos 0, 1 e 2;
+            // o 2º e o 3º só se o anterior não tiver tamanho com estoque.
+            const calca = posicoesDoProduto([0, 1, 2]);
+            console.log(`👖 Calça das posições ${calca.posicoes.join(', ')} da listagem (${calca.comoAchei})`);
             await step('homePage.abrirCategorias()', () => homePage.abrirCategorias());
             await step('categoriasPage.clickRoupas()', () => categoriasPage.clickRoupas());
             await step('categoriasPage.abrirCalcas()', () => categoriasPage.abrirCalcas());
-            await step('produtoPage.abrirPrimeiroProduto() - calça', () => produtoPage.abrirPrimeiroProduto());
-            await step('produtoPage.lerPrecoDoProduto() - calça', async () => { precoCalca = await produtoPage.lerPrecoDoProduto(); });
-            await step('produtoPage.comprar() - calça', () => produtoPage.comprar());
+            await step(`produtoPage.comprarNaPosicao(${calca.posicoes.join(', ')}) - calça`, async () => {
+                precoCalca = await produtoPage.comprarNaPosicao(calca.posicoes, 'Calça');
+            });
             await step('produtoPage.continuarComprando()', () => produtoPage.continuarComprando());
             await step('produtoPage.voltarAteCategorias()', () => produtoPage.voltarAteCategorias());
 

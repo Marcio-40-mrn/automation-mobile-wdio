@@ -67,6 +67,9 @@ const LIMITE_Y_SHEET_ADICIONADO_IOS = 0.3;
 // item, "1", "2"; capturas 21, 25, 26, 35). Muda logo depois do "Add to cart" (25 e 35).
 const CONTADOR_SACOLA_IOS = seletorTestId('action-icon-button');
 
+// Produto sem tamanho com estoque: `comprarNaPosicao` troca de produto em vez de falhar.
+export class SemEstoqueError extends Error {}
+
 export class ProdutoPage extends BasePage {
 
     // Abre o 1º produto da lista na tela (resultado da busca ou listagem de categoria) e espera a
@@ -94,13 +97,29 @@ export class ProdutoPage extends BasePage {
     // novo, senão erro explícito. Rolagem da listagem de Camisas NÃO medida no iOS do CI.
     async abrirProdutoNaPosicao(posicao: number) {
         if (posicao === 0) return this.abrirPrimeiroProduto();
+        const alvo = await this.cardNaPosicao(posicao);
+        await alvo.el.click();
+        const abriu = await $(seletorTestId('pdp-buy-button')).waitForDisplayed({ timeout: 30000 }).then(() => true).catch(() => false);
+        if (!abriu) {
+            throw new Error(`PDP não abriu: depois de tocar em ${alvo.id} (posição ${posicao}), o pdp-buy-button não apareceu em 30s.`);
+        }
+        console.log(`🛍 PDP aberta (${alvo.id}, posição ${posicao} da listagem)`);
+        await driver.pause(timewhait);
+    }
+
+    // Rola a listagem até o card da posição `posicao` estar inteiro na tela e o devolve, sem tocar.
+    // Usado para abrir a PDP (acima) e para favoritar na listagem (`CategoriasPage`). Conta a partir
+    // do topo: se a lista estiver rolada (volta da PDP), vai ao topo antes.
+    // Limite de 30 rolagens: o bloco 3 do device 10 é a posição 43 (cerca de 22 linhas da grade).
+    async cardNaPosicao(posicao: number): Promise<{ id: string; el: WebdriverIO.Element }> {
         await this.fechaBanner();
+        await this.irParaOTopoDaListagem();
         await this.waitForElement(await $(SELETOR_CARD_PRODUTO));
         const atributo = IOS ? 'name' : 'resource-id';
         const { width, height } = await driver.getWindowRect();
         const vistos: string[] = [];
 
-        for (let rolagem = 0; rolagem <= 12; rolagem++) {
+        for (let rolagem = 0; rolagem <= 30; rolagem++) {
             const visiveis: { id: string; x: number; y: number; h: number; el: WebdriverIO.Element }[] = [];
             for (const el of await $$(SELETOR_CARD_PRODUTO)) {
                 if (!(await el.isDisplayed().catch(() => false))) continue;
@@ -125,14 +144,7 @@ export class ProdutoPage extends BasePage {
                 // Card cortado (embaixo, ou em cima por baixo do cabeçalho): rola um pouco e relê,
                 // para o toque no centro cair nele.
                 if (alvo && alvo.y >= height * 0.12 && alvo.y + alvo.h <= height * 0.92) {
-                    await alvo.el.click();
-                    const abriu = await $(seletorTestId('pdp-buy-button')).waitForDisplayed({ timeout: 30000 }).then(() => true).catch(() => false);
-                    if (!abriu) {
-                        throw new Error(`PDP não abriu: depois de tocar em ${alvo.id} (posição ${posicao}), o pdp-buy-button não apareceu em 30s.`);
-                    }
-                    console.log(`🛍 PDP aberta (${alvo.id}, posição ${posicao} da listagem)`);
-                    await driver.pause(timewhait);
-                    return;
+                    return { id: alvo.id, el: alvo.el };
                 }
                 if (!alvo) {
                     await anexarPrint('Listagem — card da posição saiu da tela');
@@ -147,7 +159,61 @@ export class ProdutoPage extends BasePage {
             await driver.pause(1500);
         }
         await anexarPrint('Listagem — card da posição não alcançado');
-        throw new Error(`Produto da posição ${posicao}: não alcançado em 12 rolagens (${vistos.length} cards vistos).`);
+        throw new Error(`Produto da posição ${posicao}: não alcançado em 30 rolagens (${vistos.length} cards vistos).`);
+    }
+
+    // Compra o produto da 1ª posição da lista que tiver tamanho com estoque e devolve o preço lido na
+    // PDP. As posições vêm de `posicoesDoProduto()` (uma por bloco, todas deste device). Produto sem
+    // tamanho com estoque (`SemEstoqueError`) = volta para a listagem e tenta a próxima posição; outro
+    // erro sobe na hora. CI Run #41 (app 1.22.8/519, S26 Ultra): a camisa da posição 5 estava sem P e
+    // sem M, e o teste parou nela.
+    async comprarNaPosicao(posicoes: number[], produto: string): Promise<number> {
+        const recusados: string[] = [];
+        for (const [i, posicao] of posicoes.entries()) {
+            await this.abrirProdutoNaPosicao(posicao);
+            const preco = await this.lerPrecoDoProduto();
+            try {
+                await this.comprar();
+                return preco;
+            } catch (erro) {
+                if (!(erro instanceof SemEstoqueError)) throw erro;
+                recusados.push(`posição ${posicao}: ${erro.message}`);
+                if (i === posicoes.length - 1) break;
+                console.log(`⚠ ${produto} da posição ${posicao} sem tamanho com estoque — tentando a posição ${posicoes[i + 1]}`);
+                await this.voltarDaPdpParaListagem();
+            }
+        }
+        throw new Error(`Comprar ${produto}: nenhum produto das posições ${posicoes.join(', ')} tinha tamanho com estoque.\n- ${recusados.join('\n- ')}`);
+    }
+
+    private async voltarDaPdpParaListagem() {
+        await this.fechaBanner();
+        // "Nenhum tamanho habilitou" deixa o sheet de tamanho aberto por cima da seta.
+        const fecharSheet = await $(seletorTestId('bottom-sheet-close'));
+        if (await fecharSheet.isDisplayed().catch(() => false)) {
+            await fecharSheet.click();
+            await driver.pause(timewhait);
+        }
+        const seta = await $(SETA_VOLTAR_PDP);
+        await this.waitForElement(seta);
+        await seta.click();
+        const voltou = await $(SELETOR_CARD_PRODUTO).waitForDisplayed({ timeout: 20000 }).then(() => true).catch(() => false);
+        if (!voltou) {
+            await anexarPrint('Volta da PDP — listagem não apareceu');
+            throw new Error('Volta da PDP: a listagem (product-card-*) não apareceu em 20s depois da seta de voltar.');
+        }
+        console.log('↩ voltar (seta da PDP) para a listagem');
+    }
+
+    // Leva a listagem rolada ao topo pelo "Back to top" (BACK_TO_TOP), que só existe com a lista
+    // rolada. Sem ele na tela, a lista já está no topo.
+    async irParaOTopoDaListagem() {
+        const topo = await $(BACK_TO_TOP);
+        if (!(await topo.isDisplayed().catch(() => false))) return;
+        await topo.click();
+        await $(seletorTestId('header-back-button')).waitForDisplayed({ timeout: 10000 }).catch(() => undefined);
+        await driver.pause(1000);
+        console.log('⬆ "Back to top" tocado: listagem no topo');
     }
 
     // Comprar: abre o sheet de tamanho, escolhe o 1º tamanho disponível e adiciona à Mochila.
@@ -162,8 +228,11 @@ export class ProdutoPage extends BasePage {
     //   "Size sold out" no G da camisa, cuja última unidade estava reservada pelo pedido Pix pendente
     //   do run anterior. "Insufficient stock" (2ª unidade) é `alert-modal` + `alert-modal-confirm`,
     //   e o OK fecha o modal E o sheet (capturas 29-30 de captures-2026-10-17-sold-out-meus-pedidos/).
-    //   O id do "Size sold out" não foi capturado; presume-se o mesmo `alert-modal` — NÃO VERIFICADO.
+    //   O "Size sold out" é o mesmo `alert-modal` (árvore anexada no CI Run #41, app 1.22.8/519).
     //   Com o modal, o teste toca OK, reabre o sheet e tenta o próximo tamanho disponível.
+    // - Depois do OK, o toque em Comprar pode abrir de novo o "Size sold out" no lugar do sheet (o
+    //   app mantém o tamanho recusado escolhido; CI Run #41, S26 Ultra). Sem tamanho com estoque o
+    //   erro é `SemEstoqueError`, e o `comprarNaPosicao` tenta o próximo produto.
     async comprar() {
         if (IOS) return this.comprarIOS();
         const adicionar = seletorTestId('size-button');
@@ -176,11 +245,23 @@ export class ProdutoPage extends BasePage {
             await this.waitForElement(comprar);
             await comprar.click();
 
+            let modalNoComprar = false;
             const sheet = await this.esperarFechandoBanner(
-                () => $(adicionar).isDisplayed().catch(() => false),
+                async () => {
+                    modalNoComprar = await $(modalEstoque).isDisplayed().catch(() => false);
+                    return modalNoComprar || (await $(adicionar).isDisplayed().catch(() => false));
+                },
                 15000,
                 async () => { await (await $(seletorTestId('pdp-buy-button'))).click(); }
             );
+            if (modalNoComprar) {
+                await anexarPrint('Comprar — modal de estoque ao tocar em Comprar');
+                await this.fecharModalDeEstoque();
+                throw new SemEstoqueError(
+                    `o toque em Comprar abriu o modal de estoque no lugar do sheet de tamanho` +
+                    (recusados.length ? ` (recusados: ${recusados.join(', ')})` : '')
+                );
+            }
             if (!sheet) {
                 allure.addAttachment('Comprar — árvore da tela (sheet não abriu)', await driver.getPageSource(), 'text/xml');
                 throw new Error('Comprar: o sheet de tamanho (size-button) não abriu em 15s depois de tocar no pdp-buy-button.');
@@ -208,14 +289,7 @@ export class ProdutoPage extends BasePage {
                 if (resultado === 'modal') {
                     await anexarPrint(`Comprar — modal de estoque no tamanho ${tamanho}`);
                     console.log(`⚠ O app recusou o tamanho ${tamanho} (modal de estoque) — tocando OK e tentando outro tamanho`);
-                    await (await $(seletorTestId('alert-modal-confirm'))).click();
-                    const fechou = await driver
-                        .waitUntil(async () => !(await $(modalEstoque).isDisplayed().catch(() => false)), { timeout: 10000, interval: 500 })
-                        .then(() => true)
-                        .catch(() => false);
-                    if (!fechou) {
-                        throw new Error(`Comprar: o modal de estoque (alert-modal) não fechou depois do OK (alert-modal-confirm), tamanho ${tamanho}.`);
-                    }
+                    await this.fecharModalDeEstoque();
                     recusados.push(tamanho);
                     recusado = true;
                     break;
@@ -232,6 +306,18 @@ export class ProdutoPage extends BasePage {
                 await (await $(seletorTestId('bottom-sheet-close'))).click().catch(() => undefined);
                 await driver.pause(timewhait);
             }
+        }
+    }
+
+    private async fecharModalDeEstoque() {
+        const modalEstoque = seletorTestId('alert-modal');
+        await (await $(seletorTestId('alert-modal-confirm'))).click();
+        const fechou = await driver
+            .waitUntil(async () => !(await $(modalEstoque).isDisplayed().catch(() => false)), { timeout: 10000, interval: 500 })
+            .then(() => true)
+            .catch(() => false);
+        if (!fechou) {
+            throw new Error('Comprar: o modal de estoque (alert-modal) não fechou depois do OK (alert-modal-confirm).');
         }
     }
 
@@ -270,20 +356,33 @@ export class ProdutoPage extends BasePage {
 
     // `ignorar`: tamanhos que o app já recusou com o modal de estoque neste comprar().
     // A partir do build 1.21.7/507 os tamanhos sem estoque vêm cinza com "+" no print, mas com
-    // enabled=true no dump (capturas 20 e 26 de captures-2026-10-17-sold-out-meus-pedidos/): só o
-    // efeito no adicionar os distingue, que é o critério daqui.
+    // enabled=true no dump (capturas 20 e 26 de captures-2026-10-17-sold-out-meus-pedidos/). O "+"
+    // ordena a tentativa (com estoque primeiro); quem decide é o efeito no adicionar.
     private async escolherTamanho(adicionar: string, ignorar: string[] = []): Promise<string> {
         const opcoes = [];
         for (const el of await $$(SELETOR_TAMANHO)) {
             if (!(await el.isDisplayed().catch(() => false))) continue;
             const { y } = await el.getLocation();
-            opcoes.push({ y, id: (await el.getAttribute('resource-id')) ?? '' });
+            // Sem estoque, o tamanho vem cinza com o "+" (um SvgView filho); com estoque, sem SvgView.
+            // Conferido no build 1.22.2/513 (captures-2026-10-22-build513/64-sheet-camisa: P, M e GG
+            // com "+" no print e SvgView no dump; G, XGG e XXG sem).
+            const semEstoque = await el.$('.//*[contains(@class,"Svg")]').isExisting().catch(() => false);
+            opcoes.push({ y, id: (await el.getAttribute('resource-id')) ?? '', comEstoque: !semEstoque });
         }
         if (opcoes.length === 0) {
             throw new Error('Comprar: nenhum tamanho (size-option-*) visível no sheet.');
         }
         const linhaDoSheet = Math.max(...opcoes.map((o) => o.y));
-        const doSheet = opcoes.filter((o) => o.y === linhaDoSheet);
+        // Os disponíveis primeiro; os outros continuam na lista, porque o critério final é o efeito
+        // no botão de adicionar (abaixo), não a leitura da árvore.
+        const doSheet = opcoes
+            .filter((o) => o.y === linhaDoSheet)
+            .sort((a, b) => Number(b.comEstoque) - Number(a.comEstoque));
+        const nome = (o: { id: string }) => o.id.replace('size-option-', '');
+        console.log(
+            `📏 Tamanhos no sheet — com estoque: ${doSheet.filter((o) => o.comEstoque).map(nome).join(', ') || 'nenhum'}; ` +
+            `sem estoque: ${doSheet.filter((o) => !o.comEstoque).map(nome).join(', ') || 'nenhum'}`
+        );
 
         const tentados: string[] = [];
         for (const opcao of doSheet) {
@@ -309,8 +408,8 @@ export class ProdutoPage extends BasePage {
         }
 
         allure.addAttachment('Sheet de tamanho', Buffer.from(await driver.takeScreenshot(), 'base64'), 'image/png');
-        throw new Error(
-            `Comprar: nenhum tamanho habilitou o botão de adicionar (size-button). Tentados: ${tentados.join(', ')}` +
+        throw new SemEstoqueError(
+            `nenhum tamanho habilitou o botão de adicionar (size-button). Tentados: ${tentados.join(', ')}` +
             (ignorar.length ? `; recusados pelo app (modal de estoque): ${ignorar.join(', ')}.` : '.')
         );
     }
@@ -421,8 +520,8 @@ export class ProdutoPage extends BasePage {
     // iOS do build 1.21.7/352 (captures-2026-10-21-modal-estoque/, 17 e 18, "Insufficient stock" da
     // 2ª unidade): `alert-modal` e `alert-modal-confirm` existem (found+displayed com o modal, não
     // achados com a tela limpa); o sheet de tamanho JÁ FECHOU quando o modal aparece e o OK por
-    // element click fecha só o modal, de volta à PDP. O "Size sold out" não foi capturado: presume-se
-    // o mesmo `alert-modal` — NÃO VERIFICADO (como no Android).
+    // element click fecha só o modal, de volta à PDP. O "Size sold out" é `alert-modal` no Android
+    // (CI Run #41, app 1.22.8/519); no iOS presume-se o mesmo — NÃO VERIFICADO.
     private async comprarIOS() {
         await this.fechaBanner();
         this.contadorAntesIOS = await this.contadorSacolaIOS();
@@ -430,19 +529,11 @@ export class ProdutoPage extends BasePage {
         await this.waitForElement(comprar);
         await comprar.click();
 
-        const abriu = await this.esperarFechandoBanner(
-            async () => (await this.sheetAbertoIOS()) === 'tamanho',
-            15000,
-            async () => { await (await $(seletorTestId('pdp-buy-button'))).click(); }
-        );
-        if (!abriu) {
-            allure.addAttachment('Comprar (iOS) — árvore da tela (sheet não abriu)', await driver.getPageSource(), 'text/xml');
-            throw new Error('Comprar (iOS): o sheet de tamanho não abriu em 15s depois de tocar no pdp-buy-button.');
-        }
-        await driver.pause(1500); // o sheet ainda está subindo
-
         const modalEstoque = seletorTestId('alert-modal');
         const recusados: string[] = [];
+        await this.esperarSheetDeTamanhoIOS(recusados);
+        await driver.pause(1500); // o sheet ainda está subindo
+
         for (let i = 0; i < FRACOES_TAMANHO_IOS.length; i++) {
             const tamanho = `${i + 1}º tamanho da esquerda`;
             await this.tapProporcional(FRACOES_TAMANHO_IOS[i], FRACAO_Y_TAMANHO_IOS, tamanho);
@@ -461,28 +552,13 @@ export class ProdutoPage extends BasePage {
             if (resultado === 'modal') {
                 await anexarPrint(`Comprar (iOS) — modal de estoque no ${tamanho}`);
                 console.log(`⚠ O app recusou o ${tamanho} (modal de estoque) — tocando OK e tentando o próximo tamanho`);
-                await (await $(seletorTestId('alert-modal-confirm'))).click();
-                const fechou = await driver
-                    .waitUntil(async () => !(await $(modalEstoque).isDisplayed().catch(() => false)), { timeout: 10000, interval: 500 })
-                    .then(() => true)
-                    .catch(() => false);
-                if (!fechou) {
-                    throw new Error(`Comprar (iOS): o modal de estoque (alert-modal) não fechou depois do OK (alert-modal-confirm), ${tamanho}.`);
-                }
+                await this.fecharModalDeEstoque();
                 recusados.push(tamanho);
                 if (i === FRACOES_TAMANHO_IOS.length - 1) break;
                 // O OK volta à PDP sem sheet (captura 18): reabre o sheet para o próximo tamanho.
                 if ((await this.sheetAbertoIOS()) !== 'tamanho') {
                     await (await $(seletorTestId('pdp-buy-button'))).click();
-                    const reabriu = await this.esperarFechandoBanner(
-                        async () => (await this.sheetAbertoIOS()) === 'tamanho',
-                        15000,
-                        async () => { await (await $(seletorTestId('pdp-buy-button'))).click(); }
-                    );
-                    if (!reabriu) {
-                        await anexarPrint('Comprar (iOS) — sheet não reabriu depois do modal de estoque');
-                        throw new Error('Comprar (iOS): depois do OK no modal de estoque, o sheet de tamanho não reabriu em 15s.');
-                    }
+                    await this.esperarSheetDeTamanhoIOS(recusados);
                     await driver.pause(1500);
                 }
                 continue;
@@ -511,11 +587,39 @@ export class ProdutoPage extends BasePage {
         }
 
         await anexarPrint('Sheet de tamanho');
-        throw new Error(
-            `Comprar (iOS): nenhum dos ${FRACOES_TAMANHO_IOS.length} tamanhos tocados adicionou o produto ` +
+        throw new SemEstoqueError(
+            `nenhum dos ${FRACOES_TAMANHO_IOS.length} tamanhos tocados adicionou o produto ` +
             '(o sheet de produto adicionado não abriu). Print do sheet anexado.' +
             (recusados.length ? ` Recusados pelo app (modal de estoque): ${recusados.join(', ')}.` : '')
         );
+    }
+
+    // Espera o sheet de tamanho depois do toque em Comprar. O app pode responder com o modal de
+    // estoque no lugar do sheet (Android, CI Run #41, app 1.22.8/519; mesmo `alert-modal` no iOS):
+    // fecha o modal e devolve `SemEstoqueError`, para o `comprarNaPosicao` trocar de produto.
+    private async esperarSheetDeTamanhoIOS(recusados: string[]) {
+        const modalEstoque = seletorTestId('alert-modal');
+        let modalNoComprar = false;
+        const abriu = await this.esperarFechandoBanner(
+            async () => {
+                modalNoComprar = await $(modalEstoque).isDisplayed().catch(() => false);
+                return modalNoComprar || (await this.sheetAbertoIOS()) === 'tamanho';
+            },
+            15000,
+            async () => { await (await $(seletorTestId('pdp-buy-button'))).click(); }
+        );
+        if (modalNoComprar) {
+            await anexarPrint('Comprar (iOS) — modal de estoque ao tocar em Comprar');
+            await this.fecharModalDeEstoque();
+            throw new SemEstoqueError(
+                'o toque em Comprar abriu o modal de estoque no lugar do sheet de tamanho' +
+                (recusados.length ? ` (recusados: ${recusados.join(', ')})` : '')
+            );
+        }
+        if (!abriu) {
+            allure.addAttachment('Comprar (iOS) — árvore da tela (sheet não abriu)', await driver.getPageSource(), 'text/xml');
+            throw new Error('Comprar (iOS): o sheet de tamanho não abriu em 15s depois de tocar no pdp-buy-button.');
+        }
     }
 
     // Build 1.21.7/352: o sheet fica preso ao topo e a distância até o "Continue shopping" muda com a

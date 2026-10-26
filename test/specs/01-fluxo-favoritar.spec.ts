@@ -4,6 +4,7 @@ import { CategoriasPage } from "../pageobjects/CategoriasPage";
 import { PerfilPage } from "../pageobjects/PerfilPage";
 import { FavoritosPage } from "../pageobjects/FavoritosPage";
 import { getCredentials } from "../utils/credentials";
+import { posicoesDoProduto } from "../utils/device-index";
 import {
     configurarFechadorDeBanner,
     registrarAvisoNoRelatorio,
@@ -88,7 +89,10 @@ describe('Navegação', () => {
 
             await step('categoriaPage.clickRoupas()', () => categoriaPage.clickRoupas());
             await step('categoriaPage.abrirCamisetas()', () => categoriaPage.abrirCamisas());
-            await step('categoriaPage.favoritarPrimeiroProduto()', async () => {produtoFavoritado = await categoriaPage.favoritarPrimeiroProduto();});
+            // Camisa da posição DESTE device no bloco 1 da listagem (device-index.ts): produto
+            // diferente por teste e por device; o 02-compra-pix compra nos blocos 0, 2 e 3.
+            const [posicaoCamisa] = posicoesDoProduto([1]).posicoes;
+            await step(`categoriaPage.favoritarProdutoNaPosicao(${posicaoCamisa})`, async () => {produtoFavoritado = await categoriaPage.favoritarProdutoNaPosicao(posicaoCamisa);});
             // Um voltar() só: favoritando na listagem, esta é a única tela a sair para chegar em
             // categorias, que é onde a aba Perfil existe (a listagem não tem tab-* nenhum).
             await step('categoriaPage.voltar() - categoria', () => categoriaPage.voltar());

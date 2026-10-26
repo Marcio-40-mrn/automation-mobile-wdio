@@ -1,6 +1,8 @@
 import { BasePage, timewhait, seletorTestId } from "./BasePage";
 import { driver, $, $$ } from '@wdio/globals'
 import { texto } from "../utils/textos";
+import { ProdutoPage } from "./ProdutoPage";
+import { SELETOR_CARD_PRODUTO } from "./BuscaPage";
 
 // Estado do coração na listagem do Android migrado (1.20.10): o `action-button-icon` mede 84x84
 // com o coração vazio e 52x53 com ele preenchido, dentro de um `action-button` que fica em 84x84
@@ -89,92 +91,79 @@ export class CategoriasPage extends BasePage {
         await driver.pause(timewhait);
     }
 
-    // Favorita a primeira camisa que a lista mostrar, direto no card, e devolve o nome para a
-    // validação nos favoritos usar depois. Amarrar o teste a um nome fixo não funciona: o
-    // catálogo muda entre versões e o UiSelector().text() é match exato.
+    // Favorita a camisa da POSIÇÃO `posicao` da listagem, direto no card, e devolve o nome para a
+    // validação nos favoritos usar depois. Produto diferente por teste e por device (Marcio,
+    // 2026-10-26; `posicoesDoProduto` em device-index.ts): o 01 usa o bloco 1 da listagem de
+    // Camisas, o 02 compra nos blocos 0, 2 e 3. Nenhum nome fixo: o catálogo muda entre versões.
     //
     // Favoritar aqui, e não na página do produto, deixa o teste uma tela antes na navegação:
     // um único voltar() já chega em categorias, que é a tela onde a aba Perfil existe (a
-    // listagem não tem tab-* nenhum).
+    // listagem não tem tab-* nenhum). Com a lista rolada até o card, o cabeçalho sai da árvore;
+    // por isso, depois do toque, a lista volta ao topo ("Back to top") antes do voltar().
     //
-    // ESTADO DO CORAÇÃO: no app migrado ele É visível na árvore (no app antigo só o pixel
-    // mudava). No Android o `action-button-icon` encolhe de 84x84 para 52x53 quando preenchido;
-    // no iOS, de 32x33 para 20x21. Daí a guarda de conta suja ANTES do toque e a confirmação do
-    // toque DEPOIS, nas duas plataformas. A prova final continua sendo a tela de Favoritos.
+    // CORAÇÃO DO CARD: um `action-button` por card, DENTRO do retângulo do `product-card-<id>` —
+    // Android draft android/11 (card [42,544][534,1778], coração [429,555][513,639]); iOS
+    // captures-2026-10-17-listagem-camisas/04 (card 16,245 202x472, coração 178,249 32x33). O
+    // coração é o `action-button` cujo centro cai dentro do card; o ícone, o
+    // `action-button-icon` dentro do coração.
     //
-    // O nome sai do content-desc do rodapé do card, que vem como "Nome, R$ preço" — e pode
-    // começar com ESPAÇO (1º card, draft android/11); o preço é cortado e o resultado é aparado
-    // para sobrar o nome que a tela de Favoritos exibe. O rodapé é achado pelo padrão
-    // nome + preço (", R$"), sem depender de o nome começar por uma palavra fixa.
-    async favoritarPrimeiroProduto(): Promise<string> {
-        if (process.env.PLATFORM === 'ios') return this.favoritarPrimeiroProdutoIOS();
-        return this.favoritarPrimeiroProdutoAndroid();
-    }
+    // ESTADO DO CORAÇÃO: no Android o `action-button-icon` encolhe de 84x84 para 52x53 quando
+    // preenchido; no iOS, de 32x33 para 20x21. Daí a guarda de conta suja ANTES do toque e, no
+    // Android, a confirmação DEPOIS. A prova final continua sendo a tela de Favoritos.
+    //
+    // NOME: Android, o content-desc "Nome, R$ preço" está no card ou num filho dele (draft
+    // android/11; pode começar com espaço); iOS, o `label` do card, "Nome R$\xa0preço" (sem
+    // vírgula, espaço non-breaking). O preço é cortado e o resultado aparado.
+    async favoritarProdutoNaPosicao(posicao: number): Promise<string> {
+        const ios = process.env.PLATFORM === 'ios';
+        const produtoPage = new ProdutoPage();
 
-    // fonte (todos os seletores deste método): drafts/app-migrado/android/11-listagem-camisas.md,
-    // capturas captures-2026-09-29/17-listagem-camisas.xml (antes) e 18-apos-favoritar.xml
-    // (depois). `product-list`, `action-button` e `action-button-icon` são testIDs; o rodapé do
-    // card não tem id e é achado pelo padrão do content-desc.
-    private async favoritarPrimeiroProdutoAndroid(): Promise<string> {
-        // Timeout folgado: a lista tem 700+ produtos e demora a montar depois do clique na
-        // categoria — com os 20s do waitForElement ela terminava de aparecer junto com o estouro.
-        await $(seletorTestId('product-list')).waitForDisplayed({ timeout: 40000 });
-
-        const seletorRodape = '-android uiautomator:new UiSelector().descriptionContains(", R$").instance(0)';
-        const rodape = await $(seletorRodape);
-        await rodape.waitForDisplayed({ timeout: 40000 });
-
-        const descricao = (await rodape.getAttribute('content-desc')) ?? '';
-        const nome = descricao.replace(/,\s*R\$[\s\S]*$/, '').trim();
-        console.log(`🛍 Produto escolhido: ${nome}`);
-
+        // Timeout folgado: a lista demora a montar depois do clique na categoria.
+        await $(SELETOR_CARD_PRODUTO).waitForDisplayed({ timeout: 40000 });
         // A lista segue hidratando depois do primeiro card aparecer; sem esta pausa o clique
         // sai cedo demais e o coração não reage.
         await driver.pause(timewhait);
 
-        const seletorCoracao = `${seletorTestId('action-button')}.instance(0)`;
-        const seletorIcone = `${seletorTestId('action-button-icon')}.instance(0)`;
-        const coracao = await $(seletorCoracao);
-        await coracao.waitForDisplayed({ timeout: 20000 });
+        const card = await produtoPage.cardNaPosicao(posicao);
+        const rectCard = await driver.getElementRect(card.el.elementId);
 
-        // O coração escolhido (1º action-button da árvore) tem que ser o do card cujo nome foi
-        // lido: mesma coluna do rodapé, acima dele e a menos de um card de distância. Sem isto,
-        // uma mudança de ordem da grade (filtro, promoção) leria o nome de uma camisa e
-        // favoritaria outra.
-        const posRodape = await rodape.getLocation();
-        const tamRodape = await rodape.getSize();
-        const posCoracao = await coracao.getLocation();
-        const { height: alturaJanela } = await driver.getWindowRect();
-        const mesmaColuna = posCoracao.x >= posRodape.x && posCoracao.x <= posRodape.x + tamRodape.width;
-        const acimaDoRodape = posCoracao.y < posRodape.y && posRodape.y - posCoracao.y < alturaJanela * 0.7;
-        if (!mesmaColuna || !acimaDoRodape) {
-            throw new Error(
-                `O action-button escolhido (x=${Math.round(posCoracao.x)}, y=${Math.round(posCoracao.y)}) ` +
-                `não está no card do rodapé lido ` +
-                `[${Math.round(posRodape.x)},${Math.round(posRodape.y)} ${tamRodape.width}x${tamRodape.height}]: ` +
-                `a ordem da grade mudou e o índice não aponta mais para o produto lido ("${nome}"). ` +
-                'Favoritar assim marcaria uma camisa diferente da que o teste vai validar.'
-            );
+        let descricao = (await card.el.getAttribute(ios ? 'label' : 'content-desc').catch(() => null)) ?? '';
+        if (!ios && !descricao.includes(', R$')) {
+            descricao = (await card.el.$('.//*[contains(@content-desc, ", R$")]').getAttribute('content-desc').catch(() => null)) ?? '';
         }
+        const nome = descricao.replace(ios ? /\s*R\$[\s\S]*$/ : /,\s*R\$[\s\S]*$/, '').trim();
+        if (!nome) {
+            throw new Error(`Favoritar: o nome do produto não foi lido no card ${card.id} (posição ${posicao}).`);
+        }
+        console.log(`🛍 Produto escolhido: ${nome} (${card.id}, posição ${posicao} da listagem)`);
 
-        const razaoIcone = async (): Promise<{ razao: number; w: number; h: number } | null> => {
-            const icone = await $(seletorIcone).getSize().catch(() => null);
-            const botao = await $(seletorCoracao).getSize().catch(() => null);
-            if (!icone || !botao || !botao.width) return null;
-            return { razao: icone.width / botao.width, w: icone.width, h: icone.height };
+        const coracao = await this.dentroDe(seletorTestId('action-button'), rectCard);
+        if (!coracao) {
+            throw new Error(`Favoritar: nenhum action-button (coração) dentro do card ${card.id} (posição ${posicao}).`);
+        }
+        const medirIcone = async (): Promise<{ w: number; h: number; razao: number } | null> => {
+            const rectCoracao = await driver.getElementRect(coracao.elementId).catch(() => null);
+            if (!rectCoracao || !rectCoracao.width) return null;
+            const icone = await this.dentroDe(seletorTestId('action-button-icon'), rectCoracao);
+            if (!icone) return null;
+            const { width, height } = await driver.getElementRect(icone.elementId);
+            return { w: width, h: height, razao: width / rectCoracao.width };
         };
 
-        // Guarda de conta suja, igual à do iOS: o coração é um TOGGLE. Se o item já estiver
-        // favoritado (resto de um run que morreu entre favoritar e desfavoritar), o toque
-        // DESfavorita e o erro aparece dois passos adiante. O erro traz a medida, para que uma
-        // mudança de ícone no app seja reconhecida como tal e não como conta suja.
-        const antes = await razaoIcone();
-        if (antes && antes.razao < RAZAO_ICONE_PREENCHIDO_ANDROID) {
+        // Guarda de conta suja: o coração é um TOGGLE. Se o item já estiver favoritado (resto de um
+        // run que morreu entre favoritar e desfavoritar), o toque DESfavorita e o erro aparece dois
+        // passos adiante. O erro traz a medida, para que uma mudança de ícone no app seja reconhecida
+        // como tal e não como conta suja.
+        const preenchido = (m: { w: number; razao: number }) => (ios ? m.w < 26 : m.razao < RAZAO_ICONE_PREENCHIDO_ANDROID);
+        const antes = await medirIcone();
+        if (antes && preenchido(antes)) {
             throw new Error(
                 `Conta suja: o coração de "${nome}" já está preenchido antes do toque ` +
-                `(action-button-icon ${antes.w}x${antes.h}, razão ${antes.razao.toFixed(2)} do botão; vazio ≈ 1,00, ` +
-                'preenchido ≈ 0,62 — draft android/11). Um run anterior deixou o favorito na conta; tocar agora ' +
-                'DESfavoritaria. Desfavoritar manualmente nesta conta antes de rodar de novo.'
+                `(action-button-icon ${antes.w}x${antes.h}; ` +
+                (ios
+                    ? 'contorno mede 32x33, preenchido 20x21 — draft ios/15). '
+                    : `razão ${antes.razao.toFixed(2)} do botão; vazio ≈ 1,00, preenchido ≈ 0,62 — draft android/11). `) +
+                'Um run anterior deixou o favorito na conta; tocar agora DESfavoritaria. Desfavoritar manualmente nesta conta antes de rodar de novo.'
             );
         }
         console.log(`🤍 Coração de "${nome}" sem preenchimento (icone ${antes ? `${antes.w}x${antes.h}` : 'não medido'})`);
@@ -182,154 +171,42 @@ export class CategoriasPage extends BasePage {
         await this.fechaBanner();
         await coracao.click();
 
-        // Confirmação do toque: o ícone tem que encolher em até 10s. Favoritar é chamada de
-        // backend; ler uma vez só acusaria "não mudou" com o toque tendo funcionado.
-        let depois = antes;
-        const preencheu = await driver
-            .waitUntil(
-                async () => {
-                    depois = await razaoIcone();
-                    return !!depois && depois.razao < RAZAO_ICONE_PREENCHIDO_ANDROID;
-                },
-                { timeout: 10000, interval: 500 }
-            )
-            .then(() => true)
-            .catch(() => false);
-
-        if (!preencheu) {
-            throw new Error(
-                `Favoritar no Android: o ícone do coração de "${nome}" não passou a preenchido em 10s depois do ` +
-                `toque (action-button-icon ${depois ? `${depois.w}x${depois.h}, razão ${depois.razao.toFixed(2)}` : 'não medido'}; ` +
-                'preenchido ≈ 0,62). O toque não favoritou — conferir no vídeo se caiu num banner do Insider ' +
-                'ou num modal de erro do app.'
-            );
+        // Android: o ícone tem que encolher em até 10s (favoritar é chamada de backend). iOS: o
+        // tamanho do ícone não é asserção (efeito do SVG, não muda na tela de Favoritos); a
+        // validação é em Favoritos.
+        if (!ios) {
+            let depois = antes;
+            const preencheu = await driver
+                .waitUntil(async () => { depois = await medirIcone(); return !!depois && preenchido(depois); }, { timeout: 10000, interval: 500 })
+                .then(() => true)
+                .catch(() => false);
+            if (!preencheu) {
+                throw new Error(
+                    `Favoritar no Android: o ícone do coração de "${nome}" não passou a preenchido em 10s depois do ` +
+                    `toque (action-button-icon ${depois ? `${depois.w}x${depois.h}, razão ${depois.razao.toFixed(2)}` : 'não medido'}; ` +
+                    'preenchido ≈ 0,62). O toque não favoritou — conferir no vídeo se caiu num banner do Insider ' +
+                    'ou num modal de erro do app.'
+                );
+            }
+            console.log(`❤ Coração de "${nome}" preenchido (icone ${depois!.w}x${depois!.h})`);
         }
-        console.log(`❤ Coração de "${nome}" preenchido (icone ${depois!.w}x${depois!.h})`);
         await driver.pause(timewhait);
 
+        await produtoPage.irParaOTopoDaListagem();
         return nome;
     }
 
-    // Mesma ideia da versão Android — pegar o primeiro card que a lista mostrar, ler o nome e
-    // favoritar ali —, mas três detalhes da árvore iOS mudam o código:
-    //
-    // 1. O nome e o preço vêm concatenados no MESMO name do card: "<nome> R$\xa0<preço>".
-    //    Não há a vírgula que o content-desc do Android usa, e o espaço depois do "R$" é
-    //    non-breaking (U+00A0). O regex do Android (/,\s*R\$.../) não casaria aqui.
-    // 2. O "CONTAINS R$" é o que distingue o card do título da tela ("Camisas", em y=74), que
-    //    vem primeiro na ordem do documento. NÃO usar BEGINSWITH "Camisa": no app migrado o nome
-    //    do 1º card começa com ESPAÇO (" Camisa Manga Longa...") e o predicate não casaria.
-    //    fonte: ios/11-listagem-camisas.md e captures-m6-sessao-a/37-camisas-listagem.xml — os
-    //    únicos nós com R$ no name são wrappers (370pt), os cards (185pt/183pt) e o StaticText do
-    //    preço (52pt).
-    // 3. O action-button (o coração) não tem label NENHUM e se repete 8 vezes na grade — sem
-    //    resourceId como no Android, a única saída é indexar por posição. Como isso é frágil
-    //    (mudou a ordem da grade, mudou o alvo), conferimos que o coração escolhido cai dentro
-    //    do card cujo nome acabamos de ler, e falhamos explícito se não cair.
-    private async favoritarPrimeiroProdutoIOS(): Promise<string> {
-        const seletorCard = '-ios predicate string:name CONTAINS "R$"';
-
-        // Espera a grade montar antes de medir qualquer coisa (a lista tem 150 itens).
-        await (await $(seletorCard)).waitForDisplayed({ timeout: 40000 });
-
-        // O card NAO pode ser pego pelo indice [1] da class chain. O primeiro match na ordem do
-        // documento e o WRAPPER DA TELA, cujo `name` agrega os labels dos filhos e por isso
-        // satisfaz os dois criterios: comeca com "Camisa" (do titulo "Camisas") e contem "R$"
-        // (dos cards la dentro). Foi o que produziu, no CI iOS Run #7,
-        //   "Camisas Filter and sort 152 products Camisa Manga Longa Slim..."
-        // como nome do produto, quebrando a validacao em Favoritos.
-        //
-        // O discriminador e a LARGURA (draft 14): o card mede 185pt numa janela de 402pt,
-        // enquanto o wrapper ocupa a largura inteira. Predicate do XCUITest nao aceita
-        // geometria (registrado no draft e no voltarIOS), entao a filtragem e feita aqui.
-        const { width: larguraJanela } = await driver.getWindowRect();
-        const larguraMaxima = larguraJanela * 0.6;
-        // Piso: descarta o StaticText do preço (52pt), que também tem R$ no name mas é filho do card.
-        const larguraMinima = larguraJanela * 0.3;
-
-        const candidatos = await $$(seletorCard);
-        const medidos: { largura: number; nome: string }[] = [];
-        let card: WebdriverIO.Element | undefined;
-
-        for (const candidato of candidatos) {
-            const { width } = await candidato.getSize().catch(() => ({ width: Number.MAX_SAFE_INTEGER }));
-            const nomeBruto = (await candidato.getAttribute('name').catch(() => '')) ?? '';
-            medidos.push({ largura: width, nome: nomeBruto.slice(0, 60) });
-            if (width < larguraMaxima && width > larguraMinima) { card = candidato; break; }
+    // O 1º elemento visível do seletor cujo centro cai dentro do retângulo dado.
+    private async dentroDe(seletor: string, r: { x: number; y: number; width: number; height: number }) {
+        for (const el of await $$(seletor)) {
+            if (!(await el.isDisplayed().catch(() => false))) continue;
+            const e = await driver.getElementRect(el.elementId).catch(() => null);
+            if (!e) continue;
+            const cx = e.x + e.width / 2;
+            const cy = e.y + e.height / 2;
+            if (cx >= r.x && cx <= r.x + r.width && cy >= r.y && cy <= r.y + r.height) return el;
         }
-
-        if (!card) {
-            throw new Error(
-                `Nenhum card de produto encontrado na listagem: os ${medidos.length} nós que casaram ` +
-                `com o seletor são todos largos demais para serem um card (limite ${Math.round(larguraMaxima)}pt ` +
-                `numa janela de ${larguraJanela}pt). Medidos: ` +
-                medidos.map((m) => `${m.largura}pt "${m.nome}"`).join(' | ') +
-                '. Se o layout da grade mudou, recapturar a tela com o mobile-ui-inspector.'
-            );
-        }
-
-        const bruto = (await card.getAttribute('name')) ?? '';
-        const nome = bruto.replace(/\s*R\$[\s\S]*$/, '').trim();
-        console.log(`🛍 Produto escolhido: ${nome}`);
-
-        // A grade segue hidratando depois do primeiro card aparecer, igual ao Android.
-        await driver.pause(timewhait);
-
-        const coracao = await $('-ios class chain:**/XCUIElementTypeOther[`name == "action-button"`][1]');
-        await coracao.waitForDisplayed({ timeout: 20000 });
-
-        const posicaoCoracao = await coracao.getLocation();
-        const posicaoCard = await card.getLocation();
-        const tamanhoCard = await card.getSize();
-        // A guarda compara as DUAS coordenadas. Comparar só o x era um furo: os cards da grade
-        // ficam em duas colunas, então todo card de uma mesma coluna divide o mesmo intervalo
-        // de x — o coração da linha DE BAIXO passava na checagem sem problema. O resultado
-        // seria ler o nome de uma camisa e favoritar outra, com a validação em Favoritos
-        // falhando depois sem dizer o porquê.
-        const dentroDoCard =
-            posicaoCoracao.x >= posicaoCard.x &&
-            posicaoCoracao.x <= posicaoCard.x + tamanhoCard.width &&
-            posicaoCoracao.y >= posicaoCard.y &&
-            posicaoCoracao.y <= posicaoCard.y + tamanhoCard.height;
-
-        if (!dentroDoCard) {
-            throw new Error(
-                `O action-button escolhido (x=${Math.round(posicaoCoracao.x)}, y=${Math.round(posicaoCoracao.y)}) ` +
-                `está fora do card lido ` +
-                `[${Math.round(posicaoCard.x)},${Math.round(posicaoCard.y)} ${tamanhoCard.width}x${tamanhoCard.height}]: ` +
-                `a ordem da grade mudou e o índice não aponta mais para o produto lido ("${nome}"). ` +
-                'Favoritar assim marcaria uma camisa diferente da que o teste vai validar.'
-            );
-        }
-
-        // Guarda de conta suja. O coração é um TOGGLE: se o item já estiver favoritado (resto de
-        // um run anterior que morreu entre favoritar e desfavoritar — CI iOS Run #12 -> #13,
-        // iPhone 13), o toque DESfavorita, Favoritos abre vazio e o erro aparece dois passos
-        // adiante como "flatlist-favorites não apareceu". O único sinal na árvore iOS é o
-        // action-button-icon: 32x33 com contorno, 20x21 preenchido (draft 15, diff byte a byte).
-        // Não é atributo de estado, é efeito da renderização — por isso o erro traz a medida,
-        // para que uma mudança de ícone no app seja reconhecida como tal e não como conta suja.
-        const icone = await coracao.$('-ios predicate string:name == "action-button-icon"');
-        const tamanhoIcone = await icone.getSize().catch(() => null);
-        if (tamanhoIcone && tamanhoIcone.width < 26) {
-            throw new Error(
-                `Conta suja: o coração de "${nome}" já está preenchido antes do toque ` +
-                `(action-button-icon ${tamanhoIcone.width}x${tamanhoIcone.height}; contorno mede 32x33, ` +
-                'preenchido 20x21 — draft 15). Um run anterior deixou o favorito na conta; tocar agora ' +
-                'DESfavoritaria. Desfavoritar manualmente nesta conta antes de rodar de novo.'
-            );
-        }
-        console.log(`🤍 Coração de "${nome}" sem preenchimento (icone ${tamanhoIcone ? `${tamanhoIcone.width}x${tamanhoIcone.height}` : 'não medido'})`);
-
-        await this.fechaBanner();
-        await coracao.click();
-        await driver.pause(timewhait);
-
-        // O estado favoritado não é assertável aqui em nenhuma das duas plataformas. No iOS o
-        // action-button-icon muda de bounds (32x33 -> 20x21), mas isso é efeito colateral do
-        // SVG preenchido, específico deste componente nesta tela — na tela de Favoritos o
-        // mesmo ícone não muda de tamanho. Não usar como asserção; a validação é em Favoritos.
-        return nome;
+        return null;
     }
 
     async validaElememnto(texto: string) {

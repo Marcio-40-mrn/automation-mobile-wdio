@@ -752,10 +752,19 @@ jobs:
         if: always()
         run: |
           # Mesmo critério do passo anterior: só gera com resultado de teste real.
+          # O single-file embute todos os anexos na memória do Java; com os vídeos dá
+          # OutOfMemoryError (Java heap space). Ele é gerado de uma cópia sem os vídeos;
+          # o relatório do Pages (passo anterior) continua com eles.
           for PLAT in android ios; do
             SRC="allure-results-$PLAT"
             if [ "$(find "$SRC" -name '*-result.json' 2>/dev/null | wc -l)" -gt 0 ]; then
-              allure generate "./$SRC" --clean --single-file -o "./allure-single-$PLAT"
+              LEVE="allure-results-single-$PLAT"
+              rm -rf "$LEVE"
+              cp -r "$SRC" "$LEVE"
+              VIDEOS=$(find "$LEVE" -type f \( -name '*.mp4' -o -name '*.webm' \) | wc -l)
+              find "$LEVE" -type f \( -name '*.mp4' -o -name '*.webm' \) -delete
+              echo "Single-file $PLAT: $VIDEOS vídeo(s) fora do arquivo único"
+              allure generate "./$LEVE" --clean --single-file -o "./allure-single-$PLAT"
               echo "Single-file $PLAT em ./allure-single-$PLAT/index.html"
             else
               echo "Sem resultados $PLAT — pulando single-file"

@@ -342,7 +342,7 @@ export class FavoritosPage extends BasePage {
                 `A lista contem: ${conteudo || '(vazia)'}\n` +
                 'Se o texto procurado trouxer algo como "Filter and sort" ou o titulo da tela, ' +
                 'o defeito esta na CAPTURA do nome em ' +
-                'CategoriasPage.favoritarPrimeiroProdutoIOS, nao aqui.'
+                'CategoriasPage.favoritarProdutoNaPosicao, nao aqui.'
             );
         }
 
