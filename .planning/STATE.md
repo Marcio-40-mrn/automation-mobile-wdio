@@ -1,5 +1,13 @@
 # STATE
 
+**2026-10-26 (noite) — CI Run #42 (18:59, app Android 1.22.8/519): `02-compra-pix` falhou em 5/6 Androids.** A
+bermuda passou em todos; na listagem de Camisas recém-aberta (no topo) o `irParaOTopoDaListagem()` tocou o que o
+XPath Android do `BACK_TO_TOP` achou, outro botão do cabeçalho, e abriu a Mochila (print do S24 Ultra: "My Backpack"
+com as bermudas recomendadas; os 2 "cards" do erro, `155077`/`152372`, são essas recomendações). S23 Ultra passou
+(posição 0 abre o 1º card sem esse toque). **Corrigido (ordem do Marcio), só `tsc`, NÃO RODADO, nas duas
+plataformas:** com o `header-back-button` na tela, `irParaOTopoDaListagem()` não toca nada. Qual botão o XPath casou
+no 519 não foi conferido na árvore.
+
 **2026-10-26 — Produto diferente por teste e por device (ordem do Marcio), só `tsc`, NÃO RODADO.** Causa: CI Run #41
 (app Android 1.22.8/519), S26 Ultra, `02`: a camisa da posição 5 estava sem P e M; depois do OK no modal do M, o toque em
 Comprar abriu direto o "Size sold out" (`alert-modal`, agora confirmado no Android) e o teste só esperava o sheet.

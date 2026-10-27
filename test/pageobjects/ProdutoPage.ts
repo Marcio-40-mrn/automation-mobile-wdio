@@ -206,8 +206,11 @@ export class ProdutoPage extends BasePage {
     }
 
     // Leva a listagem rolada ao topo pelo "Back to top" (BACK_TO_TOP), que só existe com a lista
-    // rolada. Sem ele na tela, a lista já está no topo.
+    // rolada. Com o `header-back-button` na tela a lista já está no topo e nada é tocado: o XPath
+    // Android do BACK_TO_TOP só foi conferido com a lista rolada, e com ela no topo casou com outro
+    // botão do cabeçalho, que abriu a Mochila (CI Run #42, app Android 1.22.8/519, 5 de 6 devices).
     async irParaOTopoDaListagem() {
+        if (await $(seletorTestId('header-back-button')).isDisplayed().catch(() => false)) return;
         const topo = await $(BACK_TO_TOP);
         if (!(await topo.isDisplayed().catch(() => false))) return;
         await topo.click();
