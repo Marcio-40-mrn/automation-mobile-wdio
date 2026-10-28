@@ -23,17 +23,17 @@ const SETA_VOLTAR_PDP = IOS
     ? '//*[@name="image-header"]/following-sibling::*[1]'
     : '//*[@resource-id="image-header"]/following-sibling::*[1][@clickable="true"]';
 
-// "Back to top" da listagem rolada: SEM id. Android (app 1.22.2/513, captures-2026-10-22-build513/
-// 13, 15, 17, 19): o único clicável do irmão anterior ao bloco que contém o `product-list`; com a
-// lista no topo o mesmo caminho dá o `header-back-button`, por isso ele é excluído. Conferido com
-// lxml: 1 nó nas 4 listagens roladas, 0 nas demais telas; tocado 3x, a lista foi ao topo e o
-// `header-back-button` voltou nas 3 (16, 18, 20). iOS (app 1.22.3/359, ios/captures-2026-10-23-
+// "Back to top" da listagem rolada: SEM id. Android (app 1.22.9/526, CI Run #45): o clicável do irmão
+// SEGUINTE ao bloco que contém o `product-list` (rodapé da tela). Até o 513 ele era o irmão anterior,
+// e o XPath antigo deu 0 nós no 526: o `01` caiu em 6/6 Androids (o voltar tocou num card). Conferido
+// com lxml nas 12 árvores de listagem rolada do Run #45 (6 aparelhos): 1 nó em todas. Com a lista no
+// topo NÃO conferido no 526/528 (só no 515: 0 nós). iOS (app 1.22.3/359, ios/captures-2026-10-23-
 // pendencias-ios/ 17–22): DOIS nós com esse label na lista rolada (wrapper 440 pt e botão 156 pt,
 // mesmo centro), 0 com a lista no topo; o $() pega o wrapper, e o element click nele levou a lista
 // ao topo e trouxe o `header-back-button` de volta (18 → 19).
 const BACK_TO_TOP = IOS
     ? '-ios predicate string:label == "Back to top"'
-    : '//*[.//*[@resource-id="product-list"]]/preceding-sibling::*/*[@clickable="true"][not(@resource-id="header-back-button")]';
+    : '//*[.//*[@resource-id="product-list"]]/following-sibling::*/*[@clickable="true"]';
 
 // Preço promocional da PDP: irmão imediatamente anterior ao `price`, com "R$" ("R$" é marcador de
 // moeda, não validação de texto). Só existe com promoção. Android conferido nos dumps 12 (1 nó) e

@@ -1,5 +1,15 @@
 # STATE
 
+**2026-10-27 (noite) — CI Run #45 (16:00, app Android 1.22.9/526, conferido no `get-upload`): `01` 0/6 Androids, `02`
+falhou no S23+.** No 526 o "Back to top" (sem testID, já no `ELEMENTOS-SEM-TESTID.md`) passou a ser o irmão SEGUINTE do
+bloco do `product-list`; o XPath Android do `BACK_TO_TOP` (irmão anterior) deu 0 nós, a lista ficou rolada e o
+`CategoriasPage.voltar()` tocou o 1º clicável (um card), sem tab bar; no `02` S23+, "sem seta de voltar". **Corrigido
+(ordem do Marcio), só `tsc`, NÃO RODADO:** `BACK_TO_TOP` Android = `…/following-sibling::*/*[@clickable="true"]`,
+conferido com lxml nas 12 árvores de listagem rolada do Run #45: 1 nó em todas. Com a lista no topo NÃO conferido no
+526/528 (só no 515: 0 nós). iOS sem mudança. O Run #46 (21:54) roda o 1.22.9/528 com o XPath antigo. Não investigado:
+`03` S26 Ultra ("Home não apareceu"). Os "519" das entradas de 26/10 abaixo não foram conferidos no APK (o Run #37 do
+Device Farm instalou 1.22.3/515).
+
 **2026-10-26 (noite) — CI Run #42 (18:59, app Android 1.22.8/519): `02-compra-pix` falhou em 5/6 Androids.** A
 bermuda passou em todos; na listagem de Camisas recém-aberta (no topo) o `irParaOTopoDaListagem()` tocou o que o
 XPath Android do `BACK_TO_TOP` achou, outro botão do cabeçalho, e abriu a Mochila (print do S24 Ultra: "My Backpack"
