@@ -1,0 +1,9 @@
+Device: Apple iPhone 15
+E-mail: informatica.mrn+cadastro-apple-iphone-15-mvs61vrf-kfu3@gmail.com
+Nome: Teste
+Sobrenome: Automacao
+CPF: 833.619.079-18
+Nascimento: 22/06/1970
+Telefone: (11) 93888-7573
+Senha: Aramis@ZNXM0a
+Conta criada: sim (finalizar saiu da etapa 2)

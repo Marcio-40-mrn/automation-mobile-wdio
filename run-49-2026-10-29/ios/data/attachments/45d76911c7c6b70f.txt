@@ -1,0 +1,9 @@
+Device: Apple iPhone 14 Pro Max
+E-mail: informatica.mrn+cadastro-apple-iphone-14-pro-mvtmhmow-gyq4@gmail.com
+Nome: Teste
+Sobrenome: Automacao
+CPF: 963.597.888-02
+Nascimento: 15/02/1985
+Telefone: (11) 96019-3589
+Senha: Aramis@JEDN6a
+Conta criada: sim (finalizar saiu da etapa 2)

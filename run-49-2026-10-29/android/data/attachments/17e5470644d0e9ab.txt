@@ -1,0 +1,13 @@
+Preço bermuda (PDP): 499.9
+Preço camisa (PDP): 899.9
+Soma dos produtos: 1399.8
+Desconto de cupom: 0
+Entrega (resumo): 0
+Base do desconto do Pix (sem entrega): 1399.8 - 0 = 1399.8
+Prévia do Pix (antes de escolher): 10% · R$ 1259.82 | esperado 1399.8 + 0 - 139.98 = 1259.82
+Pix escolhido: 10% · R$ 1259.82
+Desconto do Pix (10%): 139.98
+Total esperado com desconto do Pix: 1399.8 + 0 - 139.98 = 1259.82
+
+Resumo — Produtos: 1399.8 | Entrega: 0 | Descontos: 139.98 | Total: 1259.82
+Total no botão do pagamento: 1259.82

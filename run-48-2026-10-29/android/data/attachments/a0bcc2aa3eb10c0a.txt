@@ -1,0 +1,9 @@
+Preço calça (lido na PDP): 699.9
+Itens na Mochila: 1
+Total no botão da tela de pagamento: 699.9
+Parcela escolhida (1x): 699.9
+Resumo — Produtos: 699.9 | Entrega: 0 | Descontos: 0 | Total: 699.9
+Toque em finalizar: sim (1 vez)
+Pedido nº: 404846
+Total na tela do pedido cancelado: 699.9
+Cartão (fake, MASSA-DE-DADOS.md): final 8219, validade 12/30
