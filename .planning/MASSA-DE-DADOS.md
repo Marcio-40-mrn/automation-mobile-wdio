@@ -112,6 +112,7 @@ pagamento" na conta `CLIENT_USER`.
 | 2026-10-19 | #201280 (R$ 716,80: calça R$ 699,90 + frete 16,90; cartão fake, Cancelado; Meus pedidos mostra a data 20/10/2026, relógio do AVD) | captura Android do cartão, build 1.22.0/509 (`captures-2026-10-19-build509-run25/`), conta `marciorocha`, 1 toque, 1 pedido; a tela nova "Não conseguimos aprovar o pagamento" apareceu no lugar do modal antifraude. O Pix foi levado só até o Resumo, sem finalizar |
 | 2026-10-22 ~11:43 | #239678 (R$ 1.349,82: óculos 699,90 + camisa 799,90 − Pix 10% 149,98; frete 0; Pix, QR carregou) | spec `02-compra-pix` no iOS (Remote Access), conta `marciorocha`, PASSOU; camisa da posição 0 (execução local) |
 | 2026-10-20 23:43 | #214832 (R$ 716,80: calça R$ 699,90 + frete 16,90; cartão fake, Cancelado) | captura no Galaxy S26 (Android 16, Device Farm Remote Access), build 1.22.2/512 (`captures-2026-10-20-android16-remoto/`), conta `marciorocha`, 1 toque, 1 pedido; modal antifraude + Pedido Cancelado |
+| 2026-10-30 16:50 | #446640 (R$ 38,85: meia Sapatilha Lisa Preto 195142 R$ 39,90 + frete Econômica 16,90 − Pix 15% 5,98 − Giftback 11,97; Pix NÃO pago, Aguardando Pagamento) | captura no AVD, build 1.22.9/530 (`captures-2026-10-30-build530-pedido-meia-giftback/`), conta `marcio.rocha.ext@aramisinc.com.br`, autorizado pelo Marcio; 1 toque, 1 pedido; saldo de Giftback 113,96 antes → zero depois |
 
 Os pedidos de runs não listados aqui não foram anotados. A tabela é atualizada a cada captura ou run que
 finalizar uma compra.

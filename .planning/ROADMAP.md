@@ -19,11 +19,54 @@ Como funciona a cada versão nova (Marcio, 2026-10-21):
 | Plataforma | Versão | Build | Profile (EAS) | Data | Evidência |
 |---|---|---|---|---|---|
 | Android | 1.22.2 | 513 | production (APK do CI Run #33) | 2026-10-22 | `drafts/app-migrado/android/captures-2026-10-22-build513/` (AVD; sem finalizar pedido nem enviar cadastro: bloqueado pelo classificador do Claude Code) |
-| iOS | 1.22.3 | 359 | production | 2026-10-23 | `drafts/app-migrado/ios/captures-2026-10-23-pendencias-ios/` (Remote Access; onboarding, Home, Menu, listagem, PDP, Mochila, Favoritos; sem checkout nem cadastro) |
+| iOS | 1.22.9 | 372 | não conferido no EAS | 2026-11-04 | `drafts/app-migrado/ios/captures-2026-11-04-build372/` (Remote Access; onboarding, Menu, Richard Stad, Categorias, Favoritos, PDP, Mochila, endereço, entrega, Pix até o Resumo; cartão só até o formulário; sem busca nem cadastro) |
 
 Profile conferido no EAS (API GraphQL `api.expo.dev`, `EXPO_TOKEN`/`EXPO_PROJECT_ID` do `.env`, campo `buildProfile`).
 O Android 1.22.3/514 (production, 2026-10-22) é build de ROLLBACK, não de teste (Marcio, 2026-10-22): não entra
-nesta tabela nem na documentação de elementos. Defasagem conhecida: o último iOS no EAS é o **1.22.2 / 356 / production** (2026-10-20), que ainda não tem levantamento.
+nesta tabela nem na documentação de elementos.
+
+**Próximo levantamento (Marcio, 2026-11-04):** build **531 no Android**, versão não escrita. A linha do Android só muda
+depois da captura.
+
+## M10 — Atualizações e melhorias 🔄 (sem fim — fora da sequência de marcos)
+
+Aberto em 2026-11-04 (Marcio). Marco contínuo, como o levantamento acima: reúne as atualizações e melhorias da
+automação do app e não tem data de término. Cada melhoria entra aqui como um item e só é feita com ordem do Marcio.
+
+| Item | Situação |
+|---|---|
+| Pix e cartão até a última tela antes de finalizar, sem criar pedido | 🔄 implementado, só `tsc`, NÃO RODADO |
+
+### Melhoria — Pix e cartão param antes de finalizar (2026-11-04)
+
+Decisão do Marcio: o `02-compra-pix` e o `03-compra-cartao` vão até a última tela antes de finalizar, **sem criar
+pedido**, e as etapas seguintes saem dos testes. A última tela é o Resumo (botão `summary-finalize-purchase`).
+Vale para as duas plataformas.
+
+| Spec | Antes | Agora |
+|---|---|---|
+| `02-compra-pix` | validava o Resumo, tocava em finalizar e criava o pedido | para depois de `validar valores do resumo (com desconto do Pix)` |
+| `03-compra-cartao` | validava o Resumo, tocava em finalizar e criava o pedido (cartão fake) | para depois de `validar valor dos produtos no resumo` |
+
+Etapas que saíram:
+
+- `02`: `finalizarPedido`, `validarQrCode`, `numeroDoPedido`, `copiarCodigo`, `verMeusPedidos`, `sairParaHome` e
+  `validarAlertaPedido`.
+- `03`: `finalizarPedidoComCartao`, `abrirMeusPedidosDepoisDaRecusa`, `numeroDoPedidoComCartao` e a validação do total
+  em Meus pedidos.
+
+Decisões e riscos da implementação (plano aprovado pelo Marcio em 2026-11-04,
+`plans/2026-11-04-pix-cartao-ate-o-resumo.md`):
+
+- **Mochila:** sem limpeza nova. O `clearApp` do `afterTest` esvazia a Mochila: conferido pelo Marcio no AVD em
+  2026-10-14. Em CI e no iOS do app migrado isso não foi conferido, e no Remote Access o `afterTest` só faz
+  `terminateApp`. O `03` falha com erro nomeado se a Mochila não tiver 1 item. O `esvaziarMochila()` continua no
+  `CheckoutPage`, sem chamada.
+- **Cobertura que deixa de existir:** QR code do Pix, cópia do código, recusa/antifraude do cartão, Meus pedidos com
+  pedido e alerta do pedido na Home.
+- **Código removido:** `PedidoPage.ts`, os métodos de finalizar do `CheckoutPage` e o `validarAlertaPedido` do
+  `HomePage`. Continuam no histórico do git.
+- **Run real:** falta run nas duas plataformas para dar o item como feito.
 
 ## M1 — Suíte Android estável ✅
 
@@ -276,9 +319,32 @@ compra.
 ## M9 — Ampliar a cobertura com novos cenários ⬜ planejamento
 
 Aberto em 2026-10-21 (Marcio): os 4 testes (`01`–`04`) cobrem boa parte do app, e outras funcionalidades serão
-validadas no futuro. **Nenhum cenário deste marco está escolhido nem escrito ainda.** A lista abaixo é o backlog de
-partida, tirado da seção 3 do `cenarios-gherkin-2026-09-28.pdf` (funcionalidades que os 4 testes não percorrem) e das
-pendências registradas; quais entram, em que ordem e com que massa é decisão do Marcio, cenário a cenário.
+validadas no futuro. **Em 2026-11-03 ficou escolhido um cenário novo** (Richard Stad Selection, teste escrito em 2026-11-04, não rodado). O resto
+da lista abaixo continua backlog, sem escolha: tirado da seção 3 do `cenarios-gherkin-2026-09-28.pdf`
+(funcionalidades que os 4 testes não percorrem) e das pendências registradas; quais entram, em que ordem e com que
+massa é decisão do Marcio, cenário a cenário.
+
+### Cenário escolhido — Menu → Richard Stad Selection (2026-11-03)
+
+Navegação: abrir o Menu, tocar em Richard Stad Selection e validar que a tela de destino carregou. **Escrito em
+2026-11-04 por ordem do Marcio (`test/specs/05-colecao-especial.spec.ts`), só `tsc`, NÃO RODADO, nas duas plataformas.**
+Escrito sem esperar a captura do Android 531.
+
+Android, build 1.22.9/530, 2026-11-03, `captures-2026-11-03-m9-colecao-especial-e-preco-100/` (Menu deslogado, captura `18`):
+
+- Abrir o Menu: `tab-menu`.
+- Toque: `menu-item-richard-stad`, `content-desc` "Richard Stad Selection", bounds `[0,1754][1080,1901]`.
+- Destino (capturas `20`–`22`): tela editorial, não é WebView. Ids: `editorial-home-root`, `editorial-group-0`
+  (hero), `editorial-group-1` (altura zero), `header-back-button`, `editorial-tab-home`, `editorial-tab-categories`,
+  `editorial-tab-bag`, `editorial-tab-menu`. A Home comum usa `tab-home` / `search` / `heart`, sem `header-back-button`.
+- O título "RICHARD STAD SELECTION", o texto e o "Saiba mais" estão só na foto. Não há `text` nem `content-desc`
+  com esse nome. Rolagem vertical e horizontal não abriu outra tela. BACK volta ao Menu.
+
+iOS, build 1.22.9/372, 2026-11-04, `drafts/app-migrado/ios/50-colecao-especial.md`: `menu-item-richard-stad` abre o destino,
+deslogado e logado, sem WebView. Chegada: `editorial-tab-home` com `header-back-button`; `editorial-home-root` também existe
+na Home e vem `visible=false`, então não serve de âncora. `header-back-button` volta ao Menu. O teste não faz swipe horizontal:
+o swipe horizontal abriu a listagem "2150 - Expert XP", causa não confirmada, e não deve contar grupos. O Android 531 ainda não foi
+capturado.
 
 Regras que valem para cada cenário novo (`REQUIREMENTS.md`):
 - **um teste por decisão**; o que repete o caminho de um dos 4 testes vira asserção dentro dele, e nenhum teste é

@@ -2,15 +2,16 @@
 
 ## O fluxo coberto hoje
 
-**Os quatro testes principais e únicos** (decisão do Marcio, 2026-10-16), em `test/specs/`, cada um
+**Os quatro testes principais** (decisão do Marcio, 2026-10-16) **e o `05-colecao-especial`** (ordem do Marcio, 2026-11-04), em `test/specs/`, cada um
 rodando por device nas duas plataformas. Comando de cada um: `COMO-RODAR-TESTES.md` (raiz).
 
 | Spec | Cenário |
 |---|---|
 | `01-fluxo-favoritar` | onboarding, login, Categorias → Roupas → Camisas, favoritar a 1ª camisa, conferir em Favoritos, desfavoritar, logout |
-| `02-compra-pix` | jornada completa de compra com Pix até o QR code, com os valores do resumo validados pelos preços lidos na PDP |
-| `03-compra-cartao` | onboarding negando as permissões, 1 calça, pagamento com cartão fake até a recusa (Pedido Cancelado com número e valor) |
+| `02-compra-pix` | jornada de compra com Pix até o Resumo, sem criar pedido, com os valores do resumo validados pelos preços lidos na PDP (M10, Marcio, 2026-11-04) |
+| `03-compra-cartao` | onboarding negando as permissões, 1 calça, pagamento com cartão fake até o Resumo, sem criar pedido, com o valor dos produtos validado pelo preço lido na PDP (M10, Marcio, 2026-11-04) |
 | `04-criar-conta` | cadastro de conta real, com os casos inválidos de cada etapa no mesmo teste |
+| `05-colecao-especial` | Menu → Coleção Especial (item `menu-item-richard-stad`), valida a tela de destino, sem login (M9, Marcio, 2026-11-04) |
 
 ## Critérios de aceite
 
@@ -66,6 +67,19 @@ Cada uma custou um incidente. Detalhes no `CLAUDE.md`.
   com o `wdio.conf.ts`.
 - **Não subir execução no AVD sem pedido explícito do Marcio.** O emulador é ambiente de
   trabalho dele; dois runs simultâneos invalidam os dois.
+- **Ao terminar o uso do AVD, limpar o app e fechar a conexão** (Marcio, 2026-11-03). Vale
+  para inspeção, reprodução de bug e suíte local. Nesta ordem — o `kill-server` derruba o
+  adb, e o `pm clear` precisa dele ainda de pé:
+
+  ```bash
+  adb shell pm clear com.aramis.ecomm
+  adb kill-server
+  ```
+
+  O `pm clear` apaga os dados do app (login, Mochila, onboarding). Na suíte WDIO local o
+  `afterTest` de `wdio.conf.ts` já executa o `pm clear` a cada teste; ao acabar a suíte,
+  falta fechar a conexão com `adb kill-server`. Não rodar `kill-server` no meio da suíte.
+  Device Farm e iOS Remote Access não usam esses comandos.
 - **Uma suíte só, para as duas plataformas.** Nunca criar spec, classe ou arquivo de page
   object separado por sistema operacional. Cada spec de `test/specs/` é o mesmo, os page
   objects são os mesmos e os nomes de método são os mesmos; quem precisar detecta a

@@ -212,6 +212,20 @@ a árvore inteira. Capturar cedo demais faz um elemento existente parecer inexis
 **Não subir execução no AVD sem pedido explícito.** O emulador é ambiente de trabalho do
 Marcio; dois runs simultâneos invalidam os dois. Quem roda `npm run wdio:android` é ele.
 
+**Ao terminar o uso do AVD, limpar o app e fechar a conexão** (Marcio, 2026-11-03). Regra
+inviolável no `REQUIREMENTS.md`. O `mobile-ui-inspector` faz isso como último ato, depois
+que as capturas já estão em disco. Nesta ordem, porque o `kill-server` derruba o adb:
+
+```bash
+adb shell pm clear com.aramis.ecomm
+adb kill-server
+```
+
+O `pm clear` apaga login, Mochila e onboarding. Na suíte WDIO local o `afterTest` de
+`wdio.conf.ts` já faz o `pm clear` a cada teste; ao acabar a suíte, falta o `adb kill-server`.
+Não rodar `kill-server` no meio da suíte. Device Farm e iOS Remote Access não usam esses
+comandos.
+
 ### Sub-agents de inspeção
 
 > **REGRA FIXA (Marcio, reforçada em 2026-10-15): toda captura usa os DOIS subagentes, sempre, sem

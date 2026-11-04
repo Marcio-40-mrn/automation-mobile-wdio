@@ -1,9 +1,8 @@
 import { BasePage, timewhait, seletorTestId, scrollUntilVisible } from "./BasePage";
 import { driver, $, $$ } from '@wdio/globals'
 import { anexarPrint } from "../utils/allure-helpers";
-import allure from '@wdio/allure-reporter';
 
-// Mochila -> endereço -> entrega -> pagamento (Pix) -> resumo -> finalizar. Seletores medidos em
+// Mochila -> endereço -> entrega -> pagamento (Pix) -> resumo. Seletores medidos em
 // Android: .planning/drafts/app-migrado/android/captures-2026-10-14-compra-pix(-rodada2)/;
 // iOS (build 349): .planning/drafts/app-migrado/ios/captures-2026-10-15-compra-pix/ (drafts 15 a 18 e 35).
 
@@ -310,93 +309,6 @@ export class CheckoutPage extends BasePage {
         return valores;
     }
 
-    // Toca em finalizar UMA vez e espera a tela do Pix. NUNCA repete o toque: cada toque que passa
-    // cria pedido real. Antes do toque, o UiAutomator2 deixa de esperar a tela "parar": a tela do
-    // Pix tem um cronômetro que muda a cada segundo, e com a espera padrão nenhum comando
-    // responde ali (rodada 2: "could not get idle state"). Vale até o fim da sessão — a Home com
-    // o alerta do pedido também tem cronômetro (`wake-order-banner-countdown`).
-    // iOS: o ajuste é do UiAutomator2 e não é feito (no iOS a tela do Pix respondeu às capturas
-    // 45–50 sem ajuste nenhum).
-    async finalizarPedido() {
-        if (!IOS) await driver.updateSettings({ waitForIdleTimeout: 0 });
-        await this.fechaBanner();
-
-        const finalizar = await $(seletorTestId('summary-finalize-purchase'));
-        await this.waitForElement(finalizar);
-        await finalizar.click();
-        console.log('🛒 Finalizar tocado (1 vez)');
-
-        const pix = await this.esperarDestinoDoFinalizar(['wake-pix-aguardando']);
-        if (!pix) {
-            await this.anexarArvoreDaTela('Finalizar (Pix) — árvore da tela sem destino');
-            throw new Error(
-                'Finalizar: a tela do pedido com Pix (wake-pix-aguardando) não abriu em 60s. O toque NÃO é repetido ' +
-                '(cada toque cria pedido) — conferir no vídeo e em Meus pedidos se o pedido foi criado.'
-            );
-        }
-        console.log('✅ Pedido criado: tela do Pix aberta');
-    }
-
-    // Árvore de elementos da tela, anexada quando o finalizar não chega a destino nenhum. Serve para
-    // levantar o id do modal "Erro ao realizar compra" (CI Run #30 S24 Ultra e Run #31 iPhone 15 Pro
-    // Max, app 1.22.2), que nunca foi capturado: o teste ainda não o reconhece e espera os 60 s.
-    private async anexarArvoreDaTela(nome: string) {
-        const arvore = await driver.getPageSource().catch((e) => `getPageSource falhou: ${e}`);
-        allure.addAttachment(nome, arvore, 'text/xml');
-    }
-
-    // Depois do toque em finalizar (Pix ou cartão), espera até 60 s por uma das telas de `destinos`.
-    // No caminho:
-    //  - modal antifraude ("Entendi" = `button-confirm`): é ACEITO sempre que aparecer (Marcio,
-    //    2026-10-20). No CI Run #29 (iOS 1.22.2, iPhone 15) o modal veio no cartão, no lugar da tela de
-    //    recusa que o Android 509+ mostra; no Android 1.21.6/506 ele vinha antes do Pedido Cancelado.
-    //  - tela de erro do app ("Oops, we have a problem!", `error-id`/`error-name`, Android 508/512): falha
-    //    na hora com o texto do erro. CI Run #29, S24+: "WakeOrderProcessing: Exception in HostFunction:
-    //    __next_prime overflow". É bug do app, não do teste.
-    // `modalBasta` (cartão): o modal antifraude aceito JÁ é o resultado esperado com o cartão fake, igual à
-    // tela de recusa (Marcio, 2026-10-20) — devolve 'modal-antifraude' assim que o modal fecha, sem exigir
-    // a tela seguinte. No Pix o modal é aceito e a espera continua até a tela do Pix.
-    // Devolve o id do destino que apareceu, ou null no timeout.
-    private async esperarDestinoDoFinalizar(destinos: string[], modalBasta = false): Promise<string | null> {
-        let destino: string | null = null;
-        let modaisAceitos = 0;
-        const fim = Date.now() + 60000;
-        while (Date.now() < fim) {
-            for (const id of destinos) {
-                if (await $(seletorTestId(id)).isDisplayed().catch(() => false)) { destino = id; break; }
-            }
-            if (destino) break;
-
-            const entendi = await $(seletorTestId('button-confirm'));
-            if (await entendi.isDisplayed().catch(() => false)) {
-                await anexarPrint('Modal antifraude');
-                await entendi.click();
-                modaisAceitos++;
-                console.log(`⚠ Modal antifraude aceito ("Entendi", button-confirm) — ${modaisAceitos}ª vez`);
-                await driver
-                    .waitUntil(async () => !(await $(seletorTestId('button-confirm')).isDisplayed().catch(() => false)), { timeout: 10000, interval: 500 })
-                    .catch(() => undefined);
-                await driver.pause(timewhait);
-                if (modalBasta && !(await $(seletorTestId('button-confirm')).isDisplayed().catch(() => false))) {
-                    return 'modal-antifraude';
-                }
-                continue;
-            }
-
-            if (await $(seletorTestId('error-id')).isDisplayed().catch(() => false)) {
-                const nome = await $(seletorTestId('error-name')).getText().catch(() => '');
-                const idErro = await $(seletorTestId('error-id')).getText().catch(() => '');
-                await anexarPrint('Erro do app depois de finalizar');
-                throw new Error(
-                    `Finalizar: o app mostrou a tela de erro ("${nome}"; ${idErro}) em vez de ${destinos.join(' / ')}. ` +
-                    'É erro do app (BUGS-APP-ANDROID.md). O toque NÃO é repetido — conferir em Meus pedidos se o pedido foi criado.'
-                );
-            }
-            await driver.pause(1000);
-        }
-        return destino;
-    }
-
     // ---- Pagamento com CARTÃO (spec 03-compra-cartao) ------------------------------------------
     // Android, build 1.21.6/506: captures-2026-10-15-compra-cartao/32 a 59 (NOTAS.md) e drafts
     // android/18, 19, 30, 31, 32 e 33.
@@ -557,46 +469,6 @@ export class CheckoutPage extends BasePage {
         }
         console.log('🧾 Resumo do pedido aberto');
         await driver.pause(timewhait);
-    }
-
-    // Finalizar com cartão: UM toque em `summary-finalize-purchase` e espera a tela de pagamento
-    // recusado (`wake-order-processing-recusado`, "Não conseguimos aprovar o pagamento"). Build
-    // 1.22.0/509 (Android, captures-2026-10-19-build509-run25/, caps. 44-01..18): a tela vem em ~11 s
-    // e fica, sem modal antifraude. iOS 1.22.2 (CI Run #29, iPhone 15): veio o modal antifraude
-    // ("Entendi", `button-confirm`): aceito, e o modal sozinho já é o resultado esperado (não se exige a
-    // tela seguinte, que no iOS 1.22.2 NÃO foi capturada).
-    // NUNCA repete o toque (cada toque cria pedido). Antes, o mesmo ajuste do finalizarPedido() do
-    // Pix: o UiAutomator2 para de esperar a tela "parar", válido até o fim da sessão.
-    // iOS: o ajuste é do UiAutomator2 e não é feito (igual ao finalizarPedido do Pix).
-    async finalizarPedidoComCartao() {
-        if (!IOS) await driver.updateSettings({ waitForIdleTimeout: 0 });
-        await this.fechaBanner();
-
-        const finalizar = await $(seletorTestId('summary-finalize-purchase'));
-        await this.waitForElement(finalizar);
-        await finalizar.click();
-        console.log('🛒 Finalizar tocado (1 vez)');
-
-        // Com o cartão fake, as DUAS condições são o resultado esperado, nas duas plataformas (Marcio,
-        // 2026-10-20): a tela de recusa (Android 509+) OU o modal antifraude, aceito no "Entendi" (iOS
-        // 1.22.2, CI Run #29). Também conta a tela do pedido cancelado/em processamento, se vier sem modal
-        // (Android 506, iOS 349). Em todos os casos o pedido é validado em seguida em Meus pedidos.
-        const destino = await this.esperarDestinoDoFinalizar([
-            'wake-order-processing-recusado',
-            'wake-order-processing-aguardando',
-            'wake-order-processing-cancelado',
-            'wake-order-processing-erro',
-        ], true);
-        if (!destino) {
-            await anexarPrint('Finalizar (cartão) — sem recusa e sem modal antifraude');
-            await this.anexarArvoreDaTela('Finalizar (cartão) — árvore da tela sem destino');
-            throw new Error(
-                'Finalizar (cartão): nem a tela de pagamento recusado nem o modal antifraude (nem wake-order-processing-*) apareceram em 60s. ' +
-                'O toque NÃO é repetido (cada toque cria pedido) — conferir no vídeo e em Meus pedidos se o pedido foi criado.'
-            );
-        }
-        await anexarPrint(`Pedido com cartão — ${destino}`);
-        console.log(`❌ Pagamento com cartão não aprovado (cartão fake, esperado): ${destino}`);
     }
 
     // ---- iOS do formulário do cartão (build 1.21.7/352, captures-2026-10-16-build352-compra/, caps. 59–75,

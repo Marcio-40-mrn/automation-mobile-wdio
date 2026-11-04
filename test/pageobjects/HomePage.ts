@@ -1,6 +1,5 @@
 import { BasePage, timewhait, seletorTestId, seletorIdsAndroid } from "./BasePage";
 import { driver, $ } from '@wdio/globals'
-import { anexarPrint } from "../utils/allure-helpers";
 
 const APP_ID = 'com.aramis.ecomm';
 
@@ -91,19 +90,6 @@ export class HomePage extends BasePage {
             );
         }
         console.log('🏠 Home confirmada (tab-home + marcador da Home)');
-    }
-
-    // Alerta do pedido na Home ("aguardando pagamento"). O id leva o número do pedido no sufixo
-    // (`wake-order-banner-open-<nº>`), então a presença dele prova que o alerta é DESTE pedido,
-    // sem ler o texto. fonte: captures-2026-10-14-compra-pix-rodada2/16-home-t1.xml (apareceu em 4s).
-    async validarAlertaPedido(numero: string) {
-        const alerta = seletorTestId(`wake-order-banner-open-${numero}`);
-        const apareceu = await $(alerta).waitForDisplayed({ timeout: 30000 }).then(() => true).catch(() => false);
-        if (!apareceu) {
-            throw new Error(`O alerta do pedido ${numero} (wake-order-banner-open-${numero}) não apareceu na Home em 30s.`);
-        }
-        console.log(`🔔 Alerta do pedido ${numero} na Home`);
-        await anexarPrint(`Home — alerta do pedido ${numero}`);
     }
 
     async irParaHome() {

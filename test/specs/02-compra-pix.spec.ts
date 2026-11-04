@@ -6,7 +6,6 @@ import { CategoriasPage } from "../pageobjects/CategoriasPage";
 import { BuscaPage } from "../pageobjects/BuscaPage";
 import { ProdutoPage } from "../pageobjects/ProdutoPage";
 import { CheckoutPage, type ValoresResumo, type LinhaPix } from "../pageobjects/CheckoutPage";
-import { PedidoPage } from "../pageobjects/PedidoPage";
 import { getCredentials } from "../utils/credentials";
 import { posicoesDoProduto } from "../utils/device-index";
 import {
@@ -22,6 +21,9 @@ import allure from '@wdio/allure-reporter';
 // que um por device do CI.
 const PRODUTO_BUSCA = 'bermuda';
 
+// O teste para no Resumo, a última tela antes de finalizar, e NÃO cria pedido (M10, decisão do Marcio,
+// 2026-11-04; último build levantado: Android 1.22.9/530). A Mochila não é limpa aqui: o `afterTest` limpa o app.
+
 const fmtPix = (l: LinhaPix | null) => (l ? `${l.percentual}% · R$ ${l.valor}` : 'não lido');
 
 
@@ -35,7 +37,6 @@ describe('Compra', () => {
         const buscaPage = new BuscaPage();
         const produtoPage = new ProdutoPage();
         const checkoutPage = new CheckoutPage();
-        const pedidoPage = new PedidoPage();
 
         const { user, password } = await getCredentials();
         const inicioEmail = user.split('@')[0];
@@ -43,9 +44,6 @@ describe('Compra', () => {
         configurarFechadorDeBanner(() => homePage.fechaBanner());
         await rotularTeste('compra-pix');
 
-        let numeroPedido = '';
-        let produtoNaMochila = false;
-        let pedidoFinalizado = false;
         let precoBermuda = 0;
         let precoCamisa = 0;
         const descontoCupom = 0;
@@ -99,7 +97,6 @@ describe('Compra', () => {
             const bermuda = posicoesDoProduto([0, 1, 2]);
             console.log(`🩳 Bermuda das posições ${bermuda.posicoes.join(', ')} da busca (${bermuda.comoAchei})`);
             await step(`produtoPage.comprarNaPosicao(${bermuda.posicoes.join(', ')}) - bermuda`, async () => {
-                produtoNaMochila = true; // marcado antes: o toque em adicionar pode ter passado mesmo se o passo falhar
                 precoBermuda = await produtoPage.comprarNaPosicao(bermuda.posicoes, 'Bermuda');
             });
             await step('produtoPage.validarCarrosselDeIndicacao()', () => produtoPage.validarCarrosselDeIndicacao());
@@ -138,7 +135,7 @@ describe('Compra', () => {
             await step('checkoutPage.lerDescontoPix() - depois de escolher o Pix', async () => { pixEscolhido = await checkoutPage.lerDescontoPix(); });
             await step('checkoutPage.prosseguirParaResumo()', () => checkoutPage.prosseguirParaResumo());
 
-            // Passo 29 — validação dos valores ANTES do clique que leva à tela do Pix (regra a partir
+            // Passo 29 — validação dos valores no Resumo, último passo do teste (regra a partir
             // do build 1.21.7/507), com os valores guardados no teste:
             //   (1) Produtos do resumo  = precoBermuda + precoCamisa (lidos na PDP);
             //   (2) Descontos do resumo = desconto de cupom + DESCONTO DO PIX (percentual lido no Pagamento
@@ -148,7 +145,6 @@ describe('Compra', () => {
             //   (5) valor da prévia (antes de escolher) = produtos - cupom + entrega - (percentual da prévia).
             //       Com frete grátis em todas as capturas, não está provado se a prévia inclui a entrega.
             // A entrega vem do próprio resumo (o teste não escolhe frete com preço conhecido).
-            // Se algum valor não conferir, o teste para AQUI, antes de finalizar — nenhum pedido é criado.
             await step('validar valores do resumo (com desconto do Pix)', async () => {
                 const v = await checkoutPage.lerValoresDoResumo();
                 valoresResumo = v;
@@ -224,37 +220,9 @@ describe('Compra', () => {
                 }
                 console.log('✅ Resumo confere: preços dos produtos e desconto do Pix (percentual do Pix escolhido, só dos produtos), igual ao Pagamento; prévia confere');
             });
-
-            // Passo 30 — prosseguir com a compra (UM toque; cria o pedido).
-            await step('checkoutPage.finalizarPedido()', async () => {
-                pedidoFinalizado = true; // marcado antes do toque: a partir daqui a Mochila pode ter virado pedido
-                await checkoutPage.finalizarPedido();
-            });
-
-            // Passos 31 a 33 — QR code, copiar o código, Meus pedidos com o número.
-            await step('pedidoPage.validarQrCode()', () => pedidoPage.validarQrCode());
-            await step('pedidoPage.numeroDoPedido()', async () => { numeroPedido = await pedidoPage.numeroDoPedido(); });
-            // A partir do build 1.21.7/507 a tela do Pix não mostra valor em R$: o valor foi validado no
-            // passo 29 (Pagamento e Resumo). Até o 506 havia aqui o step "validar valor da tela do Pix".
-            await step('pedidoPage.copiarCodigo()', () => pedidoPage.copiarCodigo());
-            await step('pedidoPage.verMeusPedidos()', async () => { await pedidoPage.verMeusPedidos(numeroPedido); });
-
-            // Passos 34 e 35 — volta para a Home e o alerta do pedido aguardando pagamento.
-            await step('pedidoPage.sairParaHome()', () => pedidoPage.sairParaHome());
-            await step('homePage.validarAlertaPedido()', () => homePage.validarAlertaPedido(numeroPedido));
-
-            // Fim — a Mochila não fica com produto para a próxima execução.
-            // DESATIVADO (Marcio, 2026-10-14): validar se a Mochila fica com item da execução anterior.
-            // O passo 22 (abrirMochila) registra no log quantos produtos a Mochila tem.
-            // await step('checkoutPage.esvaziarMochila()', () => checkoutPage.esvaziarMochila());
         } catch (erro) {
             // Se a falha foi o app fechando (crash intermitente do app), anexa o logcat de crash.
             await anexarCrashDoAppSeFechou();
-            if (produtoNaMochila && !pedidoFinalizado) {
-                // DESATIVADO (Marcio, 2026-10-14) — ver o comentário da função limparMochila.
-                // await limparMochila(checkoutPage, homePage, user);
-                console.log('ℹ Limpeza da Mochila desativada: produto(s) deste teste podem ter ficado na Mochila');
-            }
             throw erro;
         } finally {
             // Evidências no nível do TESTE (fora dos steps), para aparecerem direto no relatório,
@@ -274,11 +242,9 @@ describe('Compra', () => {
                 `Total no botão da tela de pagamento: ${totalPagamento ?? 'não lido'}\n` +
                 (r
                     ? `Resumo — Produtos: ${r.produtos} | Entrega: ${r.entrega} | Descontos: ${r.descontos} | Total: ${r.total}\n`
-                    : 'Resumo: não lido\n') +
-                `Pedido nº: ${numeroPedido || 'não criado / não lido'}`,
+                    : 'Resumo: não lido\n'),
                 'text/plain'
             );
-            if (numeroPedido) allure.addArgument('Pedido', numeroPedido);
             if (r) allure.addArgument('Total do resumo', String(r.total));
             if (totalPagamento !== null) allure.addArgument('Total no pagamento', String(totalPagamento));
         }

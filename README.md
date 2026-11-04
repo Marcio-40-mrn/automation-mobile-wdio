@@ -246,14 +246,19 @@ wdio.conf.ts          — configuração central (detecta plataforma por env var
 testspec.yml          — Device Farm test spec para Android (CI)
 testspec-ios.yml      — Device Farm test spec para iOS (CI, seta PLATFORM=ios)
 test/
-  specs/test.spec.ts  — suite de testes principal
+  specs/              — os 5 testes (01 a 05), cada um em um arquivo; lista em COMO-RODAR-TESTES.md
   pageobjects/        — Page Object Model
     BasePage.ts       — base com utilitários de scroll, espera e debug
+    BuscaPage.ts
+    CadastroPage.ts
+    CategoriasPage.ts
+    CheckoutPage.ts
+    FavoritosPage.ts
     HomePage.ts
     LoginPage.ts
-    CategoriasPage.ts
+    OnboardingPage.ts
     PerfilPage.ts
-    FavoritosPage.ts
+    ProdutoPage.ts
 scripts/
   install-apk.mjs     — download + install do APK/AAB do EAS via GraphQL API
   generate-report-index.mjs — gera índice HTML do branch reports

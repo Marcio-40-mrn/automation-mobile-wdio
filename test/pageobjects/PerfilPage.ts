@@ -22,6 +22,49 @@ export class PerfilPage extends BasePage {
         await driver.pause(timewhait);
     }
 
+    // Menu → Coleção Especial (M9, ordem do Marcio, 2026-11-04). Mesmo id e mesmo código nas
+    // duas plataformas; o item existe logado e deslogado. Android 1.22.9/530 (o 531 não foi
+    // capturado): captures-2026-11-03-m9-colecao-especial-e-preco-100/18. iOS 1.22.9/372: draft ios/50.
+    // Visível sem rolar no AVD e na janela 402x874; a rolagem cobre as telas menores do CI.
+    async abrirColecaoEspecial() {
+        const element = await $(seletorTestId('menu-item-richard-stad'));
+        const achou = await scrollUntilVisible(element, MAX_SWIPES_MENU);
+        if (!achou) {
+            throw new Error(`Coleção Especial: o item do Menu (menu-item-richard-stad) não apareceu após ${MAX_SWIPES_MENU} swipes.`);
+        }
+        await this.fechaBanner();
+        await element.click();
+        await driver.pause(timewhait);
+    }
+
+    // Destino editorial, sem WebView: o título e o texto estão só na foto, então a prova é a
+    // estrutura da tela. `editorial-tab-home` só existe aqui (a Home e o Menu usam `tab-*`).
+    // `editorial-group-0` e `header-back-button` são checados por EXISTÊNCIA: no iOS o grupo vem
+    // visible=false e no Android o voltar é NAF (isDisplayed não medido por Appium).
+    // `editorial-home-root` não serve: no iOS também existe na Home. Não contar grupos: o número
+    // varia no iOS (2 ou 7, draft ios/50). Conferido nos dumps: Android 18 × 20; iOS 09/20 × 10/21.
+    async validarColecaoEspecial() {
+        const abaEditorial = await $(seletorTestId('editorial-tab-home'))
+            .waitForDisplayed({ timeout: 20000 })
+            .then(() => true)
+            .catch(() => false);
+        const conteudo = await $(seletorTestId('editorial-group-0')).isExisting().catch(() => false);
+        const voltar = await $(seletorTestId('header-back-button')).isExisting().catch(() => false);
+        const abaComum = await $(seletorTestId('tab-menu')).isDisplayed().catch(() => false);
+
+        if (!abaEditorial || !conteudo || !voltar || abaComum) {
+            allure.addAttachment('Coleção Especial — árvore da tela', await driver.getPageSource(), 'text/xml');
+            throw new Error(
+                `Coleção Especial não abriu: editorial-tab-home visível=${abaEditorial}, editorial-group-0=${conteudo}, ` +
+                `header-back-button=${voltar}, tab-menu visível=${abaComum} (esperado: tudo true e tab-menu false).`
+            );
+        }
+
+        const print = await driver.takeScreenshot();
+        allure.addAttachment('Coleção Especial — tela de destino', Buffer.from(print, 'base64'), 'image/png');
+        console.log('✅ Coleção Especial aberta (estrutura editorial na tela, tab bar comum fora)');
+    }
+
     // Seletor do item "Sair" do Menu logado, compartilhado por logout() e validarLogado().
     // Android: o XPath estrutural do 06-03 (sem texto), VERBATIM do que logout() já usava e que
     // passou no AVD. iOS: menu-list-button + rótulo (texto só para LOCALIZAR, como o 06-03 fez).
