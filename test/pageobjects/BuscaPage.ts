@@ -1,5 +1,6 @@
 import { BasePage, timewhait, seletorTestId } from "./BasePage";
 import { driver, $ } from '@wdio/globals'
+import { texto } from "../utils/textos";
 
 // Busca de produtos a partir da tela de Categorias. Seletores medidos em
 // Android: .planning/drafts/app-migrado/android/captures-2026-10-14-compra-pix(-rodada2)/;
@@ -53,6 +54,19 @@ export class BuscaPage extends BasePage {
             throw new Error('Busca: o toque na lupa de Categorias não abriu o campo de busca em 15s.');
         }
         console.log('🔍 Tela de busca aberta pela lupa de Categorias');
+    }
+
+    // iOS: cola o que o app copiou e devolve o valor do campo. Único jeito de ler o link no aparelho
+    // real, porque o `getClipboard` volta vazio (compartilhar carrinho, iOS 1.22.9/377, capturas 30 e 31).
+    async colarNoCampoIOS(): Promise<string> {
+        const campo = await $(this.campoBusca);
+        await this.waitForElement(campo);
+        await driver.execute('mobile: touchAndHold', { elementId: campo.elementId, duration: 1.0 });
+        const colar = await $(`-ios predicate string:type == "XCUIElementTypeMenuItem" AND name == "${texto('compartilhar.colar')}"`);
+        await this.waitForElement(colar);
+        await colar.click();
+        await driver.pause(timewhait);
+        return (await campo.getAttribute('value')) ?? '';
     }
 
     // Digita o termo e confirma pelo Enter do teclado (o que abriu os resultados nas capturas).

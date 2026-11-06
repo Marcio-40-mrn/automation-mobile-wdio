@@ -29,7 +29,7 @@ import allure from '@wdio/allure-reporter';
 //      LOGADO (cap. 29), sem tela de sucesso nem verificação de e-mail.
 // Os dois botões ficam enabled=false até a etapa inteira estar válida: é o assert sem texto.
 // Build 1.22.2/513 (Android): com a etapa VÁLIDA o botão continua enabled=false, mas o toque
-// avança (BUGS-APP-ANDROID.md 39; captures-2026-10-22-cadastro-513-conta-criada/). Por ordem do
+// avança (BUGS-APP.md A39; captures-2026-10-22-cadastro-513-conta-criada/). Por ordem do
 // Marcio (2026-10-22), nas duas plataformas: botão que não habilitou com a etapa válida é só AVISO
 // (log + print no Allure) e o teste toca mesmo assim; quem decide é o destino da tela. Botão
 // HABILITADO com dado inválido continua sendo falha.

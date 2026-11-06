@@ -211,12 +211,24 @@ export class ProdutoPage extends BasePage {
     // botão do cabeçalho, que abriu a Mochila (CI Run #42, app Android 1.22.8/519, 5 de 6 devices).
     async irParaOTopoDaListagem() {
         if (await $(seletorTestId('header-back-button')).isDisplayed().catch(() => false)) return;
-        const topo = await $(BACK_TO_TOP);
-        if (!(await topo.isDisplayed().catch(() => false))) return;
-        await topo.click();
-        await $(seletorTestId('header-back-button')).waitForDisplayed({ timeout: 10000 }).catch(() => undefined);
-        await driver.pause(1000);
-        console.log('⬆ "Back to top" tocado: listagem no topo');
+        // Banner antes do toque (Marcio, 2026-11-06; CI Run #42, Android 1.22.9/534): o "Só no APP"
+        // abre logo depois do coração; o toque caía nele, a lista seguia rolada e o voltar() abria um
+        // card. O banner pode nascer depois da checagem, por isso o efeito é conferido e o toque
+        // repete 1 vez. Sem throw: o `header-back-button` na tela de busca não foi conferido.
+        const cabecalho = await $(seletorTestId('header-back-button'));
+        for (let tentativa = 1; tentativa <= 2; tentativa++) {
+            await this.fechaBanner();
+            const topo = await $(BACK_TO_TOP);
+            if (!(await topo.isDisplayed().catch(() => false))) return;
+            await topo.click();
+            const subiu = await cabecalho.waitForDisplayed({ timeout: 10000 }).then(() => true).catch(() => false);
+            await driver.pause(1000);
+            if (subiu) {
+                console.log('⬆ "Back to top" tocado: listagem no topo');
+                return;
+            }
+            console.log(`⚠ "Back to top": toque ${tentativa}/2 sem o cabeçalho voltar à tela`);
+        }
     }
 
     // Comprar: abre o sheet de tamanho, escolhe o 1º tamanho disponível e adiciona à Mochila.
@@ -276,7 +288,7 @@ export class ProdutoPage extends BasePage {
             for (let tentativa = 1; tentativa <= 2; tentativa++) {
                 await (await $(adicionar)).click();
                 // 45s: no build 507 o sheet chega ~30s depois do toque, com a PDP "parada" no meio
-                // (bug 22 do BUGS-APP-ANDROID.md, run de 2026-10-17 01:33). Era 20s.
+                // (bug A22 do BUGS-APP.md, run de 2026-10-17 01:33). Era 20s.
                 // Banner que abrir nesta espera é fechado sem repetir o toque (repetir adicionaria 2x).
                 let resultado: 'adicionado' | 'modal' | null = null;
                 await this.esperarFechandoBanner(async () => {
@@ -312,7 +324,7 @@ export class ProdutoPage extends BasePage {
         }
     }
 
-    private async fecharModalDeEstoque() {
+    async fecharModalDeEstoque() {
         const modalEstoque = seletorTestId('alert-modal');
         await (await $(seletorTestId('alert-modal-confirm'))).click();
         const fechou = await driver
@@ -490,16 +502,23 @@ export class ProdutoPage extends BasePage {
         if (IOS) return this.continuarComprandoIOS();
         const botao = await $(seletorTestId('bag-continue-shopping'));
         await this.waitForElement(botao);
-        await botao.click();
-        const fechou = await driver
-            .waitUntil(async () => !(await $(seletorTestId('bag-continue-shopping')).isDisplayed().catch(() => false)), {
-                timeout: 10000,
-                interval: 500,
-            })
-            .then(() => true)
-            .catch(() => false);
-        if (!fechou) {
-            throw new Error('Continuar comprando: o sheet de produto adicionado não fechou em 10s.');
+        // Banner antes do toque e toque repetido 1 vez (Marcio, 2026-11-06; CI Run #42, S24+ no
+        // Android 1.22.9/534): o toque caiu no banner, que fechou, e o sheet seguiu aberto.
+        for (let tentativa = 1; tentativa <= 2; tentativa++) {
+            await this.fechaBanner();
+            await botao.click();
+            const fechou = await driver
+                .waitUntil(async () => !(await $(seletorTestId('bag-continue-shopping')).isDisplayed().catch(() => false)), {
+                    timeout: 10000,
+                    interval: 500,
+                })
+                .then(() => true)
+                .catch(() => false);
+            if (fechou) break;
+            if (tentativa === 2) {
+                throw new Error('Continuar comprando: o sheet de produto adicionado não fechou em 2 toques de 10s.');
+            }
+            console.log('⚠ Continuar comprando: toque 1/2 não fechou o sheet');
         }
         console.log('↩ Continuar comprando');
         await driver.pause(timewhait);
@@ -634,15 +653,20 @@ export class ProdutoPage extends BasePage {
         if ((await this.sheetAbertoIOS()) !== 'adicionado') {
             throw new Error('Continuar comprando (iOS): o sheet de produto adicionado não está aberto.');
         }
-        await (await $(seletorTestId('bottom-sheet-close'))).click();
-        console.log('👆 Sheet de produto adicionado: toque no X (bottom-sheet-close)');
+        // Mesma regra do Android (Marcio, 2026-11-06): banner antes do toque e toque repetido 1 vez.
+        for (let tentativa = 1; tentativa <= 2; tentativa++) {
+            await this.fechaBanner();
+            await (await $(seletorTestId('bottom-sheet-close'))).click();
+            console.log('👆 Sheet de produto adicionado: toque no X (bottom-sheet-close)');
 
-        const fechou = await driver
-            .waitUntil(async () => (await this.sheetAbertoIOS()) === null, { timeout: 10000, interval: 500 })
-            .then(() => true)
-            .catch(() => false);
-        if (!fechou) {
-            throw new Error('Continuar comprando (iOS): o sheet de produto adicionado não fechou em 10s.');
+            const fechou = await driver
+                .waitUntil(async () => (await this.sheetAbertoIOS()) === null, { timeout: 10000, interval: 500 })
+                .then(() => true)
+                .catch(() => false);
+            if (fechou) break;
+            if (tentativa === 2) {
+                throw new Error('Continuar comprando (iOS): o sheet de produto adicionado não fechou em 2 toques de 10s.');
+            }
         }
         if (!(await $(seletorTestId('pdp-buy-button')).isDisplayed().catch(() => false))) {
             throw new Error('Continuar comprando (iOS): o sheet fechou, mas a PDP (pdp-buy-button) não está na tela.');

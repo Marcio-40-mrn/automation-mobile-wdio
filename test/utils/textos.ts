@@ -33,6 +33,15 @@ export const TEXTOS = {
         ios: 'login',
         fonte: `Android: ${CAP_ANDROID}/51-pos-logout.xml (draft android/28); iOS: ${CAP_IOS} capturas 11 e 32`,
     },
+    // Menu nativo e menu de contexto do iOS (rótulos do sistema, sem id próprio).
+    'compartilhar.copiar': {
+        ios: 'Copy',
+        fonte: 'drafts/app-migrado/ios/captures-2026-11-06-compartilhar-carrinho/26-share-sheet.xml',
+    },
+    'compartilhar.colar': {
+        ios: 'Paste',
+        fonte: 'drafts/app-migrado/ios/captures-2026-11-06-compartilhar-carrinho/30-busca-holdmenu.xml',
+    },
     // Rótulo do botão de entrar no iOS (pressable com label). No Android o botão é achado só pelo
     // testID `pressable`, único na tela de Login (capturas m6e1 15/17/20), sem texto.
     'login.botaoEntrar': {

@@ -167,7 +167,7 @@ export class LoginPage extends BasePage {
         const campo = await $(this.seletorCampoAndroid(0));
         await this.waitForElement(campo);
         // Ritmo de pessoa (Marcio, 2026-10-15): apaga o campo, espera, e só então escreve. O app caiu
-        // no toque em entrar logo depois desta sequência (BUG-CRASH-ANDROID.md); a hipótese é a
+        // no toque em entrar logo depois desta sequência; a hipótese é a
         // animação de saída da mensagem de erro ainda rodando quando a tela é atualizada de novo.
         await campo.clearValue();
         await driver.pause(1000);
@@ -204,7 +204,7 @@ export class LoginPage extends BasePage {
         if (!visivel) {
             // A checagem acima prova que a mensagem SAIU DA ÁRVORE, não que a animação de saída
             // terminou. Espera para a animação acabar antes de mexer na tela de novo (hipótese do
-            // crash no toque em entrar — BUG-CRASH-ANDROID.md).
+            // crash no toque em entrar).
             await driver.pause(2000);
         }
     }
@@ -371,7 +371,7 @@ export class LoginPage extends BasePage {
         if (estadoApp !== null && estadoApp !== 4) {
             throw new Error(
                 `O app fechou depois do toque em entrar (queryAppState=${estadoApp}; 1 = fechado, 3 = em segundo plano) — ` +
-                'crash do app, ver BUG-CRASH-ANDROID.md e o anexo "Crash do app — logcat".'
+                'crash do app, ver o anexo "Crash do app — logcat".'
             );
         }
 

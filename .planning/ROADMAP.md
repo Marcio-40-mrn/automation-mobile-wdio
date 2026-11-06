@@ -18,15 +18,15 @@ Como funciona a cada versão nova (Marcio, 2026-10-21):
 
 | Plataforma | Versão | Build | Profile (EAS) | Data | Evidência |
 |---|---|---|---|---|---|
-| Android | 1.22.2 | 513 | production (APK do CI Run #33) | 2026-10-22 | `drafts/app-migrado/android/captures-2026-10-22-build513/` (AVD; sem finalizar pedido nem enviar cadastro: bloqueado pelo classificador do Claude Code) |
-| iOS | 1.22.9 | 372 | não conferido no EAS | 2026-11-04 | `drafts/app-migrado/ios/captures-2026-11-04-build372/` (Remote Access; onboarding, Menu, Richard Stad, Categorias, Favoritos, PDP, Mochila, endereço, entrega, Pix até o Resumo; cartão só até o formulário; sem busca nem cadastro) |
+| Android | 1.22.9 | 534 | não conferido no EAS | 2026-11-05 | `drafts/app-migrado/android/captures-2026-11-05-build534/` (AVD; PDP, filtros, busca, Favoritos, Mochila, entrega, Pix até o Resumo, sem criar pedido; sem cartão, tela do Pix e novo endereço) |
+| iOS | 1.22.9 | 377 | não conferido no EAS | 2026-11-06 | `drafts/app-migrado/ios/captures-2026-11-06-build377/` (Remote Access, 390x844; onboarding, Menu, Coleção Especial e link, login, favoritar, logout, busca, PDP, Mochila, entrega, Pix até o Resumo, etapa 1 do cadastro; cartão só até o número, sem Resumo com cartão) |
 
 Profile conferido no EAS (API GraphQL `api.expo.dev`, `EXPO_TOKEN`/`EXPO_PROJECT_ID` do `.env`, campo `buildProfile`).
 O Android 1.22.3/514 (production, 2026-10-22) é build de ROLLBACK, não de teste (Marcio, 2026-10-22): não entra
 nesta tabela nem na documentação de elementos.
 
-**Próximo levantamento (Marcio, 2026-11-04):** build **531 no Android**, versão não escrita. A linha do Android só muda
-depois da captura.
+**Próximo levantamento:** o próximo build que o Marcio instalar. O report de 2026-11-06 cita o build 377 também no Android;
+não está escrito se existe build Android com esse número (o Android levantado é o 534).
 
 ## M10 — Atualizações e melhorias 🔄 (sem fim — fora da sequência de marcos)
 
@@ -35,7 +35,25 @@ automação do app e não tem data de término. Cada melhoria entra aqui como um
 
 | Item | Situação |
 |---|---|
-| Pix e cartão até a última tela antes de finalizar, sem criar pedido | 🔄 implementado, só `tsc`, NÃO RODADO |
+| Pix e cartão até a última tela antes de finalizar, sem criar pedido | ✅ rodado no CI Run #42 (2026-11-05, Android 1.22.9/534): `03` 6/6, `02` 5/6 (falha do S24+ por banner, `STATE.md`); iOS 5/5 iPhones |
+| Coleção Especial: rolar até a parte não visível, tocar no link e validar a tela de destino pelo cabeçalho | ⬜ não iniciado |
+
+### Melhoria — Coleção Especial até o destino do link (Marcio, 2026-11-06)
+
+O `05-colecao-especial` hoje só abre a tela da coleção e valida a chegada. Pedido: depois de chegar, rolar até a parte
+que não está visível, tocar no link e validar que ele leva à tela correta da coleção, pela mensagem do cabeçalho.
+Vale para as duas plataformas.
+
+Antes de escrever:
+
+- **iOS 1.22.9/377 capturado (draft iOS `50`, caps. 12–18).** O "Saiba mais" não existe na árvore; o toque foi por coordenada
+  e abriu a listagem "Aramis em Milão" (30 produtos). O cabeçalho do destino é lido: `header-back-button` com label
+  "Aramis em Milão". Tocar no `editorial-group-0` não foi testado.
+- **Sem elemento não há como tocar:** o teste não pode usar coordenada fora das exceções aprovadas. Falta testID do time do
+  app no link ou decisão do Marcio. Android: link não capturado no build atual; no 530 ele também estava só na foto.
+- **Validar o cabeçalho é pedido do Marcio para este teste.** A regra geral do `REQUIREMENTS.md` é não validar texto;
+  falta definir se o valor esperado é fixo ou lido da tela anterior, e o que acontece quando o idioma muda.
+- O nome do arquivo, do teste e dos métodos continua sem nome de pessoa; só o testID do app mantém o nome.
 
 ### Melhoria — Pix e cartão param antes de finalizar (2026-11-04)
 
@@ -66,7 +84,7 @@ Decisões e riscos da implementação (plano aprovado pelo Marcio em 2026-11-04,
   pedido e alerta do pedido na Home.
 - **Código removido:** `PedidoPage.ts`, os métodos de finalizar do `CheckoutPage` e o `validarAlertaPedido` do
   `HomePage`. Continuam no histórico do git.
-- **Run real:** falta run nas duas plataformas para dar o item como feito.
+- **Run real:** feito no CI Run #42 (2026-11-05), nas duas plataformas (`STATE.md`).
 
 ## M1 — Suíte Android estável ✅
 
@@ -319,7 +337,7 @@ compra.
 ## M9 — Ampliar a cobertura com novos cenários ⬜ planejamento
 
 Aberto em 2026-10-21 (Marcio): os 4 testes (`01`–`04`) cobrem boa parte do app, e outras funcionalidades serão
-validadas no futuro. **Em 2026-11-03 ficou escolhido um cenário novo** (Richard Stad Selection, teste escrito em 2026-11-04, não rodado). O resto
+validadas no futuro. **Escolhidos:** Richard Stad Selection (2026-11-03, rodado no CI Run #42) e Compartilhar carrinho (2026-11-06, escrito, não rodado). O resto
 da lista abaixo continua backlog, sem escolha: tirado da seção 3 do `cenarios-gherkin-2026-09-28.pdf`
 (funcionalidades que os 4 testes não percorrem) e das pendências registradas; quais entram, em que ordem e com que
 massa é decisão do Marcio, cenário a cenário.
@@ -327,7 +345,7 @@ massa é decisão do Marcio, cenário a cenário.
 ### Cenário escolhido — Menu → Richard Stad Selection (2026-11-03)
 
 Navegação: abrir o Menu, tocar em Richard Stad Selection e validar que a tela de destino carregou. **Escrito em
-2026-11-04 por ordem do Marcio (`test/specs/05-colecao-especial.spec.ts`), só `tsc`, NÃO RODADO, nas duas plataformas.**
+2026-11-04 por ordem do Marcio (`test/specs/05-colecao-especial.spec.ts`), rodado no CI Run #42 (2026-11-05): Android 6/6, iOS 5/5 iPhones.**
 Escrito sem esperar a captura do Android 531.
 
 Android, build 1.22.9/530, 2026-11-03, `captures-2026-11-03-m9-colecao-especial-e-preco-100/` (Menu deslogado, captura `18`):
@@ -345,6 +363,53 @@ deslogado e logado, sem WebView. Chegada: `editorial-tab-home` com `header-back-
 na Home e vem `visible=false`, então não serve de âncora. `header-back-button` volta ao Menu. O teste não faz swipe horizontal:
 o swipe horizontal abriu a listagem "2150 - Expert XP", causa não confirmada, e não deve contar grupos. O Android 531 ainda não foi
 capturado.
+
+### Cenários escolhidos — Compartilhar carrinho (2026-11-06)
+
+Decisão do Marcio: o que o app faz hoje é tomado como certo, e aqui só entra o que a automação valida. Android 1.22.9/534,
+AVD, evidência em `drafts/app-migrado/android/captures-2026-11-06-compartilhar-carrinho/`, `-2/` e `-3/`, análise em
+`drafts/app-migrado/android/ANALISE-COMPARTILHAR-CARRINHO.md`, Gherkin em `cenarios-compartilhar-carrinho-2026-11-06.md`.
+**Escrito em 2026-11-06 (`test/specs/06-compartilhar-carrinho.spec.ts` + `CompartilharPage`), só `tsc`, NÃO RODADO, nas duas plataformas.**
+
+| Nº | Cenário | O que o teste valida |
+|---|---|---|
+| 1 | Botão ausente com a Mochila vazia | `share-bag-cta` ausente |
+| 2 | Botão com 1 item | `share-bag-cta` presente |
+| 3 | Botão com mais de 1 item | `share-bag-cta` presente |
+| 4 | Toque gera o link e abre o menu nativo | `android:id/resolver_list` aberto e link lido por Copy + área de transferência |
+| 7 | Link sem CDV | URL só `/share-bag/<uuid>`, sem query |
+| 12 | Link sem dados pessoais | URL só `/share-bag/<uuid>`, sem query |
+| 13 | Compartilhar não altera a Mochila | mesmos cards `wake-product-card-bag-*` e quantidades, antes do toque e depois do Copy |
+| 5 | Link traz os produtos e tamanhos | `shared-bag-item-<id>` e tamanho na "Shared Backpack"; a quantidade é conferida na Mochila, depois de "Add all" |
+| 17 | Link abre o carrinho no app | tela "Shared Backpack" com `shared-bag-item-<id>` e `shared-bag-add-all` |
+| 22 | Carrinho visível sem login | `shared-bag-item-<id>` deslogado |
+| 19 | "Add all" soma à Mochila | cards e quantidades na Mochila depois de `shared-bag-add-all` |
+| 40 | Adicionar produto diferente depois do carrinho recebido | novo card na Mochila |
+| 41 | Remover item depois de adicionar | card sumiu, por `wake-remove-item` |
+| 42 | Alterar quantidade de item vindo do link | quantidade muda por `add-button` e `remove-button` |
+| 45 | Link inválido | `shared-bag-unavailable` e, depois de "Go to store" (`pressable`), `editorial-home-root` |
+
+**Executados por Appium no AVD em 2026-11-06 (`captures-2026-11-06-compartilhar-carrinho-3/`, 00–60): 15/15 passaram no app atual, sem coordenada.**
+
+Mecanismos conferidos para os testes:
+
+- **Abrir o link:** `mobile: deepLink` com `aramisnova://share-bag/<uuid>` e `package: com.aramis.ecomm`, logado e deslogado.
+  A URL copiada é convertida para esse formato; o https por `mobile: deepLink` dá "Page not found".
+- **Ler o link:** `setClipboard` com sentinela antes do Copy e `getClipboard` depois, porque a área de transferência do
+  emulador é compartilhada com o host.
+- **Quantidade:** `//*[@resource-id="remove-button"]/following-sibling::android.widget.TextView[1]`, relativo ao card.
+- **Rolar a Mochila:** `mobile: scrollGesture` no container `scrollable`.
+
+**iOS 1.22.9/377, Remote Access, 2026-11-06 (`drafts/app-migrado/ios/captures-2026-11-06-compartilhar-carrinho/`, 00–61): 15/15 passaram.**
+
+- **Abrir o link:** `mobile: deepLink` com `bundleId`, igual ao Android nos demais parâmetros.
+- **Ler o link:** `getClipboard`/`setClipboard` não funcionam no aparelho. O caminho é Copy (`actionGroupCell`), colar no campo de
+  Busca e ler o `value`.
+- **Card:** botões e quantidade são irmãos de `wake-product-card-bag-<id>`, por `following-sibling`.
+- **Sheets da PDP:** por fração da janela, exceção já aprovada.
+
+O cenário 13 compara a Mochila antes e depois do Copy, que fecha o menu nativo nas duas plataformas; não há cancelamento nem coordenada.
+Mochila depois do logout no Android: não conferido. Copy nos Samsung do Device Farm: não conferido.
 
 Regras que valem para cada cenário novo (`REQUIREMENTS.md`):
 - **um teste por decisão**; o que repete o caminho de um dos 4 testes vira asserção dentro dele, e nenhum teste é

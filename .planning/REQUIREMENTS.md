@@ -12,6 +12,7 @@ rodando por device nas duas plataformas. Comando de cada um: `COMO-RODAR-TESTES.
 | `03-compra-cartao` | onboarding negando as permissões, 1 calça, pagamento com cartão fake até o Resumo, sem criar pedido, com o valor dos produtos validado pelo preço lido na PDP (M10, Marcio, 2026-11-04) |
 | `04-criar-conta` | cadastro de conta real, com os casos inválidos de cada etapa no mesmo teste |
 | `05-colecao-especial` | Menu → Coleção Especial (item `menu-item-richard-stad`), valida a tela de destino, sem login (M9, Marcio, 2026-11-04) |
+| `06-compartilhar-carrinho` | compartilha a Mochila, abre o link, soma, edita, link inválido e sem login, com os 15 cenários do M9, sem criar pedido (Marcio, 2026-11-06) |
 
 ## Critérios de aceite
 
@@ -99,7 +100,8 @@ Cada uma custou um incidente. Detalhes no `CLAUDE.md`.
   |---|---|---|---|
   | Tamanho e "Add to cart" da PDP tocados por fração da janela no iOS | `ProdutoPage.comprarIOS` | conteúdo do sheet fora da árvore XCUITest (drafts iOS 13, 14, 49) | Marcio, 2026-10-15 |
   | Carrossel de indicação sem validação no iOS | `ProdutoPage.validarCarrosselDeIndicacao` | filhos do sheet fora da árvore | Marcio, 2026-10-15 |
-  | CTA das Boas-vindas e alerta de localização por fração (só se faltar id) | `BasePage.iniciaAppIOS` | sem elemento na árvore; no build 349+ o CTA tem id | REQUIREMENTS (exceção obrigatória no iOS) |
+  | Link compartilhado lido colando no campo de Busca no iOS | `CompartilharPage.lerLinkCopiado` | `getClipboard`/`setClipboard` não funcionam no aparelho iOS (captura 2026-11-06, build 377) | Marcio, 2026-11-06 |
+| CTA das Boas-vindas e alerta de localização por fração (só se faltar id) | `BasePage.iniciaAppIOS` | sem elemento na árvore; no build 349+ o CTA tem id | REQUIREMENTS (exceção obrigatória no iOS) |
 - **Nenhum passo de teste no `wdio.conf.ts`, em hipótese alguma** (decisão do Marcio,
   2026-10-02). O `wdio.conf.ts` só configura o ambiente: conexão, device, app, reporters, timeouts.
   Todo comportamento do teste mora no page object: aceitar ou negar diálogo/alerta, conceder
@@ -134,7 +136,7 @@ Cada uma custou um incidente. Detalhes no `CLAUDE.md`.
      corrigido no corpo, o build anterior é **descartado**;
   3. o que a captura não alcançou fica numa seção "Não conferido neste build", só com o nome.
   **Proibido:** seção ou coluna por build ("Build 352", "no 349 era", "acréscimo de…"), histórico de
-  versões, e bug do app misturado (bug vai no `BUGS-APP-ANDROID.md` / `BUGS-APP-IOS.md`). No topo de cada
+  versões, e bug do app misturado (bug vai no `BUGS-APP.md`). No topo de cada
   documento, uma linha só: versão/build, data e pasta de capturas.
 
 ## Restrições conhecidas de ambiente

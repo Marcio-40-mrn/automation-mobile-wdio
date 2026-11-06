@@ -10,7 +10,7 @@ const IOS = process.env.PLATFORM === 'ios';
 
 // Produto na Mochila: `wake-product-card-bag-<id>` nas duas plataformas (iOS: captura 37; o sufixo
 // muda entre rodadas, draft 15).
-const CARD_MOCHILA = IOS
+export const CARD_MOCHILA = IOS
     ? '-ios predicate string:name BEGINSWITH "wake-product-card-bag-"'
     : '-android uiautomator:new UiSelector().resourceIdMatches("wake-product-card-bag-.*")';
 
@@ -667,7 +667,7 @@ export class CheckoutPage extends BasePage {
     // Chamado no fim do teste e na limpeza depois de uma falha, para a conta não acumular produtos
     // entre execuções. Erro nomeado se sobrar produto.
     async esvaziarMochila() {
-        const card = '-android uiautomator:new UiSelector().resourceIdMatches("wake-product-card-bag-.*")';
+        const card = CARD_MOCHILA;
         const remover = seletorTestId('wake-remove-item');
         const vazia = seletorTestId('status-alert-icon');
 

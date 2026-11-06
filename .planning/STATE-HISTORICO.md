@@ -70,7 +70,7 @@ S26 (SM-S942U1), navegação por gestos, Remote Access do Device Farm aberto pel
 `drafts/app-migrado/android/captures-2026-10-20-android16-remoto/` (68 prints + árvores, `NOTAS.md`); texto para a PR em
 `captures-2026-10-20-android16/RELATORIO-PR-ANDROID16.md`. A captura do AVD (API 34, `captures-2026-10-20-android16/`) NÃO
 é evidência da PR. No S26, finalizar com cartão deu modal antifraude + Pedido Cancelado (#214832); o `__next_prime overflow`
-do Run #29 não reproduziu (`BUGS-APP-ANDROID.md` item 38). Voltar do Android OK em 14 fluxos. `ELEMENTOS-SEM-TESTID.md` e drafts 12/13/15/17 reescritos para o 512; os demais drafts seguem no
+do Run #29 não reproduziu (`BUGS-APP.md` item 38). Voltar do Android OK em 14 fluxos. `ELEMENTOS-SEM-TESTID.md` e drafts 12/13/15/17 reescritos para o 512; os demais drafts seguem no
 511 (ids comparados, iguais). **`ProdutoPage.comprar()` Android vale no 512, sem mudança de código:** a captura
 `captures-2026-10-20-build512-comprar/` (óculos e camisa, 2/2) provou `pdp-buy-button` → sheet "Select size"
 (`size-option-*`, `size-button` enabled=false) → tamanho → `size-button` enabled → `bag-continue-shopping` em ≤9 s.
@@ -81,13 +81,13 @@ que é o critério do `escolherTamanho`. **Pix (Marcio):** o percentual vem
 da Wake e muda ao escolher o Pix (prévia "10% off … estimated" → escolhido "15% off"). `02-compra-pix` agora lê a linha
 ANTES (`CheckoutPage.lerPreviaPix`, `payment-wake-pix-discount-preview`) e DEPOIS (`lerDescontoPix`,
 `payment-wake-pix-discount`) e valida cada valor pelo percentual lido; saiu o `DESCONTO_PIX = 0.10`. Só `tsc`.
-O 10% → 15% é comportamento da Wake, não bug: item 34 retirado do `BUGS-APP-ANDROID.md` (Marcio, 2026-10-20).
+O 10% → 15% é comportamento da Wake, não bug: item 34 retirado do `BUGS-APP.md` (Marcio, 2026-10-20).
 
 **2026-10-20 — AVD no build 1.22.1/511: captura completa (sem finalizar) e docs Android reescritos para o 511.**
 Capturas `drafts/app-migrado/android/captures-2026-10-20-build511/` (00–72) e `captures-2026-10-20-contas-ci-meus-dados/`
 (Meus dados das 11 contas do CI; lista nome/sobrenome/e-mail em `CONTAS-CI-AUTOMACAO.csv`/`.md`, raiz, para o time de
 dados). `ELEMENTOS-SEM-TESTID.md`, drafts 01–30/32/34–36/40 e `00-INDICE.md` reescritos; não conferidos no 511: 31, 33,
-37, 38, 39 (exigem finalizar pedido/cadastro ou abrir o formulário de endereço). `BUGS-APP-ANDROID.md` 33 (crash no Criar
+37, 38, 39 (exigem finalizar pedido/cadastro ou abrir o formulário de endereço). `BUGS-APP.md` A33 (crash no Criar
 Conta) e 34 (prévia do Pix "10% off", Pix escolhido "15% off"). **No 511 o Resumo do Pix voltou a mostrar o desconto, de
 15%** (R$ 187,47 sobre 1.249,80); o `02-compra-pix` calcula 10% (`DESCONTO_PIX`) e vai falhar no Resumo. **Aguarda o
 Marcio dizer qual é o desconto certo** antes de mudar o spec e o `CheckoutPage.lerDescontoPix` (que pode passar a ler
@@ -100,15 +100,15 @@ correções ESCRITAS (aprovadas pelo Marcio), NÃO RODADAS, só `tsc`.** Registr
 `plans/2026-10-19-ci-run25-build509.md`. Resultado: `01` Android 5/6, iOS 5/5; `02` 0/11; `03` 0/11; `04` Android 3/6,
 iOS 0/5. Causas: (1) o 509 trocou o modal antifraude + Pedido Cancelado pela tela `wake-order-processing-recusado`, e o
 pedido só aparece em Meus pedidos; (2) o 509 tirou a linha `payment-wake-pix-discount` e o Resumo do Pix mostra
-Descontos 0,00 (bug, `BUGS-APP-ANDROID.md` 27); (3) o host iOS do Device Farm não tem `mobile: keys`/`tap`/
+Descontos 0,00 (bug, `BUGS-APP.md` A27); (3) o host iOS do Device Farm não tem `mobile: keys`/`tap`/
 `dragFromToForDuration`/`touchAndHold`; (4) a `qa160` (S23 Ultra) recusava o login desde o Run #22.
 Mudanças: ações W3C no iOS (`BasePage.tocarPonto/arrastar/segurarElemento/teclaW3C`, 6 pontos); cartão verde = tela de
 recusa + total do 1º pedido de Meus pedidos = total do resumo; `lerDescontoPix` lê o botão do Pagamento e o Resumo
 continua exigindo o desconto (vermelho enquanto o bug existir). Capturas no AVD (509):
 `captures-2026-10-19-build509-run25/` (pedido real #201280, Cancelado) e `captures-2026-10-19-qa160/`. **`qa160`
 RECRIADA** no AVD com a `CLIENT_PASSWORD` (o app aceitou o e-mail e o CPF como novos), login provado, endereço salvo,
-Mochila e Favoritos vazios. Docs Android reescritos para o 509 (`ELEMENTOS-SEM-TESTID.md`, drafts, `BUGS-APP-ANDROID.md`
-26–32, `MASSA-DE-DADOS.md`). Em aberto: `04-criar-conta` no S23+/S26 Ultra (não reproduzido no AVD); ações de teclado
+Mochila e Favoritos vazios. Docs Android reescritos para o 509 (`ELEMENTOS-SEM-TESTID.md`, drafts, `BUGS-APP.md`
+A26–A32, `MASSA-DE-DADOS.md`). Em aberto: `04-criar-conta` no S23+/S26 Ultra (não reproduzido no AVD); ações de teclado
 W3C no host iOS não verificadas; iOS 354 sem captura da recusa, do Pix e de Meus pedidos.
 
 **2026-10-19 (tarde) — `04-criar-conta` iOS: a etapa 1 PASSOU inteira, inclusive o telefone, mas o run estourou os
@@ -261,8 +261,8 @@ usado só por eles (conferido com `tsc` e busca de uso antes de excluir). Comand
   fechou, veio o overlay cinza com o logo e a PDP ficou sem sheet.
 - 2026-10-17 01h, captura no AVD (507), em `captures-2026-10-17-build507-adicionar-pagamento/` (`NOTAS.md`):
   **o bug NÃO se reproduziu.** O sheet abriu em 3 de 3 tentativas (2x óculos, 1x camisa G), ~7 s depois do toque.
-  Registrado como bug (item 22 do `BUGS-APP-ANDROID.md`). No run de 01:26 ficou provado: o sheet abre ~30 s depois do toque e o `comprar()` espera 20 s. Espera do `ProdutoPage.comprar()` (Android) subiu de 20 s para 45 s por ordem do Marcio (2026-10-17).
-  - 2ª unidade de camisa sem estoque abre o modal `alert-modal` "Insufficient stock" em vez do sheet (item 23 do `BUGS-APP-ANDROID.md`).
+  Registrado como bug (item 22 do `BUGS-APP.md`). No run de 01:26 ficou provado: o sheet abre ~30 s depois do toque e o `comprar()` espera 20 s. Espera do `ProdutoPage.comprar()` (Android) subiu de 20 s para 45 s por ordem do Marcio (2026-10-17).
+  - 2ª unidade de camisa sem estoque abre o modal `alert-modal` "Insufficient stock" em vez do sheet (item 23 do `BUGS-APP.md`).
   - Tamanho sem estoque deixa o `size-button` desabilitado.
   - Mochila → `bag-checkout-button` → endereço (card sem id) → `delivery-option-slas` →
     `delivery-continue-button` → Payment (`select-wake-method-*`, `payment-submit-button`) funciona, com os ids do 506.
@@ -273,7 +273,7 @@ usado só por eles (conferido com `tsc` e busca de uso antes de excluir). Comand
    `MASSA-DE-DADOS.md`: a `allure-results/` sumiu antes do levantamento.
 2. **Captura iOS FEITA** (Remote Access, app **1.21.7 / build 352**, janela 430x932 pt), capturas 00–46 em
    `drafts/app-migrado/ios/captures-2026-10-16-calcas-cadastro/`, drafts **41–45** (Calças + cadastro), `00-INDICE`,
-   `ELEMENTOS-SEM-TESTID-IOS.md` (seção 5) e `BUGS-APP-IOS.md` (14–19) atualizados. Conta iOS real criada
+   `ELEMENTOS-SEM-TESTID-IOS.md` (seção 5) e `BUGS-APP.md` (I14–I19) atualizados. Conta iOS real criada
    (`MASSA-DE-DADOS.md`). Achados: Calças = 4º `sub-categories-button` (igual ao Android); campos do cadastro **sem
    testID e sem TextField** na árvore (só placeholder); erro = StaticText x=36 sem id; enviar/finalizar com 2 toques;
    `mobile: keys` 1 caractere por vez; apagar só com `touchAndHold` na tecla delete; logout com alerta nativo (o
@@ -282,7 +282,7 @@ usado só por eles (conferido com `tsc` e busca de uso antes de excluir). Comand
    `ELEMENTOS-SEM-TESTID-IOS.md` **reescrito do zero só para o 352** (46 pedidos; seção 3 = não conferido: Pix/QR,
    resposta do cartão/antifraude/cancelado, Meus pedidos com pedidos, Favoritos com itens, banner do pedido na Home,
    cupom aplicado, erros do endereço, edição de Meus dados/toggles). Drafts iOS com seção "Build 352" (21 arquivos)
-   e novos 46–48; `BUGS-APP-IOS.md` itens 20–29. Fechar a seção 3 exige outra sessão e finalizar pedido (autorização).
+   e novos 46–48; `BUGS-APP.md` itens I20–I29. Fechar a seção 3 exige outra sessão e finalizar pedido (autorização).
 3. **`autoGrantPermissions` REMOVIDO do `wdio.conf.ts` (AVD), ordem do Marcio 2026-10-16. NÃO RODADO.** Os
    diálogos já eram tratados por resource-id (`BasePage.ativaGps/permiteNotificacao`, permitir; `OnboardingPage.
    negarDialogoAndroid`, negar), o mesmo caminho que o Device Farm Android já usava. Validar no próximo run no AVD:
@@ -379,7 +379,7 @@ o `install-apk.mjs` cai em `development` em silêncio quando o secret vem vazio.
      33 (pedido processando/cancelado);
    - atualizados com uma seção "build 506": 02, 03, 06, 12–19 e 26;
    - `00-INDICE.md` atualizado.
-   O `ELEMENTOS-SEM-TESTID.md` foi reescrito para o build 506, e o `BUGS-APP-ANDROID.md` ganhou os itens 13–17.
+   O `ELEMENTOS-SEM-TESTID.md` foi reescrito para o build 506, e o `BUGS-APP.md` ganhou os itens 13–17.
    Correção do draft-writer: o titular vazio MOSTRA "Nome do titular obrigatório" (dump 50). A tabela de
    seletores por passo está no relatório do draft-writer e nos drafts 29–33. **iOS:** o caminho de Calças nunca foi capturado e precisa de
    uma sessão de Remote Access. O resto do cartão no iOS já está capturado (build 349).
@@ -397,7 +397,7 @@ o `install-apk.mjs` cai em `development` em silêncio quando o secret vem vazio.
    `drafts/app-migrado/ios/captures-2026-10-15-compra-{pix,cartao}/` (`NOTAS.md`); drafts escritos
    (`drafts/app-migrado/ios/00-INDICE.md`: 01–19, 21, 26, 27, 34–40). Pedidos criados: `MASSA-DE-DADOS.md`.
 2. **Documentos para o dev:** `ELEMENTOS-SEM-TESTID-IOS.md` (build 349) e `ELEMENTOS-SEM-TESTID.md` (Android 505),
-   ambos com a versão no topo; bugs em `BUGS-APP-IOS.md` e `BUGS-APP-ANDROID.md`.
+   ambos com a versão no topo; bugs em `BUGS-APP.md` e `BUGS-APP.md`.
 3. **Próximo, na ordem:**
    - **Captura do cartão no Android** (AVD, build atual), quando o Marcio liberar o emulador: inspector +
      draft-writer em paralelo (regra no `CLAUDE.md`). Incluir os **casos inválidos do formulário** (número
