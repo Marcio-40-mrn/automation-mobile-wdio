@@ -4,7 +4,6 @@ import { CategoriasPage } from "../pageobjects/CategoriasPage";
 import { PerfilPage } from "../pageobjects/PerfilPage";
 import { FavoritosPage } from "../pageobjects/FavoritosPage";
 import { getCredentials } from "../utils/credentials";
-import { posicoesDoProduto } from "../utils/device-index";
 import {
     configurarFechadorDeBanner,
     registrarAvisoNoRelatorio,
@@ -89,9 +88,12 @@ describe('Navegação', () => {
 
             await step('categoriaPage.clickRoupas()', () => categoriaPage.clickRoupas());
             await step('categoriaPage.abrirCamisetas()', () => categoriaPage.abrirCamisas());
-            // Camisa da posição DESTE device no bloco 1 da listagem (device-index.ts): produto
-            // diferente por teste e por device; o 02-compra-pix compra nos blocos 0, 2 e 3.
-            const [posicaoCamisa] = posicoesDoProduto([1]).posicoes;
+            // 1ª camisa da listagem em todos os devices (Marcio, 2026-11-09): favoritar não compra e
+            // não tira estoque de ninguém, e cada device usa a sua conta. Antes era a posição do
+            // device no bloco 1 (11 a 21): a lista ficava rolada e, no CI Run #44 do outro
+            // repositório (09/11), o "Back to top" não subiu a lista no S23/S24/S25 Ultra e o
+            // voltar() abriu um card. Com a lista no topo o irParaOTopoDaListagem() não toca nada.
+            const posicaoCamisa = 0;
             await step(`categoriaPage.favoritarProdutoNaPosicao(${posicaoCamisa})`, async () => {produtoFavoritado = await categoriaPage.favoritarProdutoNaPosicao(posicaoCamisa);});
             // Um voltar() só: favoritando na listagem, esta é a única tela a sair para chegar em
             // categorias, que é onde a aba Perfil existe (a listagem não tem tab-* nenhum).

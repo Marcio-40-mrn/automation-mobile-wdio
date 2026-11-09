@@ -167,18 +167,22 @@ jobs:
           echo "Run agendado: $RUN_ARN"
 
       # --- Aguardar conclusão ---
+      # A espera inclui a fila da frota pública da AWS: no Mobile Tests #51 (2026-11-06) os Samsung
+      # esperaram de 1h02 a 1h56 por aparelho livre, o run levou 2h33 e o timeout quebrou a esteira
+      # sem dizer o motivo. Situação por aparelho no log e no resumo: scripts/devicefarm-situacao.sh.
       - name: Wait for Device Farm run to complete
         run: |
           ARN="${{ steps.schedule.outputs.run_arn }}"
+          MAX_ESPERA_MIN=120
           echo "Aguardando run: $ARN"
           STATUS=""
           RESULT_VAL=""
           REACHED_TERMINAL=false
-          for i in $(seq 1 120); do
+          for i in $(seq 1 $MAX_ESPERA_MIN); do
             RESULT=$(aws devicefarm get-run --arn "$ARN" --region us-west-2 | jq -r '.run | "\(.status) \(.result)"')
             STATUS=$(echo $RESULT | cut -d' ' -f1)
             RESULT_VAL=$(echo $RESULT | cut -d' ' -f2)
-            echo "Status ($i/120): $STATUS / $RESULT_VAL"
+            echo "Status ($i/$MAX_ESPERA_MIN): $STATUS / $RESULT_VAL"
             if [ "$STATUS" != "PENDING" ] && [ "$STATUS" != "RUNNING" ] && [ "$STATUS" != "SCHEDULING" ]; then
               echo "Run concluído com resultado: $RESULT_VAL"
               REACHED_TERMINAL=true
@@ -186,14 +190,41 @@ jobs:
             fi
             sleep 60
           done
-          # Timeout sem estado terminal = falha real de automação (esteira travou) -> quebra.
+
+          FILA=0; RODANDO=0; SEM_APARELHO=0
+          SITUACAO=$(bash scripts/devicefarm-situacao.sh "$ARN" || true)
+          DETALHE=$(printf '%s\n' "$SITUACAO" | grep '^- ' || true)
+          CONTAGEM=$(printf '%s\n' "$SITUACAO" | grep -E '^FILA=[0-9]+ RODANDO=[0-9]+ SEM_APARELHO=[0-9]+$' || true)
+          [ -n "$CONTAGEM" ] && eval "$CONTAGEM"
+          echo "Situação por aparelho:"; printf '%s\n' "$DETALHE"
+
+          # Timeout sem estado terminal = a esteira não obteve o resultado -> quebra, dizendo se é fila
+          # de aparelho na AWS ou teste ainda rodando.
           if [ "$REACHED_TERMINAL" != "true" ]; then
-            echo "::error::Timeout aguardando o Device Farm (último status: $STATUS). A esteira não conseguiu obter o resultado."
+            if [ "$FILA" -gt 0 ]; then
+              MOTIVO="$FILA aparelho(s) ainda na fila da AWS esperando aparelho livre (frota pública) — não é falha de teste"
+            else
+              MOTIVO="$RODANDO aparelho(s) ainda rodando os testes"
+            fi
+            {
+              echo "### ❌ Android Device Farm — timeout de $MAX_ESPERA_MIN min"
+              echo "$MOTIVO."
+              echo ""
+              printf '%s\n' "$DETALHE"
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::Timeout de $MAX_ESPERA_MIN min aguardando o Device Farm: $MOTIVO. Situação de cada aparelho no resumo da execução."
             exit 1
           fi
           # Resultado do teste (PASSED/FAILED/ERRORED/WARNED) NÃO quebra a esteira: reflete no relatório.
           echo "::notice::Android Device Farm: $RESULT_VAL — ver relatório Allure"
-          echo "**Android Device Farm:** \`$RESULT_VAL\` — resultado reflete no relatório, não quebra a esteira." >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "**Android Device Farm:** \`$RESULT_VAL\` — resultado reflete no relatório, não quebra a esteira."
+            echo ""
+            printf '%s\n' "$DETALHE"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$SEM_APARELHO" -gt 0 ]; then
+            echo "::warning::Android: $SEM_APARELHO aparelho(s) não foram alocados pela AWS (\"Unable to acquire device\") — nenhum teste rodou neles."
+          fi
 
       # --- Download de artifacts ---
       - name: Download artifacts from Device Farm
@@ -544,9 +575,10 @@ jobs:
         run: |
           if [ ! -s ios-runs.tsv ]; then echo "::error::nenhum run iOS foi agendado"; exit 1; fi
           TOTAL=$(wc -l < ios-runs.tsv | tr -d ' ')
+          MAX_ESPERA_MIN=120
           TERMINOU=false
-          for i in $(seq 1 120); do
-            echo "Polling ($i/120):"
+          for i in $(seq 1 $MAX_ESPERA_MIN); do
+            echo "Polling ($i/$MAX_ESPERA_MIN):"
             PENDENTES=0
             while IFS="$(printf '	')" read -r NAME ARN; do
               LINHA=$(aws devicefarm get-run --arn "$ARN" --region us-west-2 --query 'run.[status,result]' --output text)
@@ -560,9 +592,28 @@ jobs:
             sleep 60
           done
 
-          # Timeout sem estado terminal = falha real de automacao (esteira travou) -> quebra.
+          FILA=0; RODANDO=0; SEM_APARELHO=0
+          SITUACAO=$(bash scripts/devicefarm-situacao.sh $(cut -f2 ios-runs.tsv) || true)
+          DETALHE=$(printf '%s\n' "$SITUACAO" | grep '^- ' || true)
+          CONTAGEM=$(printf '%s\n' "$SITUACAO" | grep -E '^FILA=[0-9]+ RODANDO=[0-9]+ SEM_APARELHO=[0-9]+$' || true)
+          [ -n "$CONTAGEM" ] && eval "$CONTAGEM"
+          echo "Situação por aparelho:"; printf '%s\n' "$DETALHE"
+
+          # Timeout sem estado terminal = a esteira nao obteve o resultado -> quebra, dizendo se e fila
+          # de aparelho na AWS ou teste ainda rodando.
           if [ "$TERMINOU" != "true" ]; then
-            echo "::error::Timeout aguardando os runs iOS ($PENDENTES de $TOTAL ainda em andamento). A esteira nao conseguiu obter o resultado."
+            if [ "$FILA" -gt 0 ]; then
+              MOTIVO="$FILA aparelho(s) ainda na fila da AWS esperando aparelho livre (frota pública) — não é falha de teste"
+            else
+              MOTIVO="$RODANDO aparelho(s) ainda rodando os testes"
+            fi
+            {
+              echo "### ❌ iOS Device Farm — timeout de $MAX_ESPERA_MIN min"
+              echo "$MOTIVO."
+              echo ""
+              printf '%s\n' "$DETALHE"
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::Timeout de $MAX_ESPERA_MIN min aguardando os runs iOS: $MOTIVO. Situação de cada aparelho no resumo da execução."
             exit 1
           fi
 
@@ -573,8 +624,16 @@ jobs:
             echo "- $RES — $NAME" >> "$GITHUB_STEP_SUMMARY"
             echo "::notice::iOS $NAME: $RES"
           done < ios-runs.tsv
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Resultado reflete no relatorio Allure; nao quebra a esteira." >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo ""
+            echo "Situação por aparelho:"
+            printf '%s\n' "$DETALHE"
+            echo ""
+            echo "Resultado reflete no relatorio Allure; nao quebra a esteira."
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$SEM_APARELHO" -gt 0 ]; then
+            echo "::warning::iOS: $SEM_APARELHO aparelho(s) não foram alocados pela AWS (\"Unable to acquire device\") — nenhum teste rodou neles."
+          fi
 
       # --- Download de artifacts iOS ---
       - name: Download artifacts from iOS Device Farm runs
