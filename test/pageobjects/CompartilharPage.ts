@@ -25,6 +25,35 @@ const LINK_INEXISTENTE = `${ESQUEMA_DO_LINK}00000000-0000-0000-0000-000000000000
 // seria lido como se fosse o link.
 const SENTINELA = 'sentinela-compartilhar-carrinho';
 
+// Área de transferência no Android. O `driver.setClipboard`/`getClipboard` do WDIO 9 tenta o
+// `mobile: setClipboard`/`getClipboard` e só cai no endpoint antigo do Appium quando o erro diz
+// "unknown command". O UiAutomator2 do host do Device Farm responde "Unknown mobile command" e o WDIO
+// não cai (CI Run #52, 2026-11-09, Android 1.22.9/534, S23U, S23+, S24U, S24+ e S25U). Aqui o endpoint
+// antigo entra só nesse erro; no AVD (Appium local) segue o `mobile:`.
+const semComandoMobile = (erro: unknown) =>
+    /unknown mobile command/i.test(erro instanceof Error ? erro.message : String(erro));
+
+async function gravarAreaDeTransferencia(conteudo: string) {
+    const base64 = Buffer.from(conteudo).toString('base64');
+    try {
+        await driver.setClipboard(base64, 'plaintext');
+    } catch (erro) {
+        if (!semComandoMobile(erro)) throw erro;
+        await driver.appiumSetClipboard(base64, 'plaintext');
+    }
+}
+
+async function lerAreaDeTransferencia(): Promise<string> {
+    let base64: string;
+    try {
+        base64 = await driver.getClipboard('plaintext');
+    } catch (erro) {
+        if (!semComandoMobile(erro)) throw erro;
+        base64 = await driver.appiumGetClipboard('plaintext');
+    }
+    return Buffer.from(base64 ?? '', 'base64').toString('utf8').trim();
+}
+
 const BOTAO_COMPARTILHAR = seletorTestId('share-bag-cta');
 const ITEM_RECEBIDO = IOS
     ? '-ios predicate string:name BEGINSWITH "shared-bag-item-"'
@@ -211,7 +240,7 @@ export class CompartilharPage extends BasePage {
     // iOS 27). Sem o Copy no menu, o Android lê o link da prévia e fecha com o voltar.
     async compartilharECopiar(): Promise<string | null> {
         await this.fechaBanner();
-        if (!IOS) await driver.setClipboard(Buffer.from(SENTINELA).toString('base64'), 'plaintext');
+        if (!IOS) await gravarAreaDeTransferencia(SENTINELA);
         await $(BOTAO_COMPARTILHAR).click();
         const abriu = await $(MENU_NATIVO).waitForDisplayed({ timeout: 15000 }).then(() => true).catch(() => false);
         if (!abriu) {
@@ -246,7 +275,7 @@ export class CompartilharPage extends BasePage {
             lido = (await this.buscaPage.colarNoCampoIOS()).trim().split(/\s+/)[0];
             await this.produtoPage.voltarAteCategorias();
         } else {
-            const area = Buffer.from(await driver.getClipboard('plaintext'), 'base64').toString('utf8').trim();
+            const area = await lerAreaDeTransferencia();
             lido = area && area !== SENTINELA ? area : (previa ?? '').trim();
         }
         allure.addAttachment('Link compartilhado', lido || 'não lido', 'text/plain');

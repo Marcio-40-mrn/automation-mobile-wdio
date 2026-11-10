@@ -25,6 +25,21 @@ Profile conferido no EAS (API GraphQL `api.expo.dev`, `EXPO_TOKEN`/`EXPO_PROJECT
 O Android 1.22.3/514 (production, 2026-10-22) é build de ROLLBACK, não de teste (Marcio, 2026-10-22): não entra
 nesta tabela nem na documentação de elementos.
 
+**Versão 1.23.0 (próxima):** roteiro de 15 itens das notas de release, riscos e pontos que tocam a automação em
+`.planning/TESTAR-V1.23.0.md`.
+
+**A testar na próxima versão (falhas do `06-compartilhar-carrinho` no CI Run #52, 2026-11-09, Android 1.22.9/534 e
+iOS 1.22.9/377; detalhes no `STATE.md`):**
+
+| # | Plataforma / aparelho | O que testar | Por quê |
+|---|---|---|---|
+| 1 | Android, Samsung do Device Farm | Ler o link copiado sem `mobile: setClipboard` (área de transferência ou prévia do menu nativo) e se o Copy existe no menu de compartilhar dos Samsung | `Unknown mobile command "mobile: setClipboard"` em S23U, S23+, S24U, S24+ e S25U: o Appium do host não tem o comando. **Corrigido em 2026-11-10 (endpoint antigo do Appium nesse erro), não rodado** |
+| 2 | Android, S26 Ultra | Botão de compartilhar (`share-bag-cta`) com 2 produtos na Mochila | Não apareceu no Run #52; causa não levantada |
+| 3 | iOS, todos | Tempo do teste inteiro (limite de 15 min por teste) | iPhone 13, 14 e 14 Pro Max estouraram os 900 s no cenário 40; o iPhone 15 levou 12 min até o cenário 4. **Corrigido em 2026-11-10 (limite do `06` em 40 min), não rodado; o job do Device Farm tem limite de 60 min** |
+| 4 | iOS, iPhone 15 Pro Max | "Copy" no menu nativo de compartilhar (`actionGroupCell`) | "Copy não apareceu no menu nativo" |
+| 5 | iOS, iPhone 15 | Mochila antes e depois do Copy: só os produtos adicionados pelo teste | Apareceu o `479721` (tamanho UN) depois do Copy, sem origem provada |
+| 6 | iOS, iPhone 14 Pro Max | `02-compra-pix`: voltar até Categorias | "a tela atual não tem seta de voltar"; não investigado |
+
 **Próximo levantamento:** o próximo build que o Marcio instalar. O report de 2026-11-06 cita o build 377 também no Android;
 não está escrito se existe build Android com esse número (o Android levantado é o 534).
 

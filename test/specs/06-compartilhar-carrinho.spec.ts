@@ -20,7 +20,12 @@ import {
 // com Android 1.22.9/534 e iOS 1.22.9/377, depois de executar os 15 por Appium nas duas plataformas.
 // Não cria pedido. Os blocos dos produtos são livres nos outros specs (device-index.ts).
 describe('Compartilhar carrinho', () => {
-    it('Compartilha a Mochila e valida o carrinho recebido pelo link', async () => {
+    it('Compartilha a Mochila e valida o carrinho recebido pelo link', async function () {
+        // Limite só deste teste, nas duas plataformas: 40 min no lugar dos 15 min do `mochaOpts.timeout`.
+        // No CI Run #52 (2026-11-09, iOS 1.22.9/377) o iPhone 13, o 14 e o 14 Pro Max estouraram os
+        // 15 min no cenário 40, com 4 cenários ainda pela frente.
+        this.timeout(40 * 60 * 1000);
+
         const homePage = new HomePage();
         const loginPage = new LoginPage();
         const perfilPage = new PerfilPage();
