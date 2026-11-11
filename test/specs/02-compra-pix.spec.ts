@@ -17,9 +17,10 @@ import {
 } from "../utils/allure-helpers";
 import allure from '@wdio/allure-reporter';
 
-// Bermuda no lugar do óculos (Marcio, 2026-10-26): a busca por óculos trazia só 4 produtos, menos
+// Camiseta no lugar da bermuda (Marcio, 2026-11-10, Android 1.23.0/541: o teste seguia quebrando na
+// bermuda). Antes, bermuda no lugar do óculos (Marcio, 2026-10-26): a busca por óculos trazia só 4 produtos, menos
 // que um por device do CI.
-const PRODUTO_BUSCA = 'bermuda';
+const PRODUTO_BUSCA = 'camiseta';
 
 // O teste para no Resumo, a última tela antes de finalizar, e NÃO cria pedido (M10, decisão do Marcio,
 // 2026-11-04; último build levantado: Android 1.22.9/530). A Mochila não é limpa aqui: o `afterTest` limpa o app.
@@ -44,7 +45,7 @@ describe('Compra', () => {
         configurarFechadorDeBanner(() => homePage.fechaBanner());
         await rotularTeste('compra-pix');
 
-        let precoBermuda = 0;
+        let precoCamiseta = 0;
         let precoCamisa = 0;
         const descontoCupom = 0;
         let valoresResumo: ValoresResumo | null = null;
@@ -94,10 +95,10 @@ describe('Compra', () => {
             // Passos 12 a 14 — compra o resultado da posição DESTE device e valida o carrossel de
             // indicação. Produto diferente por teste e por device (device-index.ts): blocos 0, 1 e 2 da
             // busca; o 2º e o 3º só se o anterior não tiver tamanho com estoque.
-            const bermuda = posicoesDoProduto([0, 1, 2]);
-            console.log(`🩳 Bermuda das posições ${bermuda.posicoes.join(', ')} da busca (${bermuda.comoAchei})`);
-            await step(`produtoPage.comprarNaPosicao(${bermuda.posicoes.join(', ')}) - bermuda`, async () => {
-                precoBermuda = await produtoPage.comprarNaPosicao(bermuda.posicoes, 'Bermuda');
+            const camiseta = posicoesDoProduto([0, 1, 2]);
+            console.log(`👕 Camiseta das posições ${camiseta.posicoes.join(', ')} da busca (${camiseta.comoAchei})`);
+            await step(`produtoPage.comprarNaPosicao(${camiseta.posicoes.join(', ')}) - camiseta`, async () => {
+                precoCamiseta = await produtoPage.comprarNaPosicao(camiseta.posicoes, 'Camiseta');
             });
             await step('produtoPage.validarCarrosselDeIndicacao()', () => produtoPage.validarCarrosselDeIndicacao());
 
@@ -137,7 +138,7 @@ describe('Compra', () => {
 
             // Passo 29 — validação dos valores no Resumo, último passo do teste (regra a partir
             // do build 1.21.7/507), com os valores guardados no teste:
-            //   (1) Produtos do resumo  = precoBermuda + precoCamisa (lidos na PDP);
+            //   (1) Produtos do resumo  = precoCamiseta + precoCamisa (lidos na PDP);
             //   (2) Descontos do resumo = desconto de cupom + DESCONTO DO PIX (percentual lido no Pagamento
             //       DEPOIS de escolher o Pix, sobre produtos - cupom, SEM a entrega);
             //   (3) Total do resumo     = produtos - cupom + entrega - desconto do Pix;
@@ -148,7 +149,7 @@ describe('Compra', () => {
             await step('validar valores do resumo (com desconto do Pix)', async () => {
                 const v = await checkoutPage.lerValoresDoResumo();
                 valoresResumo = v;
-                const somaProdutos = Math.round((precoBermuda + precoCamisa) * 100) / 100;
+                const somaProdutos = Math.round((precoCamiseta + precoCamisa) * 100) / 100;
                 const baseDoPix = Math.round((somaProdutos - descontoCupom) * 100) / 100;
                 const pix = pixEscolhido as LinhaPix | null;
                 const previa = previaPix as LinhaPix | null;
@@ -164,7 +165,7 @@ describe('Compra', () => {
                 totalComPixEsperado = totalEsperado;
 
                 // Os valores ficam salvos no relatório: parâmetros do teste + anexo com a conta.
-                allure.addArgument('Preço bermuda', String(precoBermuda));
+                allure.addArgument('Preço camiseta', String(precoCamiseta));
                 allure.addArgument('Preço camisa', String(precoCamisa));
                 allure.addArgument('Soma dos produtos', String(somaProdutos));
                 allure.addArgument('Prévia do Pix (antes de escolher)', `${previa.percentual}% · ${previa.valor}`);
@@ -173,7 +174,7 @@ describe('Compra', () => {
                 allure.addArgument('Total esperado com desconto do Pix', String(totalEsperado));
                 allure.addAttachment(
                     'Valores da compra',
-                    `Preço bermuda (PDP): ${precoBermuda}\n` +
+                    `Preço camiseta (PDP): ${precoCamiseta}\n` +
                     `Preço camisa (PDP): ${precoCamisa}\n` +
                     `Soma dos produtos: ${somaProdutos}\n` +
                     `Desconto de cupom: ${descontoCupom}\n` +
@@ -188,14 +189,14 @@ describe('Compra', () => {
                     'text/plain'
                 );
                 console.log(
-                    `💲 Bermuda ${precoBermuda} + camisa ${precoCamisa} = ${somaProdutos}; entrega ${v.entrega}; ` +
+                    `💲 Camiseta ${precoCamiseta} + camisa ${precoCamisa} = ${somaProdutos}; entrega ${v.entrega}; ` +
                     `prévia ${previa.percentual}% ${previa.valor}; Pix escolhido ${pix.percentual}%, desconto ${descontoPix}; total esperado ${totalEsperado} | ` +
                     `resumo: produtos ${v.produtos}, descontos ${v.descontos}, total ${v.total}`
                 );
 
                 const erros: string[] = [];
                 if (Math.abs(v.produtos - somaProdutos) > 0.009) {
-                    erros.push(`Produtos do resumo = ${v.produtos}, soma dos preços = ${precoBermuda} + ${precoCamisa} = ${somaProdutos}`);
+                    erros.push(`Produtos do resumo = ${v.produtos}, soma dos preços = ${precoCamiseta} + ${precoCamisa} = ${somaProdutos}`);
                 }
                 if (Math.abs(v.descontos - descontosEsperados) > 0.009) {
                     erros.push(
@@ -227,11 +228,11 @@ describe('Compra', () => {
         } finally {
             // Evidências no nível do TESTE (fora dos steps), para aparecerem direto no relatório,
             // passe ou falhe. Os prints de cada tela ficam nos steps correspondentes.
-            const soma = Math.round((precoBermuda + precoCamisa) * 100) / 100;
+            const soma = Math.round((precoCamiseta + precoCamisa) * 100) / 100;
             const r = valoresResumo as ValoresResumo | null;
             allure.addAttachment(
                 'Evidências da compra',
-                `Preço bermuda (lido na PDP): ${precoBermuda || 'não lido'}\n` +
+                `Preço camiseta (lido na PDP): ${precoCamiseta || 'não lido'}\n` +
                 `Preço camisa (lido na PDP): ${precoCamisa || 'não lido'}\n` +
                 `Soma dos produtos: ${soma}\n` +
                 `Desconto de cupom: ${descontoCupom}\n` +

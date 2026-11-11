@@ -108,9 +108,26 @@ export class HomePage extends BasePage {
         // fonte: android/06-home (captures-2026-09-29/09-home.xml); ios/06-home
         const element = await $(seletorTestId('tab-menu'));
         await this.waitForElement(element);
-        await this.fechaBanner();
-        await element.click();
-        await driver.pause(timewhait);
+        // App 1.23.0/541 (run local do Marcio, 2026-11-10 20:25, `01`): o banner "Só no APP: 20% OFF"
+        // abriu depois de voltar a Categorias, o fechaBanner() fechou e o toque seguinte na aba Menu
+        // não teve efeito; o abrirFavoritos() falhou esperando `menu-card-favorites`. Agora o destino
+        // é conferido e o toque repete 1 vez (mesmo padrão do irParaOTopoDaListagem/continuarComprando).
+        // Menu aberto = algum id `menu-*` visível (menu-card-*, menu-user-header, menu-login-button…),
+        // que só a tela do Menu tem, logado e deslogado. Mesma regra nas duas plataformas.
+        const menuAberto = process.env.PLATFORM === 'ios'
+            ? '-ios predicate string:name BEGINSWITH "menu-" AND visible == 1'
+            : seletorIdsAndroid('menu-.*');
+        for (let tentativa = 1; tentativa <= 2; tentativa++) {
+            await this.fechaBanner();
+            await element.click();
+            const abriu = await $(menuAberto).waitForDisplayed({ timeout: 10000 }).then(() => true).catch(() => false);
+            if (abriu) {
+                await driver.pause(timewhait);
+                return;
+            }
+            console.log(`⚠ Aba Menu: toque ${tentativa}/2 sem o Menu abrir (nenhum menu-* na tela em 10 s)`);
+        }
+        throw new Error('A aba Menu (tab-menu) foi tocada 2x e o Menu não abriu: nenhum elemento menu-* apareceu na tela.');
     }
 
     async abrirCategorias() {

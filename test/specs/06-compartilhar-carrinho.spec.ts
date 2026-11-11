@@ -24,7 +24,10 @@ describe('Compartilhar carrinho', () => {
         // Limite só deste teste, nas duas plataformas: 40 min no lugar dos 15 min do `mochaOpts.timeout`.
         // No CI Run #52 (2026-11-09, iOS 1.22.9/377) o iPhone 13, o 14 e o 14 Pro Max estouraram os
         // 15 min no cenário 40, com 4 cenários ainda pela frente.
-        this.timeout(40 * 60 * 1000);
+        // O limite vai no `.timeout()` encadeado no fim do `it`, não em `this.timeout()` aqui dentro:
+        // o wrapper do WDIO (@wdio/utils `executeAsync`) lê o `_timeout` do teste ANTES de executar o
+        // corpo, e o `this.timeout()` daqui não mudava nada. Run local de 2026-11-10 (Android
+        // 1.23.0/541): "Error: Timeout" aos 15,5 min, no passo "quantidade 2 em um item".
 
         const homePage = new HomePage();
         const loginPage = new LoginPage();
@@ -45,7 +48,7 @@ describe('Compartilhar carrinho', () => {
             const { posicoes } = posicoesDoProduto(blocos);
             await step('homePage.abrirCategorias()', () => homePage.abrirCategorias());
             await step('buscaPage.abrirPelaLupaDeCategorias()', () => buscaPage.abrirPelaLupaDeCategorias());
-            await step('buscaPage.buscar("bermuda")', () => buscaPage.buscar('bermuda'));
+            await step('buscaPage.buscar("camiseta")', () => buscaPage.buscar('camiseta'));
             await step(`produtoPage.comprarNaPosicao(${posicoes.join(', ')}) - ${rotulo}`, async () => {
                 await produtoPage.comprarNaPosicao(posicoes, rotulo);
             });
@@ -80,7 +83,7 @@ describe('Compartilhar carrinho', () => {
             await step('compartilhar: botão com 1 item (2)', () => compartilharPage.validarBotaoPresente(1));
 
             // 3: 2 produtos, um deles com quantidade 2.
-            await comprarNaBusca([3, 4], 'Bermuda');
+            await comprarNaBusca([3, 4], 'Camiseta');
             await step('checkoutPage.abrirMochila(2)', async () => { await checkoutPage.abrirMochila(2); });
             await step('compartilhar: botão com 2 itens (3)', () => compartilharPage.validarBotaoPresente(2));
             await step('compartilhar: quantidade 2 em um item', async () => {
@@ -103,7 +106,7 @@ describe('Compartilhar carrinho', () => {
             });
 
             // 40: produto diferente, somado aos que vieram do link.
-            await comprarNaBusca([5, 6], 'Bermuda diferente');
+            await comprarNaBusca([5, 6], 'Camiseta diferente');
             await step('checkoutPage.abrirMochila() - produto novo (40)', async () => { await checkoutPage.abrirMochila(compartilhados.length + 1); });
             let produtoNovo: ItemMochila | undefined;
             await step('compartilhar: produto diferente na Mochila (40)', async () => {
@@ -146,5 +149,5 @@ describe('Compartilhar carrinho', () => {
             await anexarCrashDoAppSeFechou();
             throw erro;
         }
-    });
+    }).timeout(40 * 60 * 1000);
 });

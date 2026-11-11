@@ -108,11 +108,20 @@ export class BuscaPage extends BasePage {
             await driver.pressKeyCode(66); // KEYCODE_ENTER
         }
 
-        const achou = await $(SELETOR_CARD_PRODUTO).waitForDisplayed({ timeout: 30000 }).then(() => true).catch(() => false);
+        // Android 1.23.0/541 (2026-11-10, captures-2026-11-10-build541-busca): depois do Enter a lista
+        // de resultados pode ficar mais de 30 s no carregamento (skeleton, res-a) antes dos cards; com
+        // 30 s o `06` quebrou aqui. Espera até 90 s, nas duas plataformas, e registra quanto levou.
+        const ESPERA_RESULTADOS = 90000;
+        const inicio = Date.now();
+        const achou = await $(SELETOR_CARD_PRODUTO)
+            .waitForDisplayed({ timeout: ESPERA_RESULTADOS })
+            .then(() => true)
+            .catch(() => false);
+        const segundos = Math.round((Date.now() - inicio) / 1000);
         if (!achou) {
-            throw new Error(`Busca por "${termo}": nenhum produto (product-card-*) apareceu nos resultados em 30s.`);
+            throw new Error(`Busca por "${termo}": nenhum produto (product-card-*) apareceu nos resultados em ${ESPERA_RESULTADOS / 1000}s.`);
         }
-        console.log(`✅ Busca por "${termo}" trouxe produtos`);
+        console.log(`✅ Busca por "${termo}" trouxe produtos em ${segundos}s`);
         await driver.pause(timewhait);
     }
 }

@@ -110,7 +110,8 @@ export class ProdutoPage extends BasePage {
     // Rola a listagem até o card da posição `posicao` estar inteiro na tela e o devolve, sem tocar.
     // Usado para abrir a PDP (acima) e para favoritar na listagem (`CategoriasPage`). Conta a partir
     // do topo: se a lista estiver rolada (volta da PDP), vai ao topo antes.
-    // Limite de 30 rolagens: o bloco 3 do device 10 é a posição 43 (cerca de 22 linhas da grade).
+    // Limite de 40 rolagens (era 30 até o 1.22.9/534; no 1.23.0/541 cada arrasto anda ~meia fileira):
+    // o bloco 3 do device 10 é a posição 43 (cerca de 22 linhas da grade).
     async cardNaPosicao(posicao: number): Promise<{ id: string; el: WebdriverIO.Element }> {
         await this.fechaBanner();
         await this.irParaOTopoDaListagem();
@@ -118,8 +119,14 @@ export class ProdutoPage extends BasePage {
         const atributo = IOS ? 'name' : 'resource-id';
         const { width, height } = await driver.getWindowRect();
         const vistos: string[] = [];
+        // App 1.23.0/541 (run local de 2026-11-10, `02` e `03`): os cards da listagem ficaram bem mais
+        // altos, cada arrasto anda ~meia fileira e a lista hidrata com pausas; numa rolagem sem card novo
+        // o teste concluía "a listagem acabou" com 10 de 291 produtos vistos (busca "bermuda") e 8 nas
+        // Calças. Agora só desiste depois de 3 rolagens SEGUIDAS sem card novo (com espera extra entre
+        // elas). Mesma regra nas duas plataformas.
+        let semCardNovo = 0;
 
-        for (let rolagem = 0; rolagem <= 30; rolagem++) {
+        for (let rolagem = 0; rolagem <= 40; rolagem++) {
             const visiveis: { id: string; x: number; y: number; h: number; el: WebdriverIO.Element }[] = [];
             for (const el of await $$(SELETOR_CARD_PRODUTO)) {
                 if (!(await el.isDisplayed().catch(() => false))) continue;
@@ -131,11 +138,19 @@ export class ProdutoPage extends BasePage {
             visiveis.sort((a, b) => (Math.abs(a.y - b.y) > 10 ? a.y - b.y : a.x - b.x));
             const novos = visiveis.filter((v) => !vistos.includes(v.id));
             if (rolagem > 0 && novos.length === 0 && vistos.length <= posicao) {
-                await anexarPrint('Listagem — rolagem sem card novo');
-                throw new Error(
-                    `Produto da posição ${posicao}: a listagem não trouxe card novo depois da rolagem ` +
-                    `${rolagem} (${vistos.length} cards vistos: ${vistos.join(', ')}).`
-                );
+                semCardNovo++;
+                if (semCardNovo >= 3) {
+                    await anexarPrint('Listagem — rolagem sem card novo');
+                    throw new Error(
+                        `Produto da posição ${posicao}: a listagem não trouxe card novo em 3 rolagens seguidas ` +
+                        `(até a rolagem ${rolagem}; ${vistos.length} cards vistos: ${vistos.join(', ')}).`
+                    );
+                }
+                console.log(`⚠ Listagem: rolagem ${rolagem} sem card novo (${semCardNovo}/3) — esperando e rolando de novo`);
+                await this.fechaBanner();
+                await driver.pause(2000);
+            } else if (novos.length > 0) {
+                semCardNovo = 0;
             }
             for (const v of novos) vistos.push(v.id);
 
@@ -159,7 +174,7 @@ export class ProdutoPage extends BasePage {
             await driver.pause(1500);
         }
         await anexarPrint('Listagem — card da posição não alcançado');
-        throw new Error(`Produto da posição ${posicao}: não alcançado em 30 rolagens (${vistos.length} cards vistos).`);
+        throw new Error(`Produto da posição ${posicao}: não alcançado em 40 rolagens (${vistos.length} cards vistos).`);
     }
 
     // Compra o produto da 1ª posição da lista que tiver tamanho com estoque e devolve o preço lido na
@@ -282,11 +297,16 @@ export class ProdutoPage extends BasePage {
                 throw new Error('Comprar: o sheet de tamanho (size-button) não abriu em 15s depois de tocar no pdp-buy-button.');
             }
 
-            const tamanho = await this.escolherTamanho(adicionar, recusados);
+            const { tamanho, linha } = await this.escolherTamanho(adicionar, recusados);
             let recusado = false;
 
             for (let tentativa = 1; tentativa <= 2; tentativa++) {
-                await (await $(adicionar)).click();
+                const botao = await this.botaoAdicionar(linha);
+                if (!botao) {
+                    allure.addAttachment('Comprar — árvore da tela (sem botão de adicionar)', await driver.getPageSource(), 'text/xml');
+                    throw new Error(`Comprar: o botão de adicionar não está na tela depois de escolher o tamanho ${tamanho}.`);
+                }
+                await botao.click();
                 // 45s: no build 507 o sheet chega ~30s depois do toque, com a PDP "parada" no meio
                 // (bug A22 do BUGS-APP.md, run de 2026-10-17 01:33). Era 20s.
                 // Banner que abrir nesta espera é fechado sem repetir o toque (repetir adicionaria 2x).
@@ -309,7 +329,7 @@ export class ProdutoPage extends BasePage {
                     recusado = true;
                     break;
                 }
-                if (!(await $(adicionar).isDisplayed().catch(() => false))) break;
+                if (!(await this.botaoAdicionar(linha))) break;
                 console.log(`⚠ Toque ${tentativa}/2 em adicionar não abriu o sheet de produto adicionado`);
             }
 
@@ -373,7 +393,26 @@ export class ProdutoPage extends BasePage {
     // A partir do build 1.21.7/507 os tamanhos sem estoque vêm cinza com "+" no print, mas com
     // enabled=true no dump (capturas 20 e 26 de captures-2026-10-17-sold-out-meus-pedidos/). O "+"
     // ordena a tentativa (com estoque primeiro); quem decide é o efeito no adicionar.
-    private async escolherTamanho(adicionar: string, ignorar: string[] = []): Promise<string> {
+    // Botão de adicionar do sheet de tamanho (Android). Até o 1.22.9/534 era sempre o `size-button`.
+    // No 1.23.0/541 (run local de 2026-11-10, `03`, log do Appium) o `size-button` existe com o sheet
+    // aberto e SOME da árvore depois do toque num tamanho, com o "Add to cart - R$ 499,90" na tela
+    // (print "Sheet de tamanho"). O id novo não foi capturado (o bundle do APK não o mostra legível).
+    // Sem o `size-button`: o clicável mais largo (≥ 60% da janela) abaixo da linha dos tamanhos, que
+    // no print é só o "Add to cart". NÃO conferido em dump do 541: trocar pelo id novo quando capturado.
+    private async botaoAdicionar(linhaDosTamanhos: number): Promise<WebdriverIO.Element | null> {
+        const porId = await $(seletorTestId('size-button')).getElement();
+        if (await porId.isDisplayed().catch(() => false)) return porId;
+        const { width } = await driver.getWindowRect();
+        let melhor: { el: WebdriverIO.Element; y: number } | null = null;
+        for (const el of await $$('//*[@clickable="true"]')) {
+            const r = await driver.getElementRect(el.elementId).catch(() => null);
+            if (!r || r.y <= linhaDosTamanhos || r.width < width * 0.6) continue;
+            if (!melhor || r.y > melhor.y) melhor = { el, y: r.y };
+        }
+        return melhor?.el ?? null;
+    }
+
+    private async escolherTamanho(adicionar: string, ignorar: string[] = []): Promise<{ tamanho: string; linha: number }> {
         const opcoes = [];
         for (const el of await $$(SELETOR_TAMANHO)) {
             if (!(await el.isDisplayed().catch(() => false))) continue;
@@ -411,13 +450,20 @@ export class ProdutoPage extends BasePage {
                     break;
                 }
             }
+            // Habilitou = o `size-button` ficou enabled (até o 534) OU sumiu da árvore com um botão de
+            // adicionar no lugar (1.23.0/541, ver `botaoAdicionar`). Quem confirma é o sheet de
+            // "produto adicionado" ou o modal de estoque, depois do toque no adicionar.
             const habilitou = await driver
-                .waitUntil(async () => (await $(adicionar).isEnabled().catch(() => false)), { timeout: 4000, interval: 500 })
+                .waitUntil(async () => {
+                    const porId = await $(adicionar);
+                    if (await porId.isExisting().catch(() => false)) return porId.isEnabled().catch(() => false);
+                    return (await this.botaoAdicionar(linhaDoSheet)) !== null;
+                }, { timeout: 4000, interval: 500 })
                 .then(() => true)
                 .catch(() => false);
             if (habilitou) {
                 console.log(`📏 Tamanho escolhido: ${tamanho}${tentados.length > 1 ? ` (antes, sem habilitar: ${tentados.slice(0, -1).join(', ')})` : ''}`);
-                return tamanho;
+                return { tamanho, linha: linhaDoSheet };
             }
             console.log(`⚠ Tamanho ${tamanho} não habilitou o botão de adicionar — tentando o próximo`);
         }

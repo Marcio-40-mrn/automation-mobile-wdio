@@ -181,7 +181,11 @@ export class CadastroPage extends BasePage {
             const botao = await $(seletorTestId(id));
             if (!(await botao.isExisting().catch(() => false))) break;
             await this.fechaBanner();
-            await botao.click();
+            // O botão pode sair da tela entre o `isExisting` e o clique, porque o toque anterior avançou
+            // devagar (1.23.0/541, AVD, 2026-11-10: "element wasn't found" no 2º toque do Finalizar, com
+            // a Home no print da falha). Nesse caso quem decide é o destino da tela, não o clique.
+            const clicou = await botao.click().then(() => true).catch(() => false);
+            if (!clicou) return chegou();
             console.log(`👆 ${id} (toque ${toque}/2)`);
             const ok = await driver
                 .waitUntil(chegou, { timeout: toque === 1 ? 5000 : timeoutFinal, interval: 500 })
