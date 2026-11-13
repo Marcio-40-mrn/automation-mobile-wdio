@@ -1,0 +1,10 @@
+Preço bermuda (lido na PDP): 249.9
+Preço camisa (lido na PDP): não lido
+Soma dos produtos: 249.9
+Desconto de cupom: 0
+Prévia do Pix (antes de escolher): não lido
+Pix escolhido: não lido
+Desconto do Pix esperado: não calculado
+Total esperado com desconto do Pix: não calculado
+Total no botão da tela de pagamento: não lido
+Resumo: não lido

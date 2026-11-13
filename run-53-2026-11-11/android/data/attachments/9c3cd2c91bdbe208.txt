@@ -1,0 +1,1 @@
+Buffer de crash vazio: o app fechou sem registrar exceção no logcat.

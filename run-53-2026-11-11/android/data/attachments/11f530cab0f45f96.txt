@@ -1,0 +1,13 @@
+Preço camiseta (PDP): 139.9
+Preço camisa (PDP): 369.9
+Soma dos produtos: 509.8
+Desconto de cupom: 0
+Entrega (resumo): 0
+Base do desconto do Pix (sem entrega): 509.8 - 0 = 509.8
+Prévia do Pix (antes de escolher): 15% · R$ 433.33 | esperado 509.8 + 0 - 76.47 = 433.33
+Pix escolhido: 15% · R$ 433.33
+Desconto do Pix (15%): 76.47
+Total esperado com desconto do Pix: 509.8 + 0 - 76.47 = 433.33
+
+Resumo — Produtos: 509.8 | Entrega: 0 | Descontos: 76.47 | Total: 433.33
+Total no botão do pagamento: 433.33

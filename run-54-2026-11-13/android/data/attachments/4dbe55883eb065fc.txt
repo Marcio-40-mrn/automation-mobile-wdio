@@ -1,0 +1,9 @@
+Device: Samsung Galaxy S24 Ultra
+E-mail: informatica.mrn+cadastro-samsung-galaxy-s24-u-mwfcd510-jant@gmail.com
+Nome: Teste
+Sobrenome: Automacao
+CPF: 025.369.125-74
+Nascimento: 04/11/1991
+Telefone: (11) 97948-4612
+Senha: Aramis@FHRE1a
+Conta criada: não / não confirmado

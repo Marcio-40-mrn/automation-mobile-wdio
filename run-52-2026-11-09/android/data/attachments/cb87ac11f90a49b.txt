@@ -1,0 +1,9 @@
+Device: Samsung Galaxy S26 Ultra
+E-mail: informatica.mrn+cadastro-samsung-galaxy-s26-u-mw9jfyc3-e5ne@gmail.com
+Nome: Teste
+Sobrenome: Automacao
+CPF: 721.481.319-07
+Nascimento: 13/12/1973
+Telefone: (11) 96679-1717
+Senha: Aramis@RBGG0a
+Conta criada: sim (finalizar saiu da etapa 2)
