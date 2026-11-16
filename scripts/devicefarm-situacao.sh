@@ -7,6 +7,10 @@
 # livre na frota pública (a conta não tem aparelho dedicado), o run passou de 2h e a esteira saiu
 # só com "Timeout aguardando o Device Farm", sem dizer que o motivo era fila e não teste.
 #
+# O workflow (Marcio, 2026-11-16) só copia para o resumo do job as linhas em que o teste NÃO
+# executou (fila, sem alocação, "terminou sem rodar"). A linha "terminou: `RESULTADO`" é resultado
+# de teste e fica de fora: isso aparece só no Allure.
+#
 # O início no aparelho é o `created` da 1ª suite do job: no Device Farm as suites só são criadas
 # quando o aparelho é alocado (conferido nos runs Android #40 a #51).
 #

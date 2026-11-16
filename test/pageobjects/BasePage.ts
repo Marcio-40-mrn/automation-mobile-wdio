@@ -552,17 +552,34 @@ export class BasePage {
   // `onboarding-topics-continue`. Nos dois builds o botão só entra na árvore depois de rolar até o
   // fim (no 513, ausente no início das duas telas, 05 e 07). Depois do clique, a prova de que a
   // tela trocou é o botão sair da tela.
+  //
+  // 1.23.0 (Android 544, caps. 04–08 do roteiro; CI #47 e #54 no 547): o aceite já está na tela
+  // com enabled=false. Clicar nele não troca a tela. "Go to the end of the text" (sem resource-id)
+  // leva ao fim e só então o aceite habilita. O mesmo vale para os Termos.
   private async aceitarTelaLongaAndroid(tela: string, idAceite: string) {
     const maxSwipes = 45;
+    const irAoFim = '-android uiautomator:new UiSelector().description("Go to the end of the text")';
     const aceite = `-android uiautomator:new UiSelector().resourceIdMatches("${idAceite}")`;
-    const element = await $(aceite);
+    const aceiteHabilitado = `-android uiautomator:new UiSelector().resourceIdMatches("${idAceite}").enabled(true)`;
 
-    const achou = await scrollUntilVisible(element, maxSwipes);
-    if (!achou) {
-      throw new Error(`aceite da ${tela} não apareceu após ${maxSwipes} swipes (${idAceite} não ficou visível)`);
+    const temAtalho = await $(irAoFim).waitForDisplayed({ timeout: 3000 }).then(() => true).catch(() => false);
+    if (temAtalho) {
+      await $(irAoFim).click();
+      console.log(`👆 ${tela}: Go to the end`);
+      const habilitou = await $(aceiteHabilitado).waitForDisplayed({ timeout: 15000 }).then(() => true).catch(() => false);
+      if (!habilitou) {
+        throw new Error(
+          `Onboarding Android: "Go to the end" na "${tela}" não habilitou o aceite (${idAceite}) em 15s.`
+        );
+      }
+    } else {
+      const achou = await scrollUntilVisible(await $(aceite), maxSwipes);
+      if (!achou) {
+        throw new Error(`aceite da ${tela} não apareceu após ${maxSwipes} swipes (${idAceite} não ficou visível)`);
+      }
     }
 
-    await this.aceitarEEsperarSair(tela, aceite, aceite);
+    await this.aceitarEEsperarSair(tela, temAtalho ? aceiteHabilitado : aceite, aceite);
   }
 
   // Clica o aceite e espera `sinalDeSaida` sair da tela (15s). Sem isso o laço seguinte poderia
@@ -892,20 +909,53 @@ export class BasePage {
 
   // Política (`privacy-accept`) e Termos (`terms-accept`) do iOS, até a Home (`tab-home`).
   // Separado do aceitaOnboardingIOS() para o spec que nega as permissões reaproveitar (03-compra-cartao).
+  //
+  // 1.23.0 (iOS 395, captura 06): o aceite existe desde a abertura, enabled=false. O botão
+  // "Go to the end of the text" é quem habilita. O nó pai tem o mesmo name e accessible=false;
+  // o clique tem que ser no XCUIElementTypeButton.
   async aceitarPoliticaETermosIOS() {
     const politica = seletorTestId('privacy-accept');
     const termos = seletorTestId('terms-accept');
     const home = seletorTestId('tab-home');
+    const irAoFim = '-ios predicate string:type == "XCUIElementTypeButton" AND name == "Go to the end of the text"';
     const maxSwipes = 45;
 
-    const telas: Array<[string, string, string]> = [
-      ['política de privacidade', politica, termos],
-      ['termos e condições', termos, home],
+    const telas: Array<[string, string, string, string]> = [
+      ['política de privacidade', politica, termos, 'privacy-accept'],
+      ['termos e condições', termos, home, 'terms-accept'],
     ];
-    for (const [tela, aceite, proxima] of telas) {
+    for (const [tela, aceite, proxima, idAceite] of telas) {
       const existe = await $(aceite).waitForExist({ timeout: 20000 }).then(() => true).catch(() => false);
       if (!existe) {
         throw new Error(`Onboarding iOS: o aceite da ${tela} (${aceite}) não existe na árvore (20s).`);
+      }
+
+      const temAtalho = await $(irAoFim).waitForDisplayed({ timeout: 3000 }).then(() => true).catch(() => false);
+      if (temAtalho) {
+        await this.fechaBanner();
+        await $(irAoFim).click();
+        console.log(`👆 ${tela}: Go to the end`);
+        const habilitou = await driver.waitUntil(async () => {
+          const valor = await $(aceite).getAttribute('enabled').catch(() => 'false');
+          return String(valor) === 'true';
+        }, { timeout: 15000, interval: 500 }).then(() => true).catch(() => false);
+        if (!habilitou) {
+          throw new Error(
+            `Onboarding iOS: "Go to the end" na ${tela} não habilitou o aceite (${idAceite}) em 15s.`
+          );
+        }
+        await this.fechaBanner();
+        await $(aceite).click();
+        const avancouPeloAtalho = await $(proxima).waitForExist({ timeout: 15000 }).then(() => true).catch(() => false);
+        if (!avancouPeloAtalho) {
+          throw new Error(
+            `Onboarding iOS travado na ${tela}: depois de "Go to the end" e do aceite (${idAceite}) ` +
+            `a tela seguinte (${proxima}) não apareceu em 15s.`
+          );
+        }
+        console.log(`✅ Aceite (${tela})`);
+        await driver.pause(timewhait);
+        continue;
       }
 
       let avancou = false;

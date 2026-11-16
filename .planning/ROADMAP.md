@@ -50,6 +50,7 @@ automação do app e não tem data de término. Cada melhoria entra aqui como um
 
 | Item | Situação |
 |---|---|
+| Resumo do job no GitHub: falha só quando o timeout de 120 min impede os testes de rodarem; erro de teste só no Allure | ✅ no código (2026-11-16), não rodado no CI |
 | Pix e cartão até a última tela antes de finalizar, sem criar pedido | ✅ rodado no CI Run #42 (2026-11-05, Android 1.22.9/534): `03` 6/6, `02` 5/6 (falha do S24+ por banner, `STATE.md`); iOS 5/5 iPhones |
 | Coleção Especial: rolar até a parte não visível, tocar no link e validar a tela de destino pelo cabeçalho | ⬜ não iniciado |
 
