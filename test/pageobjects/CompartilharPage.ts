@@ -18,8 +18,12 @@ const APP = 'com.aramis.ecomm';
 
 // A URL copiada abre "Page not found" quando entregue direto ao app; o `aramisnova://` com o mesmo
 // uuid abre o carrinho, logado e deslogado, nas duas plataformas.
+// Domínio: `applink.aramis.com.br` até o Android 1.23.0/542; `www.aramis.com.br` no Android 1.23.0/547
+// (run local e captura de 2026-11-16, `captures-2026-11-16-build547-entrega-link/` 27–30, 2 de 2).
+// Os dois são aceitos, nas duas plataformas (domínio do iOS 1.23.0 não conferido). No 547 o
+// `aramisnova://` com o uuid continua abrindo a "Shared Backpack" (captura 31).
 const ESQUEMA_DO_LINK = 'aramisnova://share-bag/';
-const FORMATO_DO_LINK = /^https:\/\/applink\.aramis\.com\.br\/share-bag\/([0-9a-f-]{36})$/;
+const FORMATO_DO_LINK = /^https:\/\/(?:applink|www)\.aramis\.com\.br\/share-bag\/([0-9a-f-]{36})$/;
 const LINK_INEXISTENTE = `${ESQUEMA_DO_LINK}00000000-0000-0000-0000-000000000000`;
 // A área de transferência do emulador é compartilhada com o host: sem a sentinela, um texto antigo
 // seria lido como se fosse o link.

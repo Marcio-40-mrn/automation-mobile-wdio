@@ -1,5 +1,6 @@
 import { BasePage, timewhait, seletorTestId, scrollUntilVisible } from "./BasePage";
 import { driver, $, $$ } from '@wdio/globals'
+import allure from '@wdio/allure-reporter';
 import { anexarPrint } from "../utils/allure-helpers";
 
 // Mochila -> endereço -> entrega -> pagamento (Pix) -> resumo. Seletores medidos em
@@ -120,25 +121,60 @@ export class CheckoutPage extends BasePage {
     }
 
     // Seleciona a entrega exibida e continua. A opção pode vir já marcada (rodada 1) ou não (rodada
-    // 2): o que manda é o `delivery-continue-button` habilitado, que só acontece com uma opção
-    // marcada (`selection-filled`).
+    // 2): o botão `delivery-continue-button` só habilita com uma opção marcada (`selection-filled`).
+    //
+    // Android 1.23.0/547 (run local de 2026-11-16, ordem do Marcio): o `03` falhou com "não habilitou"
+    // com a Econômica marcada e o Continue preto no print. Na captura do mesmo dia
+    // (`captures-2026-11-16-build547-entrega-link/`, 17–25) a falha não se repetiu: o botão vem
+    // `enabled=false` ao chegar, some da árvore por instantes logo depois do toque na opção e está
+    // `enabled=true` em 2 s; o Continue abre o Pagamento. Causa da falha não provada. Por isso, nas
+    // duas plataformas: 2º toque na opção se não habilitar; botão ainda desabilitado = AVISO (print e
+    // árvore no Allure) e o toque acontece mesmo assim; quem decide é o destino (Pagamento aberto),
+    // com até 2 toques no Continue, como o `CadastroPage.tocarAteAvancar`. Na falha, a árvore da tela
+    // vai para o Allure. Que o toque com o botão `enabled=false` avance NÃO foi conferido no 547.
+    // O Pagamento é esperado com `isDisplayed` em laço: o `waitForDisplayed` de `select-wake-method-pix`
+    // deu false em ~2,3 s com a tela aberta (captura 22 e 24).
     async selecionarEntregaEContinuar() {
         const continuar = seletorTestId('delivery-continue-button');
-        if (!(await $(continuar).isEnabled().catch(() => false))) {
-            await (await $(seletorTestId('delivery-option-slas'))).click();
-        }
-        const habilitou = await driver
-            .waitUntil(async () => (await $(continuar).isEnabled().catch(() => false)), { timeout: 10000, interval: 500 })
-            .then(() => true)
-            .catch(() => false);
-        if (!habilitou) {
-            throw new Error('Entrega: o botão continuar (delivery-continue-button) não habilitou depois de escolher a entrega.');
-        }
-        await (await $(continuar)).click();
+        const habilitado = () => $(continuar).isEnabled().catch(() => false);
+        const esperarHabilitar = (timeout: number) =>
+            driver.waitUntil(habilitado, { timeout, interval: 500 }).then(() => true).catch(() => false);
 
-        const pagamento = await $(seletorTestId('select-wake-method-pix')).waitForDisplayed({ timeout: 30000 }).then(() => true).catch(() => false);
+        let habilitou = await habilitado();
+        for (let toque = 1; !habilitou && toque <= 2; toque++) {
+            await this.fechaBanner();
+            await $(seletorTestId('delivery-option-slas')).click().catch(() => undefined);
+            habilitou = await esperarHabilitar(15000);
+            if (!habilitou) console.log(`⚠ Entrega: continuar desabilitado depois do toque ${toque} na opção de entrega`);
+        }
+        if (!habilitou) {
+            await anexarPrint('Aviso — Entrega: continuar (delivery-continue-button) não habilitou');
+            allure.addAttachment('Entrega — árvore da tela (continuar desabilitado)', await driver.getPageSource(), 'text/xml');
+            console.log('⚠ Entrega: continuar não habilitou; toca mesmo assim e decide pela tela de pagamento');
+        }
+
+        const naTelaDePagamento = () =>
+            driver
+                .waitUntil(async () => $(seletorTestId('select-wake-method-pix')).isDisplayed().catch(() => false), {
+                    timeout: 30000,
+                    interval: 500,
+                })
+                .then(() => true)
+                .catch(() => false);
+
+        let pagamento = false;
+        for (let toque = 1; !pagamento && toque <= 2; toque++) {
+            await this.fechaBanner();
+            await $(continuar).click().catch(() => undefined);
+            pagamento = await naTelaDePagamento();
+            if (!pagamento && toque === 1) console.log('⚠ Entrega: o 1º toque em continuar não abriu o pagamento — repetindo');
+        }
         if (!pagamento) {
-            throw new Error('Entrega: a tela de pagamento (select-wake-method-pix) não abriu em 30s.');
+            allure.addAttachment('Entrega — árvore da tela (pagamento não abriu)', await driver.getPageSource(), 'text/xml');
+            throw new Error(
+                `Entrega: a tela de pagamento (select-wake-method-pix) não abriu depois de 2 toques em continuar ` +
+                    `(delivery-continue-button ${habilitou ? 'habilitado' : 'desabilitado'}).`
+            );
         }
         console.log('🚚 Entrega selecionada');
         await driver.pause(timewhait);

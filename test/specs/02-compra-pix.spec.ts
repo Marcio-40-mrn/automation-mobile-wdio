@@ -30,6 +30,10 @@ const fmtPix = (l: LinhaPix | null) => (l ? `${l.percentual}% · R$ ${l.valor}` 
 
 describe('Compra', () => {
     it('Jornada completa de compra com Pix', async function (this: Mocha.Context) {
+        // Limite só deste teste, nas duas plataformas: 25 min no lugar dos 15 min do `mochaOpts.timeout`.
+        // Run local de 2026-11-16 (Android 1.23.0/547): "Timeout of 900000ms exceeded" aos 897 s, em
+        // `finalizarCompraESelecionarEndereco()`, sem passo com falha antes. O limite vai no `.timeout()`
+        // encadeado no fim do `it` (ver o `06-compartilhar-carrinho`: o `this.timeout()` aqui dentro não vale).
         const homePage = new HomePage();
         const onboardingPage = new OnboardingPage();
         const loginPage = new LoginPage();
@@ -249,5 +253,5 @@ describe('Compra', () => {
             if (r) allure.addArgument('Total do resumo', String(r.total));
             if (totalPagamento !== null) allure.addArgument('Total no pagamento', String(totalPagamento));
         }
-    });
+    }).timeout(25 * 60 * 1000);
 });
