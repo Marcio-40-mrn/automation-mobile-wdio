@@ -405,7 +405,18 @@ export class BasePage {
       );
     }
 
+    // Android 1.23.1/553 (run local de 2026-11-18, `02` e `03`, vídeo): o 1º toque avançou para os
+    // Tópicos ~20 s depois, e o 2º toque estourou "element wasn't found" no container que já tinha
+    // saído. Antes de tocar de novo, confere se a tela já avançou; se o container sumiu, espera o
+    // destino por mais 30 s em vez de tocar.
     for (let tentativa = 1; tentativa <= 2; tentativa++) {
+      if (tentativa > 1 && !(await $(container).isExisting().catch(() => false))) {
+        if (await this.algumVisivel(destinos, 30000)) {
+          console.log('✅ Boas-vindas avançou depois do toque 1/2 (com atraso)');
+          return;
+        }
+        break;
+      }
       await (await $(container)).click();
       if (await this.algumVisivel(destinos, 20000)) {
         console.log(`✅ Boas-vindas avançou (toque ${tentativa}/2)`);

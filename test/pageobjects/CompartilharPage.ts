@@ -1,4 +1,4 @@
-import { BasePage, timewhait, seletorTestId, scrollFinger, scrollUntilVisible } from "./BasePage";
+import { BasePage, timewhait, seletorTestId } from "./BasePage";
 import { BuscaPage } from "./BuscaPage";
 import { CARD_MOCHILA } from "./CheckoutPage";
 import { HomePage } from "./HomePage";
@@ -22,8 +22,15 @@ const APP = 'com.aramis.ecomm';
 // (run local e captura de 2026-11-16, `captures-2026-11-16-build547-entrega-link/` 27–30, 2 de 2).
 // Os dois são aceitos, nas duas plataformas (domínio do iOS 1.23.0 não conferido). No 547 o
 // `aramisnova://` com o uuid continua abrindo a "Shared Backpack" (captura 31).
+// Android 1.23.1/553 (mudança esperada, Marcio, 2026-11-18): o link virou
+// `https://www.aramis.com.br/checkout?checkoutId=<uuid>`, com a única query sendo o código. O
+// `aramisnova://share-bag/<uuid>` com esse mesmo uuid abre a "Shared Backpack", logado e deslogado, e o
+// uuid inválido dá `shared-bag-unavailable` (`captures-2026-11-18-build553-link-checkout/` 14, 35).
+// iOS 1.23.1/403 (Remote Access, 2026-11-18, `drafts/app-migrado/ios/captures-2026-11-18-compartilhar-1.23.1/`):
+// `https://applink.aramis.com.br/checkout?checkoutId=<uuid>`; o `aramisnova://share-bag/<uuid>` abre a
+// "Shared Backpack" logado e deslogado. Os dois formatos são aceitos, nas duas plataformas.
 const ESQUEMA_DO_LINK = 'aramisnova://share-bag/';
-const FORMATO_DO_LINK = /^https:\/\/(?:applink|www)\.aramis\.com\.br\/share-bag\/([0-9a-f-]{36})$/;
+const FORMATO_DO_LINK = /^https:\/\/(?:applink|www)\.aramis\.com\.br\/(?:share-bag\/|checkout\?checkoutId=)([0-9a-f-]{36})$/;
 const LINK_INEXISTENTE = `${ESQUEMA_DO_LINK}00000000-0000-0000-0000-000000000000`;
 // A área de transferência do emulador é compartilhada com o host: sem a sentinela, um texto antigo
 // seria lido como se fosse o link.
@@ -64,14 +71,20 @@ const ITEM_RECEBIDO = IOS
     : '-android uiautomator:new UiSelector().resourceIdMatches("shared-bag-item-.*")';
 
 // Menu nativo. Android: ids do `intentresolver` do AVD; o nome do pacote muda por aparelho e versão,
-// por isso a regra só no id (Samsung do Device Farm não conferido). iOS: sheet na árvore do app.
+// por isso a regra só no id. iOS: sheet na árvore do app.
+// Samsung (One UI) tem chooser próprio: `android:id/sem_chooser_frame_root`, Copy = `sem_chooser_chip_button`
+// ("Copy URL") e a prévia `text1` traz o título da página, não a URL (árvore anexada no CI Run #56,
+// 2026-11-17, S23 Ultra, Android 1.23.0/550; mesmo menu no Run #55). O link vem da área de transferência.
 const MENU_NATIVO = IOS
     ? '-ios predicate string:name == "ActivityListView"'
-    : '-android uiautomator:new UiSelector().resourceIdMatches(".*:id/(resolver_list|copy|chooser_copy_button|content_preview_text)")';
+    : '-android uiautomator:new UiSelector().resourceIdMatches(".*:id/(resolver_list|copy|chooser_copy_button|content_preview_text|sem_chooser_frame_root|sem_chooser_chip_button)")';
 const PREVIA_DO_LINK = '-android uiautomator:new UiSelector().resourceIdMatches(".*:id/content_preview_text")';
+// iOS 18: Copy = `actionGroupCell`. iOS 17 (iPhone 15 Pro Max do Device Farm, 17.3.1): o Copy é uma linha da
+// lista do sheet (print do CI Run #56, 2026-11-17), e não casou com o `actionGroupCell`; a regra aceita célula ou
+// botão com o mesmo label. Árvore do iOS 17 não capturada: o próximo run anexa a árvore se não achar.
 const copiarDoMenu = () => IOS
-    ? `-ios predicate string:name == "actionGroupCell" AND label == "${texto('compartilhar.copiar')}"`
-    : '-android uiautomator:new UiSelector().resourceIdMatches(".*:id/(copy|chooser_copy_button)")';
+    ? `-ios predicate string:label == "${texto('compartilhar.copiar')}" AND (name == "actionGroupCell" OR type == "XCUIElementTypeCell" OR type == "XCUIElementTypeButton")`
+    : '-android uiautomator:new UiSelector().resourceIdMatches(".*:id/(copy|chooser_copy_button|sem_chooser_chip_button)")';
 
 // Campos de cada produto: no Android e no iOS os botões e textos são IRMÃOS do card, não filhos.
 // Android: todos sob um único pai, por isso `following::` (conferido com lxml na captura 19: 1 nó por
@@ -108,11 +121,27 @@ export class CompartilharPage extends BasePage {
     }
 
     async validarBotaoPresente(itens: number) {
-        if (!(await scrollUntilVisible($(BOTAO_COMPARTILHAR), 6))) {
+        await this.fechaBanner();
+        let achou = false;
+        for (let rolagem = 0; rolagem <= 6 && !achou; rolagem++) {
+            achou = await $(BOTAO_COMPARTILHAR).isDisplayed().catch(() => false);
+            if (!achou) await this.rolarMochila();
+        }
+        if (!achou) {
             await anexarPrint('Compartilhar — botão ausente');
             throw new Error(`Compartilhar: o share-bag-cta não apareceu com ${itens} produto(s) na Mochila.`);
         }
         console.log(`✅ Botão de compartilhar presente com ${itens} produto(s)`);
+    }
+
+    // Rola a lista da Mochila para baixo. O `scrollFinger` começa o arrasto em 81,7% da altura, em cima do
+    // "Finish purchase" fixo (S23+ e S26 Ultra: 77–83%), e a lista não se move (CI Run #52 e #56: o
+    // share-bag-cta e o wake-remove-item abaixo dos cards nunca chegaram à tela; print do S23+ no Run #56).
+    // Aqui o arrasto fica entre 60% e 25%, acima do botão fixo, na borda direita (fora dos botões do card).
+    private async rolarMochila() {
+        const { width, height } = await driver.getWindowRect();
+        await this.arrastar(width * 0.92, height * 0.6, width * 0.92, height * 0.25, 600);
+        await driver.pause(1000);
     }
 
     private async irAoTopoDaMochila() {
@@ -147,8 +176,7 @@ export class CompartilharPage extends BasePage {
                 itens.set(sufixo(id), { id: sufixo(id), tamanho, quantidade: Number(quantidade) });
             }
             if (await $(BOTAO_COMPARTILHAR).isDisplayed().catch(() => false)) break;
-            await scrollFinger();
-            await driver.pause(1000);
+            await this.rolarMochila();
         }
         const lidos = [...itens.values()];
         console.log(`🎒 Mochila: ${descrever(lidos)}`);
@@ -172,8 +200,7 @@ export class CompartilharPage extends BasePage {
         for (let rolagem = 0; rolagem <= 6; rolagem++) {
             const botao = await $(campoDoCard(card, campo));
             if (await botao.isDisplayed().catch(() => false)) return botao.getElement();
-            await scrollFinger();
-            await driver.pause(1000);
+            await this.rolarMochila();
         }
         await anexarPrint(`Mochila — ${campo} do produto ${id} não alcançado`);
         throw new Error(`Mochila: ${campo} do produto ${id} não apareceu em 6 rolagens.`);
@@ -259,9 +286,18 @@ export class CompartilharPage extends BasePage {
         if (await copiar.isDisplayed().catch(() => false)) {
             await copiar.click();
             await driver.pause(timewhait);
+            // O Copy do AVD e do iOS fecha o menu; se algum chooser ficar aberto, sai pelo voltar.
+            if (!IOS && (await $(MENU_NATIVO).isDisplayed().catch(() => false))) {
+                await driver.back();
+                await driver.pause(timewhait);
+            }
             return previa;
         }
-        if (IOS) throw new Error('Compartilhar: o Copy não apareceu no menu nativo.');
+        if (IOS) {
+            allure.addAttachment('Compartilhar — árvore do menu sem Copy', await driver.getPageSource(), 'text/plain');
+            await anexarPrint('Compartilhar — menu sem Copy');
+            throw new Error('Compartilhar: o Copy não apareceu no menu nativo.');
+        }
         console.log('ℹ Menu nativo sem o Copy: o link vem da prévia');
         await driver.back();
         await driver.pause(timewhait);
@@ -286,11 +322,11 @@ export class CompartilharPage extends BasePage {
         return lido;
     }
 
-    // Link só com o código: sem query, sem produto, CDV ou dado pessoal na URL.
+    // Link só com o código (no path ou no `checkoutId`): sem produto, CDV ou dado pessoal na URL.
     validarFormatoDoLink(link: string): string {
         const formato = link.match(FORMATO_DO_LINK);
-        if (!formato) throw new Error(`Link compartilhado fora do formato /share-bag/<uuid>: "${link}".`);
-        console.log('✅ Link só com o código, sem query');
+        if (!formato) throw new Error(`Link compartilhado fora do formato /share-bag/<uuid> ou /checkout?checkoutId=<uuid>: "${link}".`);
+        console.log('✅ Link só com o código, sem outro dado');
         return `${ESQUEMA_DO_LINK}${formato[1]}`;
     }
 
@@ -331,9 +367,28 @@ export class CompartilharPage extends BasePage {
         await driver.pause(timewhait);
         await this.fechaBanner();
         await $(seletorTestId('header-back-button')).click();
-        const aba = await $(seletorTestId('tab-bag'));
-        await this.waitForElement(aba);
-        await aba.click();
+        // Android 1.23.1/553 (captura 2026-11-18, `captures-2026-11-18-build553-cenarios-40-42/`): com a
+        // "Shared Backpack" aberta sobre a Mochila, o voltar já devolve a Mochila com os itens somados, e o
+        // `tab-bag` só volta à árvore ~3 s depois. Um `$()` resolvido na transição estourou os 20 s em 3 de
+        // 4 vezes com a aba já na tela. Agora reconsulta a cada volta e só toca na aba se a Mochila não
+        // estiver aberta. Nas duas plataformas.
+        let naMochila = false;
+        const pronto = await driver
+            .waitUntil(async () => {
+                naMochila = (await $(CARD_MOCHILA).isDisplayed().catch(() => false))
+                    || (await $(seletorTestId('status-alert-icon')).isDisplayed().catch(() => false));
+                return naMochila || (await $(seletorTestId('tab-bag')).isDisplayed().catch(() => false));
+            }, { timeout: 30000, interval: 1000 })
+            .then(() => true)
+            .catch(() => false);
+        if (!pronto) {
+            await anexarPrint('Add all — nem Mochila nem tab-bag depois do voltar');
+            throw new Error('Add all: depois do voltar, nem a Mochila nem o tab-bag apareceram em 30s.');
+        }
+        if (!naMochila) {
+            await this.fechaBanner();
+            await $(seletorTestId('tab-bag')).click();
+        }
         await driver.pause(timewhait);
     }
 

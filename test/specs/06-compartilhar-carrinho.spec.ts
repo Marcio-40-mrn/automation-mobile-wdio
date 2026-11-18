@@ -137,6 +137,10 @@ describe('Compartilhar carrinho', () => {
             await step('homePage.abrirPerfil()', () => homePage.abrirPerfil());
             await step('perfilPage.logout()', () => perfilPage.logout());
             await step('perfilPage.confirmarLogout()', () => perfilPage.confirmarLogout());
+            // Android 1.23.1/553 (captura 2026-11-18, `captures-2026-11-18-build553-cenarios-40-42/` 18 e 23):
+            // a Mochila esvaziada logada voltou com um item depois do logout (1 de 2 vezes, causa não provada).
+            // Esvaziar a Mochila deslogada deixa o 22 conferir só o que veio do link. Nas duas plataformas.
+            await step('checkoutPage.esvaziarMochila() - deslogada', () => checkoutPage.esvaziarMochila());
             await step('compartilhar: carrinho recebido sem login (22)', () => compartilharPage.abrirCarrinhoRecebido(linkDoApp, compartilhados));
             await step('compartilhar: Mochila deslogada igual à compartilhada (22)', async () => {
                 await compartilharPage.adicionarTudoEAbrirMochila();

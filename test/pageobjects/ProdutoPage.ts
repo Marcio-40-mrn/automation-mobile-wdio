@@ -212,7 +212,18 @@ export class ProdutoPage extends BasePage {
         const seta = await $(SETA_VOLTAR_PDP);
         await this.waitForElement(seta);
         await seta.click();
-        const voltou = await $(SELETOR_CARD_PRODUTO).waitForDisplayed({ timeout: 20000 }).then(() => true).catch(() => false);
+        // Qualquer card visível: no iOS todos os cards estão na árvore, e o 1º (posição 0) fica fora da tela
+        // com a lista rolada (CI Run #56, iPhone 13, iOS 1.23.0: print com a listagem na tela e a espera
+        // pelo 1º card deu falso). No Android a árvore só traz os cards da tela; o resultado é o mesmo.
+        const voltou = await driver
+            .waitUntil(async () => {
+                for (const el of await $$(SELETOR_CARD_PRODUTO)) {
+                    if (await el.isDisplayed().catch(() => false)) return true;
+                }
+                return false;
+            }, { timeout: 20000, interval: 1000 })
+            .then(() => true)
+            .catch(() => false);
         if (!voltou) {
             await anexarPrint('Volta da PDP — listagem não apareceu');
             throw new Error('Volta da PDP: a listagem (product-card-*) não apareceu em 20s depois da seta de voltar.');

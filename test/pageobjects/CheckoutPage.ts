@@ -712,7 +712,19 @@ export class CheckoutPage extends BasePage {
         await this.waitForElement(aba);
         await aba.click();
 
-        const abriu = await this.algumVisivel([card, vazia], 30000);
+        // iOS 1.23.1/403 (captura 2026-11-18, `drafts/app-migrado/ios/captures-2026-11-18-compartilhar-1.23.1/`
+        // 28–29): com a Mochila rolada, o 1º card fica `visible=false` e o `isDisplayed()` do 1º nó deu
+        // falso com 2 cards na tela. Confere QUALQUER card visível. Nas duas plataformas.
+        const abriu = await driver
+            .waitUntil(async () => {
+                if (await $(vazia).isDisplayed().catch(() => false)) return true;
+                for (const c of await $$(card)) {
+                    if (await c.isDisplayed().catch(() => false)) return true;
+                }
+                return false;
+            }, { timeout: 30000, interval: 500 })
+            .then(() => true)
+            .catch(() => false);
         if (!abriu) {
             throw new Error('Esvaziar Mochila: a Mochila não abriu em 30s (nem produto nem o estado vazio na tela).');
         }
@@ -722,7 +734,20 @@ export class CheckoutPage extends BasePage {
             if (antes === 0) break;
 
             await this.fechaBanner();
-            await (await $(remover)).click();
+            // Toca num remover VISÍVEL; se nenhum estiver (Mochila rolada), arrasta para o topo e tenta de novo.
+            let alvo: WebdriverIO.Element | undefined;
+            for (let volta = 0; volta < 2 && !alvo; volta++) {
+                for (const r of await $$(remover)) {
+                    if (await r.isDisplayed().catch(() => false)) { alvo = await r.getElement(); break; }
+                }
+                if (!alvo) {
+                    const { width, height } = await driver.getWindowRect();
+                    for (let i = 0; i < 3; i++) await this.arrastar(width * 0.92, height * 0.3, width * 0.92, height * 0.8);
+                    await driver.pause(500);
+                }
+            }
+            if (alvo) await alvo.click();
+            else await $(remover).click();
             const removeu = await driver
                 .waitUntil(async () => (await $$(card).length) < antes, { timeout: 15000, interval: 500 })
                 .then(() => true)
