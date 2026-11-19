@@ -1,0 +1,9 @@
+Device: Apple iPhone 15 Pro Max
+E-mail: informatica.mrn+cadastro-apple-iphone-15-pro-mwmkcfp6-h6ya@gmail.com
+Nome: Teste
+Sobrenome: Automacao
+CPF: 182.955.143-42
+Nascimento: 17/12/1987
+Telefone: (11) 91658-2957
+Senha: Aramis@CRGD1a
+Conta criada: sim (finalizar saiu da etapa 2)

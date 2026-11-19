@@ -1,0 +1,9 @@
+Device: Apple iPhone 13
+E-mail: informatica.mrn+cadastro-apple-iphone-13-mwnvztl2-scgi@gmail.com
+Nome: Teste
+Sobrenome: Automacao
+CPF: 109.292.956-84
+Nascimento: 25/03/1991
+Telefone: (11) 90804-3391
+Senha: Aramis@ZUNJ3a
+Conta criada: sim (finalizar saiu da etapa 2)

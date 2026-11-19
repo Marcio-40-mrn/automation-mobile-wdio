@@ -1,0 +1,9 @@
+Device: Apple iPhone 14
+E-mail: informatica.mrn+cadastro-apple-iphone-14-mwnw0bxl-z3v1@gmail.com
+Nome: Teste
+Sobrenome: Automacao
+CPF: 827.325.275-21
+Nascimento: 21/09/1982
+Telefone: (11) 96031-3884
+Senha: Aramis@LFAP3a
+Conta criada: sim (finalizar saiu da etapa 2)

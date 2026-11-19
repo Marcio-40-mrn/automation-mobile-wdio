@@ -1,0 +1,6 @@
+Preço calça (lido na PDP): 349.9
+Itens na Mochila: 1
+Total no botão da tela de pagamento: 366.8
+Parcela escolhida (1x): 366.8
+Resumo — Produtos: 349.9 | Entrega: 16.9 | Descontos: 0 | Total: 366.8
+Cartão (fake, MASSA-DE-DADOS.md): final 8219, validade 12/30

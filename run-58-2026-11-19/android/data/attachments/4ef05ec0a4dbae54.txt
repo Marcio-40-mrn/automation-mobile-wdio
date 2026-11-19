@@ -1,0 +1,9 @@
+Device: Samsung Galaxy S25 Ultra
+E-mail: informatica.mrn+cadastro-samsung-galaxy-s25-u-mwnxinji-al59@gmail.com
+Nome: Teste
+Sobrenome: Automacao
+CPF: 208.779.794-30
+Nascimento: 06/05/1971
+Telefone: (11) 90204-2059
+Senha: Aramis@NABC9a
+Conta criada: sim (finalizar saiu da etapa 2)
