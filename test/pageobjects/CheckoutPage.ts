@@ -67,6 +67,10 @@ export class CheckoutPage extends BasePage {
                 return itens >= minimoDeItens;
             }, { timeout: 30000, interval: 1000 })
             .catch(() => undefined);
+        // Contagem final antes de decidir (run-06c.log de 2026-11-18, Android 1.23.1/557): cada `$$` levou
+        // 22–25 s; o waitUntil estourou os 30 s com a 2ª contagem em curso e o teste falhou com a calça
+        // na Mochila ("esperados 1, encontrados 1"). Sem mudança de tempo: só não decide com a conta pela metade.
+        if (itens < minimoDeItens) itens = await $$(CARD_MOCHILA).length;
         if (itens < minimoDeItens) {
             await anexarPrint('Mochila — itens não encontrados');
             throw new Error(`Mochila: esperados pelo menos ${minimoDeItens} produtos (wake-product-card-bag-*), encontrados ${itens} em 30s.`);
@@ -729,8 +733,12 @@ export class CheckoutPage extends BasePage {
             throw new Error('Esvaziar Mochila: a Mochila não abriu em 30s (nem produto nem o estado vazio na tela).');
         }
 
+        // A contagem que confirmou a remoção anterior é a contagem de partida da seguinte: uma busca a menos por
+        // produto. Na Mochila com frete grátis cada busca leva 3–7 s (Android 1.23.1/557, 2026-11-19,
+        // `captures-2026-11-19-build557-06-passo-a-passo/NOTAS.md`, achado 5). Nas duas plataformas.
+        let atual = await $$(card).length;
         for (let i = 0; i < 10; i++) {
-            const antes = await $$(card).length;
+            const antes = atual;
             if (antes === 0) break;
 
             await this.fechaBanner();
@@ -749,16 +757,16 @@ export class CheckoutPage extends BasePage {
             if (alvo) await alvo.click();
             else await $(remover).click();
             const removeu = await driver
-                .waitUntil(async () => (await $$(card).length) < antes, { timeout: 15000, interval: 500 })
+                .waitUntil(async () => (atual = await $$(card).length) < antes, { timeout: 15000, interval: 500 })
                 .then(() => true)
                 .catch(() => false);
             if (!removeu) {
                 throw new Error(`Esvaziar Mochila: o toque em remover (wake-remove-item) não tirou o produto em 15s (${antes} na Mochila).`);
             }
-            console.log(`🗑 Produto removido da Mochila (restam ${antes - 1})`);
+            console.log(`🗑 Produto removido da Mochila (restam ${atual})`);
         }
 
-        const sobrou = await $$(card).length;
+        const sobrou = atual;
         if (sobrou > 0) {
             throw new Error(`Esvaziar Mochila: ainda há ${sobrou} produto(s) depois de 10 remoções.`);
         }

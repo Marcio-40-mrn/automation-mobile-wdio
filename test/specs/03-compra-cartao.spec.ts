@@ -6,7 +6,7 @@ import { CategoriasPage } from "../pageobjects/CategoriasPage";
 import { ProdutoPage } from "../pageobjects/ProdutoPage";
 import { CheckoutPage, type DadosCartao, type ValoresResumo } from "../pageobjects/CheckoutPage";
 import { getCredentials } from "../utils/credentials";
-import { posicoesDoProduto } from "../utils/device-index";
+import { primeirosCards } from "../utils/device-index";
 import {
     anexarCrashDoAppSeFechou,
     configurarFechadorDeBanner,
@@ -96,7 +96,7 @@ describe('Compra', () => {
             // Categorias → Roupas → Calças: a calça da posição DESTE device, com tamanho, e volta até
             // Categorias. Produto diferente por teste e por device (device-index.ts): blocos 0, 1 e 2;
             // o 2º e o 3º só se o anterior não tiver tamanho com estoque.
-            const calca = posicoesDoProduto([0, 1, 2]);
+            const calca = primeirosCards();
             console.log(`👖 Calça das posições ${calca.posicoes.join(', ')} da listagem (${calca.comoAchei})`);
             await step('homePage.abrirCategorias()', () => homePage.abrirCategorias());
             await step('categoriasPage.clickRoupas()', () => categoriasPage.clickRoupas());

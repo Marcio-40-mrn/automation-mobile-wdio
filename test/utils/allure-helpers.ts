@@ -53,7 +53,16 @@ export async function step(nome: string, fn: () => Promise<void>): Promise<void>
             console.log(`ℹ Print da falha não anexado (${erroDoPrint instanceof Error ? erroDoPrint.message : erroDoPrint})`);
         }
         allure.endStep(Status.FAILED);
-        throw e;
+        // Vermelho no Allure (Marcio, 2026-11-18): o @wdio/allure-reporter só marca o teste como FAILED
+        // quando a mensagem do erro começa por "AssertionError" ou contém "expect" (getTestStatus);
+        // qualquer outro erro vira BROKEN (amarelo). Os page objects acusam o comportamento errado com
+        // `throw new Error(...)`, então todo passo que falha sai com o prefixo. Timeout do Mocha e erro
+        // fora de um step() continuam amarelos. Nas duas plataformas.
+        if (e instanceof Error) {
+            if (!/^assertionerror/i.test(e.message.trim())) e.message = `AssertionError: ${e.message}`;
+            throw e;
+        }
+        throw new Error(`AssertionError: ${String(e)}`);
     }
 }
 

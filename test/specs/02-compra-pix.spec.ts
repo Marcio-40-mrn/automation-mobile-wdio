@@ -7,7 +7,7 @@ import { BuscaPage } from "../pageobjects/BuscaPage";
 import { ProdutoPage } from "../pageobjects/ProdutoPage";
 import { CheckoutPage, type ValoresResumo, type LinhaPix } from "../pageobjects/CheckoutPage";
 import { getCredentials } from "../utils/credentials";
-import { posicoesDoProduto } from "../utils/device-index";
+import { primeirosCards } from "../utils/device-index";
 import {
     anexarCrashDoAppSeFechou,
     configurarFechadorDeBanner,
@@ -99,7 +99,7 @@ describe('Compra', () => {
             // Passos 12 a 14 — compra o resultado da posição DESTE device e valida o carrossel de
             // indicação. Produto diferente por teste e por device (device-index.ts): blocos 0, 1 e 2 da
             // busca; o 2º e o 3º só se o anterior não tiver tamanho com estoque.
-            const camiseta = posicoesDoProduto([0, 1, 2]);
+            const camiseta = primeirosCards();
             console.log(`👕 Camiseta das posições ${camiseta.posicoes.join(', ')} da busca (${camiseta.comoAchei})`);
             await step(`produtoPage.comprarNaPosicao(${camiseta.posicoes.join(', ')}) - camiseta`, async () => {
                 precoCamiseta = await produtoPage.comprarNaPosicao(camiseta.posicoes, 'Camiseta');
@@ -114,7 +114,7 @@ describe('Compra', () => {
             // compra a camisa da SUA posição na listagem (device-index.ts): com os 11 aparelhos na
             // 1ª camisa o estoque acabava no meio do run (CI Run #30, app 1.22.2). Blocos 0, 2 e 3:
             // o bloco 1 da listagem de Camisas é do 01-fluxo-favoritar.
-            const camisa = posicoesDoProduto([0, 2, 3]);
+            const camisa = primeirosCards();
             console.log(`👕 Camisa das posições ${camisa.posicoes.join(', ')} da listagem (${camisa.comoAchei})`);
             await step('categoriasPage.clickRoupas()', () => categoriasPage.clickRoupas());
             await step('categoriasPage.abrirCamisas()', () => categoriasPage.abrirCamisas());

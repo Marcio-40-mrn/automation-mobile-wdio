@@ -117,6 +117,14 @@ export class BasePage {
       // Sem banner na tela o método custa uma consulta e retorna: roda antes de todo step.
       if (!(await this.bannerNaTela(overlay))) return;
 
+      // Contêiner vazio (Android 1.23.1/553–557, ordem do Marcio, 2026-11-18): o `insiderLayout` fica na
+      // árvore com a tela limpa, só com `buttonContainer` + `closeBt` e SEM `android.webkit.WebView`
+      // (`captures-2026-11-18-build553-link-checkout/03-mochila-1-produto.xml`). Banner real tem a WebView do
+      // criativo dentro (`captures-2026-10-22-build513/42-categorias.xml`). Sem WebView não há o que fechar:
+      // retorna na hora em vez de esperar 20 s pelo Close (run-06.log de 2026-11-18: 6 esperas de ~20 s).
+      const webview = await $$('//*[@resource-id="com.aramis.ecomm:id/insiderLayout"]//android.webkit.WebView').length;
+      if (webview === 0) return;
+
       // A WebView do criativo publica os filhos com atraso (aos 10s ainda sem o Close; aos 20s já
       // presente — mesma captura), daí a espera de até 20s por qualquer um dos candidatos.
       const seletorClose = await this.algumVisivel(botoesFechar, 20000);

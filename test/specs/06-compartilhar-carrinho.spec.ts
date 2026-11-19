@@ -7,7 +7,7 @@ import { ProdutoPage } from "../pageobjects/ProdutoPage";
 import { CheckoutPage } from "../pageobjects/CheckoutPage";
 import { CompartilharPage, type ItemMochila } from "../pageobjects/CompartilharPage";
 import { getCredentials } from "../utils/credentials";
-import { posicoesDoProduto } from "../utils/device-index";
+import { primeirosCards } from "../utils/device-index";
 import {
     anexarCrashDoAppSeFechou,
     configurarFechadorDeBanner,
@@ -44,8 +44,8 @@ describe('Compartilhar carrinho', () => {
         await rotularTeste('compartilhar-carrinho');
         await limparLogDeCrash();
 
-        const comprarNaBusca = async (blocos: number[], rotulo: string) => {
-            const { posicoes } = posicoesDoProduto(blocos);
+        // Primeiros cards da busca (device-index.ts, `primeirosCards`).
+        const comprarNaBusca = async (posicoes: number[], rotulo: string) => {
             await step('homePage.abrirCategorias()', () => homePage.abrirCategorias());
             await step('buscaPage.abrirPelaLupaDeCategorias()', () => buscaPage.abrirPelaLupaDeCategorias());
             await step('buscaPage.buscar("camiseta")', () => buscaPage.buscar('camiseta'));
@@ -70,7 +70,7 @@ describe('Compartilhar carrinho', () => {
             await step('compartilhar: botão ausente (1)', () => compartilharPage.validarBotaoAusente());
 
             // 2: 1 produto.
-            const calca = posicoesDoProduto([3, 4]);
+            const calca = primeirosCards();
             await step('homePage.abrirCategorias()', () => homePage.abrirCategorias());
             await step('categoriasPage.clickRoupas()', () => categoriasPage.clickRoupas());
             await step('categoriasPage.abrirCalcas()', () => categoriasPage.abrirCalcas());
@@ -83,7 +83,7 @@ describe('Compartilhar carrinho', () => {
             await step('compartilhar: botão com 1 item (2)', () => compartilharPage.validarBotaoPresente(1));
 
             // 3: 2 produtos, um deles com quantidade 2.
-            await comprarNaBusca([3, 4], 'Camiseta');
+            await comprarNaBusca(primeirosCards().posicoes, 'Camiseta');
             await step('checkoutPage.abrirMochila(2)', async () => { await checkoutPage.abrirMochila(2); });
             await step('compartilhar: botão com 2 itens (3)', () => compartilharPage.validarBotaoPresente(2));
             await step('compartilhar: quantidade 2 em um item', async () => {
@@ -106,7 +106,8 @@ describe('Compartilhar carrinho', () => {
             });
 
             // 40: produto diferente, somado aos que vieram do link.
-            await comprarNaBusca([5, 6], 'Camiseta diferente');
+            // Começa no card seguinte ao da 1ª camiseta, para ser outro produto.
+            await comprarNaBusca(primeirosCards(3, produtoPage.ultimaPosicaoComprada + 1).posicoes, 'Camiseta diferente');
             await step('checkoutPage.abrirMochila() - produto novo (40)', async () => { await checkoutPage.abrirMochila(compartilhados.length + 1); });
             let produtoNovo: ItemMochila | undefined;
             await step('compartilhar: produto diferente na Mochila (40)', async () => {

@@ -18,8 +18,8 @@ Como funciona a cada versão nova (Marcio, 2026-10-21):
 
 | Plataforma | Versão | Build | Profile (EAS) | Data | Evidência |
 |---|---|---|---|---|---|
-| Android | 1.22.9 | 534 | não conferido no EAS | 2026-11-05 | `drafts/app-migrado/android/captures-2026-11-05-build534/` (AVD; PDP, filtros, busca, Favoritos, Mochila, entrega, Pix até o Resumo, sem criar pedido; sem cartão, tela do Pix e novo endereço) |
-| iOS | 1.22.9 | 377 | não conferido no EAS | 2026-11-06 | `drafts/app-migrado/ios/captures-2026-11-06-build377/` (Remote Access, 390x844; onboarding, Menu, Coleção Especial e link, login, favoritar, logout, busca, PDP, Mochila, entrega, Pix até o Resumo, etapa 1 do cadastro; cartão só até o número, sem Resumo com cartão) |
+| Android | 1.23.1 | 557 (e 553) | não conferido no EAS | 2026-11-18 | 557: `captures-2026-11-18-build557-sheet-adicionado/` (draft 14) e `captures-2026-11-18-build557-insiderlayout/` (draft 44); 553: `captures-2026-11-18-build553-link-checkout/` e `captures-2026-11-18-build553-cenarios-40-42/` (`ANALISE-COMPARTILHAR-CARRINHO.md`). Só compartilhar carrinho, sheet "adicionado" e `insiderLayout`; o resto dos drafts segue no 534/530 (`android/00-INDICE.md`) |
+| iOS | 1.23.1 | 403 | não conferido no EAS | 2026-11-18 | `drafts/app-migrado/ios/captures-2026-11-18-compartilhar-1.23.1/` (Remote Access, iOS 27.0, 402x874; só compartilhar carrinho, `ANALISE-COMPARTILHAR-CARRINHO.md`); o resto dos drafts segue no 377 (`ios/00-INDICE.md`) |
 
 Profile conferido no EAS (API GraphQL `api.expo.dev`, `EXPO_TOKEN`/`EXPO_PROJECT_ID` do `.env`, campo `buildProfile`).
 O Android 1.22.3/514 (production, 2026-10-22) é build de ROLLBACK, não de teste (Marcio, 2026-10-22): não entra

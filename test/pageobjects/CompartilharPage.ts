@@ -7,6 +7,7 @@ import { driver, $, $$ } from '@wdio/globals'
 import allure from '@wdio/allure-reporter';
 import { anexarPrint } from "../utils/allure-helpers";
 import { texto } from "../utils/textos";
+import { lerArvoreAndroid, seguinte, irmaoSeguinte } from "../utils/arvore-android";
 
 // Compartilhar carrinho (M9, Marcio, 2026-11-06). Executado por Appium antes de escrever:
 // Android 1.22.9/534, drafts/app-migrado/android/captures-2026-11-06-compartilhar-carrinho-3/;
@@ -152,11 +153,34 @@ export class CompartilharPage extends BasePage {
         }
     }
 
+    // Uma busca só (`$$`), não `$()` + `isExisting()`: na Mochila com frete grátis cada busca leva 3–7 s
+    // (Android 1.23.1/557, 2026-11-19, NOTAS.md achado 5). Nas duas plataformas.
     private async textoDe(seletor: string): Promise<string | null> {
-        const el = await $(seletor);
-        if (!(await el.isExisting().catch(() => false))) return null;
-        const valor = await el.getAttribute(IOS ? 'label' : 'text').catch(() => null);
+        const els = await $$(seletor).getElements();
+        if (els.length === 0) return null;
+        const valor = await els[0].getAttribute(IOS ? 'label' : 'text').catch(() => null);
         return valor ?? null;
+    }
+
+    // Android: tamanho e quantidade de cada card lidos de UMA árvore (`getPageSource`), com a mesma regra
+    // dos XPaths `campoDoCard`/`quantidadeDoCard` (tamanho = `wake-item-size` seguinte; quantidade = TextView
+    // irmão seguinte do `remove-button`), procurados só até o próximo card. Antes: 4 buscas por card, 105 s
+    // para 3 cards com frete grátis (Android 1.23.1/557, 2026-11-19, NOTAS.md achados 1b e 5). Só a leitura
+    // muda; o que é validado é o mesmo do iOS.
+    private async lerTelaDaMochilaAndroid(itens: Map<string, ItemMochila>): Promise<boolean> {
+        const nos = lerArvoreAndroid(await driver.getPageSource());
+        const cards = nos.map((n, i) => (/^wake-product-card-bag-/.test(n.id) ? i : -1)).filter((i) => i >= 0);
+        cards.forEach((c, k) => {
+            const id = sufixo(nos[c].id);
+            if (itens.has(id)) return;
+            const ate = cards[k + 1] ?? nos.length;
+            const tam = seguinte(nos, c, (n) => n.id === 'wake-item-size', ate);
+            const menos = seguinte(nos, c, (n) => n.id === 'remove-button', ate);
+            const qtd = menos >= 0 ? irmaoSeguinte(nos, menos, (n) => n.classe === 'android.widget.TextView') : -1;
+            if (tam < 0 || qtd < 0 || qtd >= ate || !nos[tam].texto || !nos[qtd].texto) return;
+            itens.set(id, { id, tamanho: nos[tam].texto, quantidade: Number(nos[qtd].texto) });
+        });
+        return nos.some((n) => n.id === 'share-bag-cta' && n.exibido);
     }
 
     // Lê id, tamanho e quantidade de cada produto, rolando porque os cards de baixo só entram na árvore
@@ -167,6 +191,11 @@ export class CompartilharPage extends BasePage {
         await this.irAoTopoDaMochila();
         const itens = new Map<string, ItemMochila>();
         for (let rolagem = 0; rolagem <= 8; rolagem++) {
+            if (!IOS) {
+                if (await this.lerTelaDaMochilaAndroid(itens)) break;
+                await this.rolarMochila();
+                continue;
+            }
             for (const card of await $$(CARD_MOCHILA)) {
                 const id = await this.idDoElemento(card);
                 if (!id || itens.has(sufixo(id))) continue;

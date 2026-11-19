@@ -11,6 +11,8 @@ import { anexarPrint } from "../utils/allure-helpers";
 // -compra-cartao/ (drafts 12, 13 e 14).
 
 const IOS = process.env.PLATFORM === 'ios';
+// Android: "Continue shopping" do sheet de produto adicionado por XPath (ver `sheetAdicionadoNaTela`).
+const CONTINUAR_COMPRANDO_XPATH = '//*[@resource-id="bag-continue-shopping"]';
 
 const SELETOR_TAMANHO = '-android uiautomator:new UiSelector().resourceIdMatches("size-option-.*")';
 
@@ -182,6 +184,9 @@ export class ProdutoPage extends BasePage {
     // tamanho com estoque (`SemEstoqueError`) = volta para a listagem e tenta a próxima posição; outro
     // erro sobe na hora. CI Run #41 (app 1.22.8/519, S26 Ultra): a camisa da posição 5 estava sem P e
     // sem M, e o teste parou nela.
+    // Posição do último produto comprado: o `06` começa a "camiseta diferente" no card seguinte.
+    ultimaPosicaoComprada = -1;
+
     async comprarNaPosicao(posicoes: number[], produto: string): Promise<number> {
         const recusados: string[] = [];
         for (const [i, posicao] of posicoes.entries()) {
@@ -189,6 +194,7 @@ export class ProdutoPage extends BasePage {
             const preco = await this.lerPrecoDoProduto();
             try {
                 await this.comprar();
+                this.ultimaPosicaoComprada = posicao;
                 return preco;
             } catch (erro) {
                 if (!(erro instanceof SemEstoqueError)) throw erro;
@@ -287,7 +293,7 @@ export class ProdutoPage extends BasePage {
             await comprar.click();
 
             let modalNoComprar = false;
-            const sheet = await this.esperarFechandoBanner(
+            const esperarSheet = () => this.esperarFechandoBanner(
                 async () => {
                     modalNoComprar = await $(modalEstoque).isDisplayed().catch(() => false);
                     return modalNoComprar || (await $(adicionar).isDisplayed().catch(() => false));
@@ -295,6 +301,8 @@ export class ProdutoPage extends BasePage {
                 15000,
                 async () => { await (await $(seletorTestId('pdp-buy-button'))).click(); }
             );
+            let sheet = await esperarSheet();
+            if (!sheet && !modalNoComprar) sheet = await this.tocarComprarDeNovo(esperarSheet);
             if (modalNoComprar) {
                 await anexarPrint('Comprar — modal de estoque ao tocar em Comprar');
                 await this.fecharModalDeEstoque();
@@ -305,7 +313,7 @@ export class ProdutoPage extends BasePage {
             }
             if (!sheet) {
                 allure.addAttachment('Comprar — árvore da tela (sheet não abriu)', await driver.getPageSource(), 'text/xml');
-                throw new Error('Comprar: o sheet de tamanho (size-button) não abriu em 15s depois de tocar no pdp-buy-button.');
+                throw new Error('Comprar: o sheet de tamanho (size-button) não abriu em 15s depois de cada um dos 2 toques no pdp-buy-button.');
             }
 
             const { tamanho, linha } = await this.escolherTamanho(adicionar, recusados);
@@ -323,7 +331,7 @@ export class ProdutoPage extends BasePage {
                 // Banner que abrir nesta espera é fechado sem repetir o toque (repetir adicionaria 2x).
                 let resultado: 'adicionado' | 'modal' | null = null;
                 await this.esperarFechandoBanner(async () => {
-                    if (await $(seletorTestId('bag-continue-shopping')).isDisplayed().catch(() => false)) resultado = 'adicionado';
+                    if (await this.sheetAdicionadoNaTela()) resultado = 'adicionado';
                     else if (await $(modalEstoque).isDisplayed().catch(() => false)) resultado = 'modal';
                     return resultado !== null;
                 }, 45000);
@@ -449,10 +457,29 @@ export class ProdutoPage extends BasePage {
             `sem estoque: ${doSheet.filter((o) => !o.comEstoque).map(nome).join(', ') || 'nenhum'}`
         );
 
+        // Habilitou = o `size-button` ficou enabled (até o 534) OU sumiu da árvore com um botão de
+        // adicionar no lugar (1.23.0/541, ver `botaoAdicionar`). Quem confirma é o sheet de
+        // "produto adicionado" ou o modal de estoque, depois do toque no adicionar.
+        const botaoHabilitado = async () => {
+            const porId = await $(adicionar);
+            if (await porId.isExisting().catch(() => false)) return porId.isEnabled().catch(() => false);
+            return (await this.botaoAdicionar(linhaDoSheet)) !== null;
+        };
+        // O `size-button` some da árvore por ~4 s depois do toque no tamanho e volta habilitado (Android
+        // 1.23.1/557, AVD, 2026-11-19, `captures-2026-11-19-build557-06-passo-a-passo/NOTAS.md` achado 4: XGG tocado,
+        // "não habilitou", P sem estoque tocado, log "P" e a Mochila com XGG). Antes de tocar no próximo tamanho,
+        // confere de novo: se o botão habilitou, o tamanho anterior é o escolhido. Tocar num tamanho com "+"
+        // desmarcou o escolhido em 2026-11-10 (`captures-2026-11-10-build541-tamanho/` 14–15). Nas duas
+        // plataformas (o iOS usa o `comprarIOS`, por fração, e não passa aqui).
+        const escolhidoDepois = (tamanho: string) => {
+            console.log(`📏 Tamanho escolhido: ${tamanho} (o botão de adicionar habilitou depois da espera)`);
+            return { tamanho, linha: linhaDoSheet };
+        };
         const tentados: string[] = [];
         for (const opcao of doSheet) {
             const tamanho = opcao.id.replace('size-option-', '');
             if (ignorar.includes(tamanho)) continue;
+            if (tentados.length > 0 && (await botaoHabilitado())) return escolhidoDepois(tentados[tentados.length - 1]);
             tentados.push(tamanho);
             // Reencontra pelo id e pela linha: a referência antiga pode ficar obsoleta depois de um toque.
             for (const el of await $$(seletorTestId(opcao.id))) {
@@ -461,23 +488,17 @@ export class ProdutoPage extends BasePage {
                     break;
                 }
             }
-            // Habilitou = o `size-button` ficou enabled (até o 534) OU sumiu da árvore com um botão de
-            // adicionar no lugar (1.23.0/541, ver `botaoAdicionar`). Quem confirma é o sheet de
-            // "produto adicionado" ou o modal de estoque, depois do toque no adicionar.
             const habilitou = await driver
-                .waitUntil(async () => {
-                    const porId = await $(adicionar);
-                    if (await porId.isExisting().catch(() => false)) return porId.isEnabled().catch(() => false);
-                    return (await this.botaoAdicionar(linhaDoSheet)) !== null;
-                }, { timeout: 4000, interval: 500 })
+                .waitUntil(botaoHabilitado, { timeout: 4000, interval: 500 })
                 .then(() => true)
                 .catch(() => false);
             if (habilitou) {
                 console.log(`📏 Tamanho escolhido: ${tamanho}${tentados.length > 1 ? ` (antes, sem habilitar: ${tentados.slice(0, -1).join(', ')})` : ''}`);
                 return { tamanho, linha: linhaDoSheet };
             }
-            console.log(`⚠ Tamanho ${tamanho} não habilitou o botão de adicionar — tentando o próximo`);
+            console.log(`⚠ Tamanho ${tamanho} não habilitou o botão de adicionar em 4s`);
         }
+        if (tentados.length > 0 && (await botaoHabilitado())) return escolhidoDepois(tentados[tentados.length - 1]);
 
         allure.addAttachment('Sheet de tamanho', Buffer.from(await driver.takeScreenshot(), 'base64'), 'image/png');
         throw new SemEstoqueError(
@@ -555,17 +576,33 @@ export class ProdutoPage extends BasePage {
         return ids;
     }
 
+    // Sheet de "produto adicionado" no Android: pelo UiSelector OU pelo XPath. Run do `06` de 2026-11-18
+    // (Android 1.23.1/557, `run-06.log`): com o sheet na tela por 45 s (vídeo e print), o
+    // `UiSelector().resourceId("bag-continue-shopping")` deu `no such element` em todas as buscas
+    // (20:49:51–20:50:39), e o XPath `//*[@clickable="true"]` (20:51:45) trouxe o botão nos bounds dele
+    // ([42,1927] 996x142, os mesmos da captura `captures-2026-11-18-build557-sheet-adicionado/`), junto do
+    // `closeBt` do `insiderLayout`. Por que o UiSelector não acha nesse estado: NÃO provado.
+    private async sheetAdicionadoNaTela(): Promise<boolean> {
+        if (await $(seletorTestId('bag-continue-shopping')).isDisplayed().catch(() => false)) return true;
+        return (await $$(CONTINUAR_COMPRANDO_XPATH).length) > 0;
+    }
+
     async continuarComprando() {
         if (IOS) return this.continuarComprandoIOS();
-        const botao = await $(seletorTestId('bag-continue-shopping'));
-        await this.waitForElement(botao);
+        const apareceu = await driver
+            .waitUntil(() => this.sheetAdicionadoNaTela(), { timeout: 20000, interval: 1000 })
+            .then(() => true)
+            .catch(() => false);
+        if (!apareceu) throw new Error('Continuar comprando: o bag-continue-shopping não apareceu em 20s (UiSelector nem XPath).');
         // Banner antes do toque e toque repetido 1 vez (Marcio, 2026-11-06; CI Run #42, S24+ no
         // Android 1.22.9/534): o toque caiu no banner, que fechou, e o sheet seguiu aberto.
         for (let tentativa = 1; tentativa <= 2; tentativa++) {
             await this.fechaBanner();
-            await botao.click();
+            const porId = await $(seletorTestId('bag-continue-shopping'));
+            if (await porId.isDisplayed().catch(() => false)) await porId.click();
+            else await $(CONTINUAR_COMPRANDO_XPATH).click();
             const fechou = await driver
-                .waitUntil(async () => !(await $(seletorTestId('bag-continue-shopping')).isDisplayed().catch(() => false)), {
+                .waitUntil(async () => !(await this.sheetAdicionadoNaTela()), {
                     timeout: 10000,
                     interval: 500,
                 })
@@ -679,7 +716,7 @@ export class ProdutoPage extends BasePage {
     private async esperarSheetDeTamanhoIOS(recusados: string[]) {
         const modalEstoque = seletorTestId('alert-modal');
         let modalNoComprar = false;
-        const abriu = await this.esperarFechandoBanner(
+        const esperarSheet = () => this.esperarFechandoBanner(
             async () => {
                 modalNoComprar = await $(modalEstoque).isDisplayed().catch(() => false);
                 return modalNoComprar || (await this.sheetAbertoIOS()) === 'tamanho';
@@ -687,6 +724,8 @@ export class ProdutoPage extends BasePage {
             15000,
             async () => { await (await $(seletorTestId('pdp-buy-button'))).click(); }
         );
+        let abriu = await esperarSheet();
+        if (!abriu && !modalNoComprar) abriu = await this.tocarComprarDeNovo(esperarSheet);
         if (modalNoComprar) {
             await anexarPrint('Comprar (iOS) — modal de estoque ao tocar em Comprar');
             await this.fecharModalDeEstoque();
@@ -697,8 +736,23 @@ export class ProdutoPage extends BasePage {
         }
         if (!abriu) {
             allure.addAttachment('Comprar (iOS) — árvore da tela (sheet não abriu)', await driver.getPageSource(), 'text/xml');
-            throw new Error('Comprar (iOS): o sheet de tamanho não abriu em 15s depois de tocar no pdp-buy-button.');
+            throw new Error('Comprar (iOS): o sheet de tamanho não abriu em 15s depois de cada um dos 2 toques no pdp-buy-button.');
         }
+    }
+
+    // O 1º toque no Comprar foi aceito pelo Appium e o sheet de tamanho não abriu, sem banner; um 2º toque
+    // abriu em 2,2 s (Android 1.23.1/557, AVD, 2026-11-19, calça, `captures-2026-11-19-build557-06-passo-a-passo/`
+    // NOTAS.md achado 3, `011-sonda-2o-toque-buy`). Toca 1 vez mais e espera de novo o mesmo prazo (Marcio,
+    // 2026-11-19, item 5 do `plans/2026-11-19-06-mochila-lenta.md`). Nas duas plataformas.
+    private async tocarComprarDeNovo(esperarSheet: () => Promise<boolean>): Promise<boolean> {
+        console.log('⚠ Comprar: o 1º toque no pdp-buy-button não abriu o sheet em 15s (sem banner) — tocando de novo');
+        await this.fechaBanner();
+        try {
+            await (await $(seletorTestId('pdp-buy-button'))).click();
+        } catch {
+            // sem o botão na tela: a espera abaixo decide pelo sheet
+        }
+        return esperarSheet();
     }
 
     // Build 1.21.7/352: o sheet fica preso ao topo e a distância até o "Continue shopping" muda com a
@@ -765,6 +819,19 @@ export class ProdutoPage extends BasePage {
             const seletor = naPdp ? SETA_VOLTAR_PDP : seletorTestId('header-back-button');
             if (!naPdp) await this.mostrarCabecalhoDaListagem();
             const botao = await $(seletor);
+            // Android 1.23.1/557 (run-06b.log de 2026-11-18, 21:31–21:32, vídeo): a listagem de Calças no
+            // topo SEM o cabeçalho desenhado (faixa branca de y 63 a 544 por mais de 80 s, sem seta nem
+            // título) — a mesma tela capturada com cabeçalho em
+            // `captures-2026-11-18-build557-insiderlayout/11-b-apos-elementClick-back-to-top-t3s`. Sem seta,
+            // usa o voltar do sistema; o laço confere Categorias a cada volta. Que o voltar do sistema
+            // funcione nessa tela: NÃO conferido. iOS sem mudança.
+            if (!IOS && !(await botao.isDisplayed().catch(() => false))) {
+                await anexarPrint('Voltar até Categorias — sem seta, voltar do sistema');
+                console.log('⚠ Voltar até Categorias: sem seta na tela — usando o voltar do sistema');
+                await driver.back();
+                await driver.pause(timewhait);
+                continue;
+            }
             if (!(await botao.isDisplayed().catch(() => false))) {
                 await anexarPrint('Voltar até Categorias — sem seta de voltar');
                 throw new Error('Voltar até Categorias: a tela atual não tem seta de voltar (nem a da PDP nem o header-back-button).');

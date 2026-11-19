@@ -29,50 +29,16 @@ export const deviceIndex: Record<'android', Record<string, number>> = {
     },
 };
 
-// Posição do produto na listagem que ESTE device usa (0 = 1º card), no 1º bloco (ver
-// `posicoesDoProduto`). Os 11 aparelhos do CI
-// (Android e iOS rodam ao mesmo tempo) compravam a mesma 1ª camisa e o estoque acabava no meio
-// do run: CI Run #30 (2026-10-20, app 1.22.2, Android 512), "Size sold out" em 4 iPhones e a
-// camisa tirada do pedido no checkout no S24+ e no iPhone 15. Cada device passa a ter a sua
-// posição, sem nome de produto fixo (REQUIREMENTS.md).
-//   Android: 0–5, o mesmo índice da conta (`deviceModel`, mapa acima).
-//   iOS: 6–10, pelo DEVICE_LABEL que o workflow injeta no .env do run (nome do device no Device
-//   Farm, o mesmo que aparece em "CI iOS Run #N - <nome>"). O host iOS não tem outro sinal.
-//   Local (AVD / Remote Access) ou device fora dos mapas: 0, como era antes.
-const posicaoIOS: Record<string, number> = {
-    "Apple iPhone 13": 6,
-    "Apple iPhone 14": 7,
-    "Apple iPhone 14 Pro Max": 8,
-    "Apple iPhone 15": 9,
-    "Apple iPhone 15 Pro Max": 10,
-};
-
-// Quantos devices rodam ao mesmo tempo no CI (Android 0–5 + iOS 6–10). Cada listagem é dividida
-// em blocos de 11 posições: o bloco N dá ao device a posição `posicao + 11 * N`, então dois devices
-// nunca caem no mesmo card. Cada TESTE usa os seus blocos na listagem que compartilha com outro
-// teste (Marcio, 2026-10-26: produto diferente por teste e por device), e os blocos seguintes são o
-// próximo produto quando o primeiro não tem tamanho com estoque (CI Run #41, app 1.22.8/519).
-export const DEVICES_NO_CI = 11;
-
-export function posicoesDoProduto(blocos: number[]): { posicoes: number[]; comoAchei: string } {
-    const { posicao, comoAchei } = posicaoDoProduto();
-    return { posicoes: blocos.map((bloco) => posicao + DEVICES_NO_CI * bloco), comoAchei };
-}
-
-export function posicaoDoProduto(): { posicao: number; comoAchei: string } {
-    if (!process.env.DEVICEFARM_DEVICE_UDID) return { posicao: 0, comoAchei: 'execução local' };
-
-    if (process.env.PLATFORM === 'ios') {
-        const label = process.env.DEVICE_LABEL ?? '';
-        const posicao = posicaoIOS[label];
-        return posicao === undefined
-            ? { posicao: 0, comoAchei: `DEVICE_LABEL "${label}" fora do mapa (posição 0)` }
-            : { posicao, comoAchei: `DEVICE_LABEL "${label}"` };
-    }
-
-    const model = String((browser?.capabilities as any)?.deviceModel ?? '');
-    const posicao = Object.entries(deviceIndex.android).find(([prefix]) => model.startsWith(prefix))?.[1];
-    return posicao === undefined
-        ? { posicao: 0, comoAchei: `Device model "${model}" fora do mapa (posição 0)` }
-        : { posicao, comoAchei: `Device model "${model}"` };
+// Produto na listagem (Marcio, 2026-11-18): os primeiros cards, sem posição por device. A regra
+// anterior (posição do device + 11 × bloco, de 2026-10-26) existia porque os testes criavam pedido e o
+// estoque acabava no meio do run (CI Run #30, app 1.22.2). Desde 2026-11-04 nenhum teste cria pedido, e
+// pôr na Mochila não reserva estoque (Marcio). Ela levava o teste até o card 33–55, que a listagem nem
+// sempre tem; no AVD (Android 1.23.1/557) o app travou (ANR) nessa rolagem (`run-06e.log`, 2026-11-18).
+// Agora: `quantos` cards a partir de `inicio` (0 = 1º card); o seguinte só se o anterior não tiver
+// tamanho com estoque. Igual em local, Device Farm e iOS.
+export function primeirosCards(quantos = 3, inicio = 0): { posicoes: number[]; comoAchei: string } {
+    return {
+        posicoes: Array.from({ length: quantos }, (_, i) => inicio + i),
+        comoAchei: `${quantos} primeiros cards a partir do ${inicio}`,
+    };
 }
