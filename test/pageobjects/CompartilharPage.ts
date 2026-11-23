@@ -76,16 +76,20 @@ const ITEM_RECEBIDO = IOS
 // Samsung (One UI) tem chooser próprio: `android:id/sem_chooser_frame_root`, Copy = `sem_chooser_chip_button`
 // ("Copy URL") e a prévia `text1` traz o título da página, não a URL (árvore anexada no CI Run #56,
 // 2026-11-17, S23 Ultra, Android 1.23.0/550; mesmo menu no Run #55). O link vem da área de transferência.
+// Samsung Android 14/15 (S24 Ultra, S24+, S25 Ultra; link vazio no CI Run #58): outro menu, com a URL inteira no
+// `sem_chooser_main_title` e o Copy = `sem_copy_button` (ícone, content-desc "Copy"). Conferido no S24 Ultra por
+// Remote Access em 2026-11-19 (Android 1.23.1/557, `captures-2026-11-19-s24u-menu-compartilhar/` 03–04): o toque
+// grava o link na área de transferência e fecha o menu. O `sem_chooser_main_title` entra como prévia (reserva).
 const MENU_NATIVO = IOS
     ? '-ios predicate string:name == "ActivityListView"'
     : '-android uiautomator:new UiSelector().resourceIdMatches(".*:id/(resolver_list|copy|chooser_copy_button|content_preview_text|sem_chooser_frame_root|sem_chooser_chip_button)")';
-const PREVIA_DO_LINK = '-android uiautomator:new UiSelector().resourceIdMatches(".*:id/content_preview_text")';
+const PREVIA_DO_LINK = '-android uiautomator:new UiSelector().resourceIdMatches(".*:id/(content_preview_text|sem_chooser_main_title)")';
 // iOS 18: Copy = `actionGroupCell`. iOS 17 (iPhone 15 Pro Max do Device Farm, 17.3.1): o Copy é uma linha da
 // lista do sheet (print do CI Run #56, 2026-11-17), e não casou com o `actionGroupCell`; a regra aceita célula ou
 // botão com o mesmo label. Árvore do iOS 17 não capturada: o próximo run anexa a árvore se não achar.
 const copiarDoMenu = () => IOS
     ? `-ios predicate string:label == "${texto('compartilhar.copiar')}" AND (name == "actionGroupCell" OR type == "XCUIElementTypeCell" OR type == "XCUIElementTypeButton")`
-    : '-android uiautomator:new UiSelector().resourceIdMatches(".*:id/(copy|chooser_copy_button|sem_chooser_chip_button)")';
+    : '-android uiautomator:new UiSelector().resourceIdMatches(".*:id/(copy|chooser_copy_button|sem_chooser_chip_button|sem_copy_button)")';
 
 // Campos de cada produto: no Android e no iOS os botões e textos são IRMÃOS do card, não filhos.
 // Android: todos sob um único pai, por isso `following::` (conferido com lxml na captura 19: 1 nó por

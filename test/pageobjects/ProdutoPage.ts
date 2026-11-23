@@ -815,6 +815,14 @@ export class ProdutoPage extends BasePage {
             if (toque === 6) break;
 
             await this.fechaBanner();
+            // O banner do Insider por cima de Categorias deixa o `category-button` displayed=false: confere de novo
+            // depois de fechar, antes de procurar a seta (CI Run #58, 2026-11-19, iOS 1.23.1, iPhone 14; mesma
+            // falha no `02` do iPhone 14 Pro Max no CI Run #52). Nas duas plataformas.
+            if (await this.estaEmCategorias()) {
+                console.log(`↩ Categorias alcançada com ${toque} toque(s) em voltar (depois de fechar o banner)`);
+                await driver.pause(timewhait);
+                return;
+            }
             const naPdp = await $(SETA_VOLTAR_PDP).isDisplayed().catch(() => false);
             const seletor = naPdp ? SETA_VOLTAR_PDP : seletorTestId('header-back-button');
             if (!naPdp) await this.mostrarCabecalhoDaListagem();

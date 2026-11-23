@@ -733,12 +733,11 @@ export class CheckoutPage extends BasePage {
             throw new Error('Esvaziar Mochila: a Mochila não abriu em 30s (nem produto nem o estado vazio na tela).');
         }
 
-        // A contagem que confirmou a remoção anterior é a contagem de partida da seguinte: uma busca a menos por
-        // produto. Na Mochila com frete grátis cada busca leva 3–7 s (Android 1.23.1/557, 2026-11-19,
-        // `captures-2026-11-19-build557-06-passo-a-passo/NOTAS.md`, achado 5). Nas duas plataformas.
-        let atual = await $$(card).length;
+        // Reconta a cada volta e no fim. Logo depois do toque em remover, a contagem pode vir 0 por um instante
+        // enquanto o app redesenha a lista: no CI Run #58 (2026-11-19, iOS 1.23.1, iPhone 15 Pro Max e 14 Pro Max)
+        // a versão que reaproveitava essa contagem deu a Mochila por vazia com 1 produto nela. Nas duas plataformas.
         for (let i = 0; i < 10; i++) {
-            const antes = atual;
+            const antes = await $$(card).length;
             if (antes === 0) break;
 
             await this.fechaBanner();
@@ -757,16 +756,16 @@ export class CheckoutPage extends BasePage {
             if (alvo) await alvo.click();
             else await $(remover).click();
             const removeu = await driver
-                .waitUntil(async () => (atual = await $$(card).length) < antes, { timeout: 15000, interval: 500 })
+                .waitUntil(async () => (await $$(card).length) < antes, { timeout: 15000, interval: 500 })
                 .then(() => true)
                 .catch(() => false);
             if (!removeu) {
                 throw new Error(`Esvaziar Mochila: o toque em remover (wake-remove-item) não tirou o produto em 15s (${antes} na Mochila).`);
             }
-            console.log(`🗑 Produto removido da Mochila (restam ${atual})`);
+            console.log(`🗑 Produto removido da Mochila (restam ${antes - 1})`);
         }
 
-        const sobrou = atual;
+        const sobrou = await $$(card).length;
         if (sobrou > 0) {
             throw new Error(`Esvaziar Mochila: ainda há ${sobrou} produto(s) depois de 10 remoções.`);
         }

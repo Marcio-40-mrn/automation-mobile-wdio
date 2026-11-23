@@ -1,7 +1,10 @@
 # Plano — `06-compartilhar-carrinho`: Mochila lenta e escolha de tamanho (Android 1.23.1/557)
 
 Situação: **itens 1 a 5 aprovados pelo Marcio (2026-11-19) e implementados. Rodado no AVD pelo Marcio (2026-11-19, 14:18–14:46): o `06`
-PASSOU inteiro em 27,2 min (1ª vez); os outros 5 specs também passaram. CI e iOS não rodados.** Leitor da árvore
+PASSOU inteiro em 27,2 min (1ª vez); os outros 5 specs também passaram. CI e iOS não rodados.**
+**Item 3 DESFEITO (Marcio, 2026-11-19, noite):** no CI Run #58 (iPhone 15 Pro Max e 14 Pro Max) a contagem logo depois do
+remover veio 0 por um instante e o `esvaziarMochila` deu a Mochila por vazia com 1 produto; voltou a recontar a cada volta e
+no fim, como antes. Os itens 1, 2, 4 e 5 continuam. Leitor da árvore
 (`test/utils/arvore-android.ts`) conferido offline nas 21 árvores de Mochila da captura de 2026-11-19: mesmos ids, tamanhos e
 quantidades que o teste leu. **Desvio no item 3:** a árvore inteira leva 4–12 s e uma busca 3–5 s na Mochila lenta, então no
 `esvaziarMochila` a árvore seria mais lenta; ficou só o reaproveitamento da contagem (1 busca a menos por produto, nas duas
