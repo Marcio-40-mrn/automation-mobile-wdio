@@ -1,4 +1,4 @@
-import { BasePage, timewhait, seletorTestId } from "./BasePage";
+import { BasePage, timewhait, seletorTestId, scrollUntilVisibleParaCima } from "./BasePage";
 import { PerfilPage } from "./PerfilPage";
 import { driver, $ } from '@wdio/globals'
 import { texto } from "../utils/textos";
@@ -248,7 +248,19 @@ export class LoginPage extends BasePage {
             }
         }
 
-        const acesso = await $(acessoSel);
+        // Depois de um logout o Menu fica rolado até o fim: o acesso do topo (`menu-login-button`) sai
+        // da tela e o do rodapé fica visível (iOS 1.23.x, Remote Access 2026-11-25; registrado em
+        // 2026-10-23). Topo visível → topo; senão o rodapé; senão rola para cima até o topo.
+        let acesso = await $(acessoSel);
+        if (!(await acesso.isDisplayed().catch(() => false))) {
+            const rodape = await $(this.seletorAcessoLogin('menu.acessoLoginRodape'));
+            if (await rodape.isDisplayed().catch(() => false)) {
+                console.log('↩ Acesso ao Login pelo rodapé do Menu (Menu rolado)');
+                acesso = rodape;
+            } else {
+                await scrollUntilVisibleParaCima(acesso, 6);
+            }
+        }
         await this.waitForElement(acesso);
         await this.fechaBanner();
         await acesso.click();

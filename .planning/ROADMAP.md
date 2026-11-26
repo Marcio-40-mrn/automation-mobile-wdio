@@ -19,7 +19,7 @@ Como funciona a cada versão nova (Marcio, 2026-10-21):
 | Plataforma | Versão | Build | Profile (EAS) | Data | Evidência |
 |---|---|---|---|---|---|
 | Android | 1.23.1 | 557 (e 553) | não conferido no EAS | 2026-11-18 | 557: `captures-2026-11-18-build557-sheet-adicionado/` (draft 14) e `captures-2026-11-18-build557-insiderlayout/` (draft 44); 553: `captures-2026-11-18-build553-link-checkout/` e `captures-2026-11-18-build553-cenarios-40-42/` (`ANALISE-COMPARTILHAR-CARRINHO.md`). Só compartilhar carrinho, sheet "adicionado" e `insiderLayout`; o resto dos drafts segue no 534/530 (`android/00-INDICE.md`) |
-| iOS | 1.23.1 | 403 | não conferido no EAS | 2026-11-18 | `drafts/app-migrado/ios/captures-2026-11-18-compartilhar-1.23.1/` (Remote Access, iOS 27.0, 402x874; só compartilhar carrinho, `ANALISE-COMPARTILHAR-CARRINHO.md`); o resto dos drafts segue no 377 (`ios/00-INDICE.md`) |
+| iOS | 1.23.2 | 408 | não conferido no EAS | 2026-11-24 | `drafts/app-migrado/ios/captures-2026-11-24-endereco/` (Remote Access; só cadastro e edição de endereço, `NOTAS.md`). Compartilhar carrinho segue no 1.23.1/403; o resto dos drafts segue no 377 (`ios/00-INDICE.md`) |
 
 Profile conferido no EAS (API GraphQL `api.expo.dev`, `EXPO_TOKEN`/`EXPO_PROJECT_ID` do `.env`, campo `buildProfile`).
 O Android 1.22.3/514 (production, 2026-10-22) é build de ROLLBACK, não de teste (Marcio, 2026-10-22): não entra
@@ -102,258 +102,14 @@ Decisões e riscos da implementação (plano aprovado pelo Marcio em 2026-11-04,
   `HomePage`. Continuam no histórico do git.
 - **Run real:** feito no CI Run #42 (2026-11-05), nas duas plataformas (`STATE.md`).
 
-## M1 — Suíte Android estável ✅
+## Marcos concluídos (M1–M8) ✅
 
-Concluído em 2026-09-03.
-
-- `fechaBanner` fecha o banner do Insider por **seletor** (`accessibility id:Close`, o botão
-  do próprio criativo), esperando a WebView publicar a árvore, confirmando que o
-  `insiderLayout` sumiu e repetindo o ciclo até 3 vezes. Nenhuma coordenada.
-- O produto favoritado deixou de ser um nome fixo: `favoritarPrimeiroProduto()` pega a
-  primeira camisa que a lista mostrar, lê o nome do `content-desc` do card e favorita ali
-  mesmo, no `action-button`.
-- Favoritando na listagem, o teste fica uma tela antes na navegação e um único `voltar()`
-  chega em categorias, que é onde a aba Perfil existe.
-- `abrirPerfil` aceita `Menu` ou `Perfil`, porque o id da aba muda entre versões do app.
-
-## M2 — Inspeção de elementos padronizada ✅
-
-Concluído em 2026-09-04. Dois agentes, divididos por **papel** (inspecionar × redigir):
-
-- `.claude/agents/mobile-ui-inspector.md` — inspeção nas duas plataformas: Android via
-  `adb` (`uiautomator dump` + `screencap`), iOS via sessão Appium/XCUITest contra o
-  endpoint de Remote Access do Device Farm (`getPageSource()` + `takeScreenshot()`).
-- `.claude/agents/mobile-draft-writer.md` — lê as capturas brutas e escreve os drafts. Não
-  toca no device, para que a inspeção e a redação corram em paralelo sem uma travar a
-  outra (as sessões de Remote Access duram 20–30min; a captura sobrevive à sessão, a
-  redação não precisa esperar).
-
-## M3 — Rodar a MESMA suíte no iOS ✅
-
-Concluído em 2026-09-11 — `CI Run #14`: Android 18/18 e iOS 5/5 no mesmo run.
-
-**Regra que define este marco: não existe uma suíte iOS.** É a mesma suíte, o mesmo
-`test/specs/test.spec.ts`, os mesmos page objects, os mesmos nomes de método. Cada método
-que precisar detecta a plataforma (`process.env.PLATFORM === 'ios'`) e escolhe o seletor
-ali dentro — o padrão que o `ativarApp()` de `test/pageobjects/HomePage.ts` já inaugurou.
-**Nunca** criar spec, classe ou arquivo separado por SO.
-
-A infraestrutura já existe: `npm run wdio:ios`, `testspec-ios.yml`, capabilities XCUITest
-no `wdio.conf.ts`, variáveis no `.env`.
-
-Passos:
-
-1. ✅ Sessão de Remote Access num iPhone do Device Farm, com o IPA instalado.
-2. ✅ `REMOTE_HOST` / `REMOTE_PORT` / `REMOTE_PATH_IOS` no `.env`.
-3. ✅ Inspeção tela a tela — **encerrada em 2026-09-04**: 8 sessões, 3 iPhones, 33 drafts
-   em `.planning/drafts/ios/` (índice em `00-INDICE.md`), mais o consolidado
-   `.planning/RELATORIO-ANOMALIAS-IOS.md`. Cobre o fluxo do M1 inteiro e o do
-   `test/Draft.ts` até o `Finalize purchase`.
-4. ✅ Ramo iOS preenchido em `test/pageobjects/` (2026-09-08) — 14 ramificações em 6
-   arquivos, `tsc --noEmit` limpo. **Escrito a partir dos drafts, ainda não exercitado
-   contra device**: o que valida é o passo 5.
-5. ✅ A suíte roda no iOS ponta a ponta. **Passou pela primeira vez** no `CI iOS Run #8`
-   (2026-09-10), no iPhone 15 — os 17 steps, de `ativarApp` a `confirmarLogout`. No `CI iOS Run #9`,
-   **4/5** — o login (caractere perdido na digitação) está corrigido e validado; o 14 Pro Max
-   caiu porque o banner do Insider não era fechado no iOS (fechamento reativado com o marcador
-   de presença certo, aguardando run). Detalhes no `STATE.md`. `CI iOS Run #12`: 4/5; `CI iOS Run #13`: 3/5 (iPhone 13 por conta suja
-   herdada do #12, 15 Pro Max por tap perdido no `Back` + falso positivo do `telaMudou`) e o
-   **Android caiu para 16/18** pelo banner novo "Só no APP: 20% OFF" — correção dos 4 pontos
-   (validar desfavoritar, `voltar()` por tab bar, guarda de conta suja, limpeza em falha) no
-   `c367423`. **`CI Run #14` (2026-09-11 15:49): Android 18/18 e iOS 5/5** — os 5 aparelhos
-   passaram no mesmo run. Passo fechado.
-
-O bloqueio original deste marco — 19 dos 31 seletores eram Android-only e os 12
-`accessibility id:` não podiam ser presumidos — **está resolvido**: o valor iOS de cada um
-está documentado por captura, draft por draft.
-
-### Divergências de FLUXO, não só de seletor
-
-São estas que obrigam o `if`, e não apenas a troca de uma string:
-
-- **Logout não tem diálogo de confirmação no iOS** (draft `24`). No Android é
-  `id:android:id/button1`; no iOS o tap em "Logout" desloga na hora — não existe elemento,
-  alerta nem timeout que resolva sozinho, então `confirmarLogout()` não tem o que esperar.
-- **O onboarding depende de toque por coordenada em dois pontos** (drafts `01` e `02`): o
-  CTA "Toque para começar" não gera nó nenhum na árvore de acessibilidade, e o alerta de
-  localização é do SpringBoard — fora do `getPageSource()` do app. `autoAcceptAlerts: true`
-  e `driver.acceptAlert()` reportam sucesso sem fechar nada.
-- **`accessibility id` no iOS é id interno, não o texto visível** (drafts `03`–`05`, `12`,
-  `13`): `tab-menu`/`tab-categories`/`accept-button`/`category-button` no lugar de
-  `Menu`/`Categorias`/`Continue`/`Roupas`. O texto mostrado vive no `label`, e vários nós
-  compartilham o mesmo `name` — daí o uso de `-ios predicate string` combinando os dois.
-- **Campos de formulário perdem `name` e `label` ao serem preenchidos** (draft `08`) — o
-  seletor por placeholder só serve para achar o campo vazio.
-- **O primeiro tap em "Sign in" depois de digitar não registra** (draft `09`): 5
-  ocorrências, 4 sessões, 3 devices, uma delas byte-idêntica a outra. É comportamento
-  padrão esperado, não exceção — pausa de 2–3s antes do submit é regra do page object.
-- **A listagem de produtos e a PDP não têm tab bar**, igual ao Android (draft `21`) — a
-  regra "`voltar()` antes de `abrirPerfil()`" vale no iOS do mesmo jeito.
-- **Favoritos persistem por CONTA, no backend** (draft `22`) — sobreviveram à reinstalação
-  do app em outro iPhone. Nenhum cenário pode assumir a lista de Favoritos vazia. A Sacola,
-  ao contrário, não persiste (draft `19`).
-- **Comandos de conveniência do XCUITest reportam sucesso sem agir neste app** — três casos
-  confirmados: `acceptAlert()`, `mobile: hideKeyboard` e `clearValue()` (seção 3 do
-  `RELATORIO-ANOMALIAS-IOS.md`). Validar sempre pelo estado seguinte, nunca pelo retorno.
-
-### Lacuna fechada em 2026-09-08
-
-O `voltar()` da listagem de produtos era o único ponto do fluxo do M1 sem seletor capturado.
-Resolvido: a tela tem um chevron sem nó próprio, dentro do nó do título, e o cabeçalho tem
-dois nós homônimos — o `[1]` é a barra (inerte) e o `[2]` é o botão. Seletor validado 2x, ver
-draft `34`. `driver.back()` e o gesto de borda foram testados e **não** funcionam nesta tela.
-
-### Sobre o banner do Insider no iOS
-
-O `Close` do criativo é `accessibility id:Close` nas duas plataformas — mas no iOS ele **não
-serve como marcador de presença**: o nó sobrevive na árvore e responde `displayed=true` com a
-tela limpa. O equivalente ao `insiderLayout` é a WebView `label == "Insider WebView Content"`
-(e a Window `Inapp Window`): `displayed=true` só com o criativo visível. Medido no
-`CI iOS Run #9` nos dois estados, no mesmo aparelho. Regra: presença pela WebView, clique no
-`Close`, confirmação pela WebView sumir — o mesmo ciclo do Android. Nunca desligar o
-fechamento por causa de falso positivo do `Close`; corrigir a checagem.
-
-**2026-09-11 — medido com banner real (2x, Remote Access):** o `Close` é o "X" e o `element click`
-fecha; a árvore fica sem nenhum nó Insider. Mas um elemento por baixo do banner responde
-`displayed=true`/`hittable=true`, então a única checagem no início do step não basta: o
-`fechaBanner()` passou a ser chamado **antes de cada clique do ramo iOS**, com 3s antes do
-clique no `Close`, 3s depois e validação, e screenshot no Allure se não fechar. Aguardando run.
-
-## M4 — Paridade em CI ✅
-
-Concluído em 2026-09-10, com ajustes nos testes em 2026-09-11 (`c367423`) —
-`CI Run #14`: Android 18/18 e iOS 5/5, um run por iPhone, 5 contas distintas.
-
-O job `run-ios-on-device-farm` **já existe** em `.github/workflows/mobile_test.yml`, com
-`testspec-ios.yml`, pool de devices iOS próprio e os `allure-results` entrando no mesmo
-relatório do Android. O que faltava era o fluxo do M3 passar — não infraestrutura.
-
-**Resolvido em 2026-09-10 — a pendência dos mapas `ios` deixou de existir.** A tentativa de
-identificar o iPhone em runtime (primeiro por modelId, depois pelo par versão de OS +
-resolução) foi abandonada: o XCUITest não devolve `deviceModel`, o UDID muda a cada run e o
-host não expõe índice de job. Pior, o mapa virou **condição de partida** — no `CI iOS Run #6`
-dois aparelhos não executaram nada por não casarem a chave.
-
-Agora quem decide a conta é o CI: **um run por aparelho**, com o email daquele device
-injetado no testspec do run (`schedule-run --device-selection-configuration`, mirando o ARN).
-Nenhum aparelho pode ficar de fora por não ser reconhecido, e nada disso encosta no Android,
-que segue com o mapa por modelo do `deviceIndex.android`. Ver `STATE.md`.
-
-Validado: `CI iOS Run #7` (5 runs, 5 contas distintas, os 5 aparelhos executaram) e
-`CI Run #14` (fluxo inteiro verde nas duas plataformas).
-
-## M6 — Cenários Gherkin da seção 3 no app migrado ✅
-
-**Concluído em 2026-10-21 (Marcio).** O escopo final é a suíte de 4 testes (`01-fluxo-favoritar`, `02-compra-pix`,
-`03-compra-cartao`, `04-criar-conta`), decisão de 2026-10-16; os 16 planos e os 101 cenários abaixo ficam como registro.
-CI Run #30 (2026-10-20, app 1.22.2): `01` 11/11, `03` 10/11, `04` 11/11; o `02` segue em ajuste de estoque (`STATE.md`).
-
-**Em execução desde 2026-10-01** (`/gsd-execute-phase 6`): 5/16 planos concluídos — 06-01 (DEC-A +
-captura iOS), 06-02 e 06-03 (POC migrada, Etapa 0) **verde local no Android e no iOS**. CI do Device Farm pendente. Ver `STATE.md`.
-**2026-10-16 (Marcio):** a suíte passou a ter só quatro testes, os principais e únicos (`01-fluxo-favoritar`,
-`02-compra-pix`, `03-compra-cartao`, `04-criar-conta`; `REQUIREMENTS.md`). Os specs da Etapa 1 (onboarding,
-login e logout) e os planos 06-04 e 06-05 foram excluídos.
-
-**Planejado em 2026-10-01** pelo `/gsd-plan-phase 6`: 16 planos
-(`.planning/phases/06-cenarios-gherkin-app-migrado/06-01-PLAN.md`…`06-16-PLAN.md`), em sequência,
-com o escopo do `06-CONTEXT.md` (82 cenários agora, 11 pendentes de massa, 8 excluídos).
-Próximo comando: `/gsd-execute-phase 6`.
-
-Decidido em 2026-09-29. **Fonte:** seção 3 ("Cenários de teste em Gherkin") de
-`cenarios-gherkin-2026-09-28.pdf`, na raiz do repositório — 15 funcionalidades, **101
-cenários**, escritos para o app migrado (pt-BR, Mochila). As seções 1, 2 e 4 do PDF (regras,
-técnicas, testes não funcionais) não fazem parte deste marco.
-
-- **O que é "escrever" aqui:** teste automatizado **WebdriverIO + Mocha** (o framework do
-  `wdio.conf.ts`), com o Gherkin do PDF como especificação de cada caso.
-- **Seletores:** os `testID` do app migrado, levantados no M5
-  (`drafts/app-migrado/android/captures-2026-09-29/TESTIDS.md` e os drafts). Onde não houver
-  testID, vale o que o draft da tela disser.
-- **Uma suíte só** continua valendo: specs por funcionalidade, nunca por sistema operacional.
-- **Em etapas**, na ordem abaixo — acesso primeiro (todo o resto depende de onboarding e
-  login), massa de dados pesada por último. Cada etapa fecha com os seus cenários verdes em
-  run real (AVD-S24, rodado pelo Marcio, e Device Farm).
-
-| Etapa | Funcionalidades do PDF (nº de cenários) | Cenários | Dependência / observação |
-|---|---|---|---|
-| 0 — Base | — | 0 | page objects e seletores por testID do app migrado, textos pt-BR, estrutura dos specs, massa de dados |
-| 1 — Acesso | Onboarding — Permissões e Acesso Inicial (7); Login — Autenticação e Recuperação de Senha (7); Menu — Logout (3) | 17 | fluxo já capturado no M5 |
-| 2 — Catálogo | Busca de Produtos por Palavra-chave (3); Filtros de Busca — Combinação, Contagem e Limpeza (7); PDP — Visualização, Seleção de Tamanho e Adição à Mochila (7) | 17 | |
-| 3 — Mochila | Mochila — Gerenciamento de Itens, Quantidade e Cupom (16) | 16 | cupons (válido, inexistente, expirado, condicional), valor mínimo do frete grátis e produto com estoque conhecido |
-| 4 — Checkout | Checkout — Cadastro de Endereço de Entrega (7) | 7 | campos de endereço **sem testID** (2ª leva Android, `STATE.md`) |
-| 5 — Criar Conta | Criar Conta — Validações da Etapa 1 (15); Criar Conta — Validações da Etapa 2 (Senha) (7) | 22 | e-mail/CPF descartáveis por execução e um e-mail/CPF já cadastrado |
-| 6 — Menu | Menu — Meus Dados (9); Menu — Configurações de Comunicação e Exclusão de Conta (4); Menu — Estado Vazio de Meus Pedidos e Favoritos (2); Menu — Visibilidade da Seção DEV por Tipo de Build (2) | 17 | simular falha de conectividade; build interna para a seção DEV |
-| 7 — pt-BR | Exibição de Conteúdo em Português do Brasil (5) | 5 | transversal; fecha depois das telas cobertas |
-
-Total: 17 + 17 + 16 + 7 + 22 + 17 + 5 = **101**.
-
-Não está escrito ainda — definir antes da etapa correspondente:
-
-- **Massa de dados:** de onde vêm cupons, CEPs, estoque, valor do frete grátis, e-mails e
-  CPFs para cadastro (etapas 3, 4 e 5).
-- **Ramo iOS:** as capturas iOS do M5 estão incompletas (sem login, sem PDP). Como as etapas
-  avançam enquanto o iOS não estiver capturado.
-- **Como simular** falha de conectividade (Meus Dados) e obter a build interna com a seção
-  DEV (etapa 6).
-- **Repositório e forma de entrada no código** (ramo nos page objects atuais, suíte nova ou
-  repositório novo) — a decisão de repositório adiada no M5.
-- Se os cenários entram no CI (Device Farm) já na etapa em que são escritos ou só ao final.
-
-## M7 — A suíte atual rodando no app migrado ✅
-
-**Concluído em 2026-10-21 (Marcio).** A POC do favoritar migrou para o app migrado no M6 (06-02/06-03) e é o
-`01-fluxo-favoritar`, verde nos 11 aparelhos do CI Run #30. A decisão de repositório deixou de existir: o app migrado
-vive neste repositório.
-
-Era o M6 até 2026-09-29, renumerado quando os cenários Gherkin entraram como próximo passo.
-
-Depois do M5. Replicar no app novo o mesmo cenário de `test/specs/test.spec.ts` — e os
-testes que vierem depois — a partir dos drafts do M5. Como isso entra no código (mais um
-ramo nos page objects, suíte separada ou repositório novo) depende da decisão de
-repositório adiada no M5; **não está escrito**.
-
-## M8 — Cobertura além do favoritar ✅
-
-**Concluído em 2026-10-21 (Marcio).** A compra está coberta pelo `02-compra-pix` (até o QR code) e pelo
-`03-compra-cartao` (até a recusa/antifraude), nas duas plataformas, com pedidos reais finalizados — o bloqueio de
-ReCAPTCHA abaixo foi medido no app antigo e não ocorre no app migrado. O texto abaixo fica como registro.
-
-Era o M7 até 2026-09-29. **Sobreposição com o M6:** adicionar à sacola, escolher tamanho e
-cadastrar endereço passam a ser cobertos pelas etapas 2, 3 e 4 do M6; o que sobra aqui é
-cartão → finalizar compra (e o bloqueio de ReCAPTCHA abaixo).
-
-**Adiado em 2026-09-11:** nenhum cenário de compra é criado antes do M5 e do M7. Os drafts
-`25`–`33` do app atual ficam como referência; no app migrado o fluxo de compra é
-recapturado no M5, e o teste — quando vier — corre no app migrado. Não se sabe se o app
-migrado tem o mesmo ReCAPTCHA; o bloqueio abaixo foi medido no app atual.
-
-**2026-10-14 — cenário de compra com Pix no app migrado (Android, local):** `test/specs/02-compra-pix.spec.ts`,
-pedido do Marcio, finaliza um pedido Pix real e valida os valores do resumo pelos preços lidos na PDP.
-Roda no Device Farm (guarda que o pulava removida em 2026-10-16). Registro: `plans/2026-10-14-compra-pix.md`.
-
-**2026-10-19 — build 1.22.0 (509/354):** a recusa do cartão virou a tela `wake-order-processing-recusado` (sem modal
-nem Pedido Cancelado; o pedido só em Meus pedidos) e o Pagamento do Pix perdeu a linha do desconto. Specs `02` e
-`03` ajustados, não rodados. Registro: `plans/2026-10-19-ci-run25-build509.md`.
-
-**Próximo (Marcio, 2026-10-15): compra com cartão.** Exige capturar antes, no Android, os elementos
-da tela de pagamento com cartão no build atual (a captura de 2026-09-29 parou no formulário, sem
-testID). Cartão de teste e ponto final do fluxo **não estão escritos**. Ver `STATE.md`.
-
-O fluxo de compra rascunhado em `test/Draft.ts`: adicionar à sacola → escolher tamanho →
-endereço → cartão → finalizar compra.
-
-**Bloqueado por fora da automação:** o `Finalize purchase` falha com erro de ReCAPTCHA,
-2/2 tentativas byte-idênticas (draft `33`). Não é bug de seletor nem de timing — é proteção
-anti-bot do backend funcionando como projetada. Tudo até o Summary é automatizável e está
-documentado (drafts `25`–`32`). Encaminhamento: pedir ao time de backend um allowlist ou
-bypass de ReCAPTCHA para o ambiente de QA/Device Farm; até lá, o critério de sucesso
-possível é a chegada ao Summary. **O M1, o M3 e o M7 não são afetados** — não passam por
-compra.
+M1, M2, M3, M4, M6, M7 e M8 concluídos, e o histórico do levantamento (era o M5): texto completo em `.planning/ROADMAP-HISTORICO.md` (fora do carregamento automático).
 
 ## M9 — Ampliar a cobertura com novos cenários ⬜ planejamento
 
 Aberto em 2026-10-21 (Marcio): os 4 testes (`01`–`04`) cobrem boa parte do app, e outras funcionalidades serão
-validadas no futuro. **Escolhidos:** Richard Stad Selection (2026-11-03, rodado no CI Run #42) e Compartilhar carrinho (2026-11-06, escrito, não rodado). O resto
+validadas no futuro. **Escolhidos:** Richard Stad Selection (2026-11-03, rodado no CI Run #42), Compartilhar carrinho (2026-11-06, escrito, não rodado) e Criar conta + cadastro e alteração de endereço com CEP inválido e válido (2026-11-23, elementos capturados; teste escrito em 2026-11-25 dentro do `04-criar-conta`; passou no AVD (Android 1.23.3/562) e no iOS (Remote Access) em 2026-11-25, CI não rodado, `STATE.md`). O resto
 da lista abaixo continua backlog, sem escolha: tirado da seção 3 do `cenarios-gherkin-2026-09-28.pdf`
 (funcionalidades que os 4 testes não percorrem) e das pendências registradas; quais entram, em que ordem e com que
 massa é decisão do Marcio, cenário a cenário.
@@ -420,12 +176,46 @@ Mecanismos conferidos para os testes:
 
 - **Abrir o link:** `mobile: deepLink` com `bundleId`, igual ao Android nos demais parâmetros.
 - **Ler o link:** `getClipboard`/`setClipboard` não funcionam no aparelho. O caminho é Copy (`actionGroupCell`), colar no campo de
-  Busca e ler o `value`.
+  Busca e ler o `value`. Desde 2026-11-24 o texto copiado pode ser uma frase mais a URL (a frase não é fixa); o teste acha a
+  URL dentro do texto (`CompartilharPage`, não rodado de novo; `STATE.md`).
 - **Card:** botões e quantidade são irmãos de `wake-product-card-bag-<id>`, por `following-sibling`.
 - **Sheets da PDP:** por fração da janela, exceção já aprovada.
 
 O cenário 13 compara a Mochila antes e depois do Copy, que fecha o menu nativo nas duas plataformas; não há cancelamento nem coordenada.
 Mochila depois do logout no Android: não conferido. Copy nos Samsung do Device Farm: não conferido.
+
+### Cenário escolhido — Criar conta + cadastro de endereço com CEP inválido e válido (2026-11-23)
+
+Ordem do Marcio (2026-11-23): criar uma conta e, com ela, cadastrar um endereço, primeiro tentando um CEP inválido e
+depois salvando com um CEP válido. **Elementos capturados no Android 1.23.1/557** (AVD,
+`drafts/app-migrado/android/captures-2026-11-23-build557-cadastro-endereco/`, `NOTAS.md`, draft `39`); teste **escrito em 2026-11-25 dentro do `04-criar-conta`; passou no AVD (Android 1.23.3/562) e no iOS (Remote Access) em 2026-11-25, CI não rodado** (`STATE.md`). iOS capturado em 2026-11-24 no 1.23.2/408 (`drafts/app-migrado/ios/captures-2026-11-24-endereco/`, `NOTAS.md`): o formulário não tem os testIDs do Android (`address-zip-input` e os demais campos, fora `address-state-input` e `address-save-button`). Decisão 1 fechada: entrou no `04-criar-conta`.
+
+Caminho no app (Android 557): Criar Conta (igual ao `04`) → produto na Mochila → `bag-checkout-button` → formulário
+"New delivery address" direto (a conta nova não tem endereço; Menu e My Data não têm endereço).
+
+| Decisão | O que o teste valida (sem texto) |
+|---|---|
+| CEP inválido (`00000000`) | erro no campo (XPath estrutural: `SvgView` logo depois do contêiner do `address-zip-input`) e `address-save-button` `enabled=false`, mesmo com todos os outros campos preenchidos; o toque não sai do formulário |
+| CEP válido | erro some; o app preenche `address-street-input`, `address-state-input`, `address-city-input` e `address-neighborhood-input`; com Número e Destinatário, `address-save-button` `enabled=true`; o toque leva à Entrega (`delivery-option-slas`) |
+
+Não conferido: CEP incompleto (`1234`) não mostra mensagem no Android (só o Save desabilitado; decidir se entra); no iOS
+não foi capturado. Massa de CEP usada: válido `01310100`, inválido `00000000`, edição `01226030`. iOS da tela: capturado
+em 2026-11-24 (drafts `16` e `51`); o plano guarda o que não pode ser copiado do Android.
+
+**Alterar endereço com CEP inválido e CEP válido novo (ordem do Marcio, 2026-11-23).** Levantado no Android
+1.23.1/559 (`drafts/app-migrado/android/captures-2026-11-23-build559-endereco/`, `NOTAS.md`, drafts `16` e `39`; o 557,
+com o bug, ficou em `captures-2026-11-23-build557-alterar-endereco/` e no `RELATORIO-ENDERECO-DEV-2026-11-23.txt`);
+teste **escrito em 2026-11-25 dentro do `04-criar-conta`; passou no AVD (Android 1.23.3/562) e no iOS (Remote Access) em 2026-11-25, CI não rodado** (plano: `plans/2026-11-23-teste-endereco.md`, `STATE.md`). No iOS 1.23.2/408 o mesmo caminho abre a lista ("Alterar" sem id, `pressable` "Cadastrar novo endereço") e o formulário em modo Update; o CEP novo preenche a rua, o Update fica habilitado e o toque não sai da tela nem mostra carregando (gravação não conferida, `NOTAS.md`). Caminho: Entrega →
+"+ Add or choose another address" (ou login → Mochila → `bag-checkout-button`) → Meus endereços → "Alterar" (sem id;
+XPath por irmãos, draft `16`) → o mesmo formulário, com o `address-save-button` em modo Update.
+
+| Decisão | O que o app faz (559) | O que o teste validaria (sem texto) |
+|---|---|---|
+| CEP inválido (`00000000`) | erro no campo, Update `enabled=false`, toque não faz nada | erro pelo XPath estrutural, Update desabilitado, continua no formulário |
+| CEP válido novo (`01226030`) | Rua e Bairro trocam pelo CEP; Update grava (2 de 2), mostra carregando e vai à **Entrega** com o CEP novo; a lista tem o mesmo cartão editado | chegada na Entrega (`delivery-option-slas`) e, ao reabrir "Alterar", o CEP do campo igual ao digitado (dado) |
+
+No 557 o Update com CEP novo não gravava nem dava retorno (corrigido no 559, que só mostra carregando, sem mensagem de
+sucesso). O `enabled` do Update não é confiável no 559: o teste decide pelo destino.
 
 Regras que valem para cada cenário novo (`REQUIREMENTS.md`):
 - **um teste por decisão**; o que repete o caminho de um dos 4 testes vira asserção dentro dele, e nenhum teste é
@@ -445,7 +235,7 @@ Regras que valem para cada cenário novo (`REQUIREMENTS.md`):
 | Mochila (16) | só adicionar | quantidade (+/−), remover, estado vazio | — |
 | Mochila — cupom (6, pendentes de massa) | nada | válido, inexistente, expirado, condicional | cupons de teste do time do app |
 | Mochila — estoque (2) e frete grátis (3), pendentes de massa | nada | limite de estoque, barra de frete grátis | produto com estoque conhecido; valor mínimo do frete |
-| Checkout — Cadastro de endereço (7) | nada (as contas do CI já têm endereço) | novo endereço, CEP inválido, campos obrigatórios | conta sem endereço ou excluir endereço; campos sem testID |
+| Checkout — Cadastro de endereço (7) | nada (as contas do CI já têm endereço); novo endereço e CEP inválido escolhidos em 2026-11-23 (acima) | campos obrigatórios restantes | conta nova (sem endereço) resolve a massa; campos com testID no 557 |
 | Menu — Meus Dados (9, sem o de conectividade) | nada | editar e validar campos | captura da edição |
 | Menu — Configurações de comunicação (parte dos 4) | nada | 4 toggles de comunicação | a tela existe (draft iOS 48), mas os toggles estão fora da árvore no iOS; Android não capturado no 512 |
 | Menu — Estado vazio de Meus pedidos e Favoritos (2) | Favoritos vazio ao final do `01` | Meus pedidos vazio | conta sem pedido |
@@ -460,49 +250,3 @@ o app não tem a opção (Marcio, 2026-10-21; a captura de Meus dados, draft And
 - Quais áreas entram primeiro e quantos testes novos (o limite de tempo do CI por device).
 - Se os cenários novos entram no CI a cada teste ou em bloco.
 - A origem da massa: cupons, estoque, frete, conta sem endereço/sem pedido.
-
-
-## Histórico do levantamento (era o M5, 2026-09-11 a 2026-10-21)
-
-Decidido em 2026-09-11. O app Aramis está sendo **migrado por módulos** para uma versão
-nova, com `testID` nos elementos. O Marcio entrega o build; a partir dele, este marco
-captura os elementos das telas **nas duas plataformas**, pelo mesmo procedimento do M2/M3
-(`mobile-ui-inspector` captura, `mobile-draft-writer` redige), para que depois os cenários
-Gherkin (M6), a suíte atual (M7) e os testes futuros rodem nesse app. Estado em 2026-09-29:
-Android com 2ª leva capturada e drafts escritos; iOS com a 1ª leva incompleta e sem draft.
-
-O que está definido:
-
-- **Escopo da captura:** o fluxo da suíte atual (onboarding → login → categorias → camisas
-  → favoritar → favoritos → desfavoritar → logout) **e o fluxo de compra completo**, até
-  onde o app deixar. Só levantamento de elementos — **nenhum cenário de teste é criado
-  neste marco.**
-- **Nem tudo está ativo.** A migração é por módulos; explorar só as partes que já
-  funcionam (o Marcio indica quais). O que não funcionar entra no draft como lacuna do
-  módulo, não como anomalia do app.
-- **Procedimento:** o Marcio instala o app, abre a sessão e avisa; o Claude passa para o
-  `mobile-ui-inspector`, que refaz os mesmos passos do levantamento de 2026-09-04. O
-  Marcio acompanha na tela e recupera a conexão quando cair. Valem as regras de Remote
-  Access do `STATE.md`: capturar primeiro, documentar depois; um `getPageSource()` por
-  tela; fechar a sessão ao final.
-- **Primeira plataforma: iOS** — 1ª leva feita em 2026-09-11 (37 capturas, deslogado, sem
-  draft ainda); login bloqueado pelo backend e PDP não aberta. Ver `STATE.md`.
-- **Android: 1ª leva feita em 2026-09-22** — AVD local via `adb`, build 1.20.8 (483), 32
-  capturas, fluxo da suíte de ponta a ponta. Login OK (a conta foi cadastrada no app migrado
-  nesse dia, o que também explica o bloqueio do iOS); favoritar falha no app ("Falha ao
-  carregar"). Sem draft ainda. Ver `STATE.md`.
-- **Android: 2ª leva feita em 2026-09-29** — build 1.20.10 (492), capturas `00`–`51`, fluxo da suíte
-  inteiro funcionando (favoritar/desfavoritar OK) + compra até a escolha de pagamento. App agora em
-  pt-BR. testIDs consolidados em `captures-2026-09-29/TESTIDS.md`. 28 drafts em
-  `.planning/drafts/app-migrado/android/` (índice `00-INDICE.md`). Ver `STATE.md`.
-- **Destino dos drafts:** `.planning/drafts/app-migrado/ios/` e
-  `.planning/drafts/app-migrado/android/`, mesmo formato e mesmo `00-INDICE.md` dos drafts
-  atuais. Os drafts do app atual (`.planning/drafts/ios/`) ficam como estão, como base de
-  comparação tela a tela.
-
-Não está escrito ainda — definir quando o build chegar:
-
-- Identificador do app novo (bundle id / package), versão e origem do build.
-- Se o app migrado vai viver neste repositório ou em outro. **Decisão adiada em
-  2026-09-11.**
-- ~~Como o Android será capturado~~ — **AVD local via `adb`**, como no M2 (usado em 2026-09-22).

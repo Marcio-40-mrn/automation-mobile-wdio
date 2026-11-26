@@ -3,6 +3,11 @@ import { OnboardingPage } from "../pageobjects/OnboardingPage";
 import { LoginPage } from "../pageobjects/LoginPage";
 import { PerfilPage } from "../pageobjects/PerfilPage";
 import { CadastroPage } from "../pageobjects/CadastroPage";
+import { BuscaPage } from "../pageobjects/BuscaPage";
+import { ProdutoPage } from "../pageobjects/ProdutoPage";
+import { CheckoutPage } from "../pageobjects/CheckoutPage";
+import { EnderecoPage, type EnderecoLido } from "../pageobjects/EnderecoPage";
+import { primeirosCards } from "../utils/device-index";
 import { gerarDadosCadastro, type DadosCadastro } from "../utils/massa";
 import {
     anexarCrashDoAppSeFechou,
@@ -21,6 +26,14 @@ const TELEFONE_INCOMPLETO = '1193';
 const SENHAS_INVALIDAS = ['abc', 'abcdefgh', 'Abcdefgh', 'Abcdefg1']; // curta, sem maiúscula, sem número, sem especial
 const SENHAS_FORA_DA_REGRA = [SENHAS_INVALIDAS[Math.floor(Math.random() * SENHAS_INVALIDAS.length)]];
 
+// Endereço na mesma conta nova (decisão 1, 2026-11-25): não repete onboarding nem cadastro.
+// CEP incompleto `1234` não entra. O teste não toca em `delivery-continue-button`.
+const CEP_INVALIDO = '00000000';
+const CEP_VALIDO = '01310100';
+const CEP_EDITADO = '01226030';
+const NUMERO = '1000';
+const NUMERO_EDITADO = '1001';
+
 describe('Criar Conta', () => {
     it('Cadastro de conta nova, com os casos inválidos de cada etapa', async function (this: Mocha.Context) {
         const homePage = new HomePage();
@@ -28,6 +41,10 @@ describe('Criar Conta', () => {
         const loginPage = new LoginPage();
         const perfilPage = new PerfilPage();
         const cadastroPage = new CadastroPage();
+        const buscaPage = new BuscaPage();
+        const produtoPage = new ProdutoPage();
+        const checkoutPage = new CheckoutPage();
+        const enderecoPage = new EnderecoPage();
 
         configurarFechadorDeBanner(() => homePage.fechaBanner());
         const { device } = await rotularTeste('criar-conta');
@@ -114,6 +131,72 @@ describe('Criar Conta', () => {
             await step('homePage.validarHome() - depois do cadastro', () => homePage.validarHome());
             await step('homePage.abrirPerfil() - logado', () => homePage.abrirPerfil());
             await step('perfilPage.validarLogado()', () => perfilPage.validarLogado());
+
+            // Conta sem endereço: camiseta na Mochila e o checkout abre o formulário direto.
+            await step('homePage.abrirCategorias()', () => homePage.abrirCategorias());
+            await step('buscaPage.abrirPelaLupaDeCategorias()', () => buscaPage.abrirPelaLupaDeCategorias());
+            await step('buscaPage.buscar("camiseta")', () => buscaPage.buscar('camiseta'));
+            const camiseta = primeirosCards();
+            console.log(`👕 Camiseta das posições ${camiseta.posicoes.join(', ')} da busca (${camiseta.comoAchei})`);
+            await step(`produtoPage.comprarNaPosicao(${camiseta.posicoes.join(', ')}) - camiseta`, async () => {
+                await produtoPage.comprarNaPosicao(camiseta.posicoes, 'Camiseta');
+            });
+            // Igual ao `02`: fecha o sheet de produto adicionado e só então volta a Categorias,
+            // onde existe `tab-bag`. No AVD de 2026-11-25 o voltar rodou com o sheet aberto
+            // (`bag-continue-shopping` na tela) e 6 toques não chegaram em Categorias.
+            await step('produtoPage.continuarComprando()', () => produtoPage.continuarComprando());
+            await step('produtoPage.voltarAteCategorias()', () => produtoPage.voltarAteCategorias());
+            await step('checkoutPage.abrirCheckoutSemEnderecoSalvo()', () => checkoutPage.abrirCheckoutSemEnderecoSalvo());
+
+            const destinatario = `${dados.nome} ${dados.sobrenome}`;
+            await step('enderecoPage.validarFormularioAberto()', () => enderecoPage.validarFormularioAberto());
+            await step(`CEP inválido (${CEP_INVALIDO})`, async () => {
+                await enderecoPage.preencherCep(CEP_INVALIDO);
+                // O erro é conferido antes do Número e do Destinatário: digitar o Destinatário
+                // rola o formulário e tira o CEP (e o erro) da tela e da árvore (AVD 1.23.3/562, 2026-11-25).
+                await enderecoPage.validarErroNoCep(true);
+                await enderecoPage.preencherNumeroEDestinatario(NUMERO, destinatario);
+                await enderecoPage.validarSalvar(false);
+                await enderecoPage.tocarSalvarSemSair();
+            });
+            let enderecoDoCep: EnderecoLido = { rua: '', bairro: '', textoNaArvore: false };
+            await step(`CEP válido (${CEP_VALIDO})`, async () => {
+                await enderecoPage.preencherCep(CEP_VALIDO);
+                await enderecoPage.validarErroNoCep(false);
+                enderecoDoCep = await enderecoPage.validarEnderecoDoCep();
+                await enderecoPage.validarSalvar(true);
+            });
+            await step('enderecoPage.salvarEIrParaEntrega()', async () => {
+                await enderecoPage.salvarEIrParaEntrega();
+                await enderecoPage.conferirCepNaEntrega(CEP_VALIDO);
+            });
+
+            await step('enderecoPage.abrirMeusEnderecos()', () => enderecoPage.abrirMeusEnderecos());
+            await step('enderecoPage.validarUmCartao()', () => enderecoPage.validarUmCartao());
+            await step('enderecoPage.abrirAlterarPrimeiro()', () => enderecoPage.abrirAlterarPrimeiro());
+            await step('enderecoPage.validarFormularioDeEdicao()', () => enderecoPage.validarFormularioDeEdicao());
+            await step(`edição — CEP inválido (${CEP_INVALIDO})`, async () => {
+                await enderecoPage.preencherCep(CEP_INVALIDO);
+                await enderecoPage.validarErroNoCep(true);
+                await enderecoPage.validarSalvar(false);
+                await enderecoPage.tocarSalvarSemSair();
+            });
+            await step(`edição — CEP novo (${CEP_EDITADO})`, async () => {
+                await enderecoPage.preencherCep(CEP_EDITADO);
+                await enderecoPage.validarErroNoCep(false);
+                await enderecoPage.validarRuaEBairroMudaram(enderecoDoCep);
+                await enderecoPage.preencherNumero(NUMERO_EDITADO);
+            });
+            await step('enderecoPage.salvarEIrParaEntrega() - edição', async () => {
+                await enderecoPage.salvarEIrParaEntrega();
+                await enderecoPage.conferirCepNaEntrega(CEP_EDITADO);
+            });
+            await step('enderecoPage.abrirMeusEnderecos() - depois da edição', () => enderecoPage.abrirMeusEnderecos());
+            await step('enderecoPage.validarUmCartao() - CEP editado', () => enderecoPage.validarUmCartao(CEP_EDITADO));
+            await step('enderecoPage.abrirAlterarPrimeiro() - conferir o CEP', async () => {
+                await enderecoPage.abrirAlterarPrimeiro();
+                await enderecoPage.conferirCepNoFormulario(CEP_EDITADO);
+            });
         } catch (erro) {
             await anexarCrashDoAppSeFechou();
             throw erro;
@@ -130,9 +213,16 @@ describe('Criar Conta', () => {
                 `Nascimento: ${dados.nascimentoFormatado}\n` +
                 `Telefone: ${dados.telefoneFormatado}\n` +
                 `Senha: ${dados.senha}\n` +
-                `Conta criada: ${contaCriada ? 'sim (finalizar saiu da etapa 2)' : 'não / não confirmado'}`,
+                `Conta criada: ${contaCriada ? 'sim (finalizar saiu da etapa 2)' : 'não / não confirmado'}\n` +
+                `Destinatário do endereço: ${dados.nome} ${dados.sobrenome}\n` +
+                `Número: ${NUMERO} → ${NUMERO_EDITADO}\n` +
+                `CEP inválido: ${CEP_INVALIDO}\n` +
+                `CEP válido: ${CEP_VALIDO}\n` +
+                `CEP editado: ${CEP_EDITADO}`,
                 'text/plain'
             );
         }
-    });
+        // O caminho do endereço entra neste spec. 25 min, como o `02`: o `this.timeout()` dentro
+        // do `it` não vale, e os 15 min do mochaOpts cortam a conta + a Mochila + os dois CEPs.
+    }).timeout(25 * 60 * 1000);
 });

@@ -90,7 +90,7 @@ describe('Compartilhar carrinho', () => {
                 compartilhados = await compartilharPage.aumentarQuantidadeDeUmItem(await compartilharPage.lerMochila());
             });
 
-            // 4, 7, 12 e 13: menu nativo, link só com o código e Mochila igual depois de compartilhar.
+            // 4, 7, 12 e 13: menu nativo, URL só com o código (a frase em volta não entra) e Mochila igual depois de compartilhar.
             await step('compartilhar: menu nativo e link (4, 7, 12, 13)', async () => {
                 const previa = await compartilharPage.compartilharECopiar();
                 await compartilharPage.validarMochila(compartilhados, 'depois de compartilhar');

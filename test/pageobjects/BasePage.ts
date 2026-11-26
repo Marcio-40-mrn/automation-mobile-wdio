@@ -1322,6 +1322,55 @@ export const scrollUntilVisible = async (
     return false;
 };
 
+// Contrário do `scrollFinger`: o dedo desce (25% → 70% da altura) e a tela mostra o que está ACIMA.
+// Começa abaixo do cabeçalho e termina acima do teclado/rodapé fixo (formulário de endereço,
+// AVD 1.23.3/562, 2026-11-25: o CEP fica no topo e sai da tela depois do Destinatário).
+export const scrollFingerParaCima = async () => {
+  const { width, height } = await driver.getWindowRect();
+  const x = Math.round(width * 0.5);
+
+  await driver.performActions([
+    {
+      type: 'pointer',
+      id: 'finger1',
+      parameters: { pointerType: 'touch' },
+      actions: [
+        { type: 'pointerMove', duration: 0, x, y: Math.round(height * 0.25) },
+        { type: 'pointerDown', button: 0 },
+        { type: 'pointerMove', duration: 800, x, y: Math.round(height * 0.70) },
+        { type: 'pointerUp', button: 0 }
+      ]
+    }
+  ]);
+
+  // releaseActions não existe em alguns Appium (Device Farm); o gesto já foi aplicado.
+  try {
+    await driver.releaseActions();
+  } catch {
+    // no-op: endpoint ausente nesse host
+  }
+};
+
+// Igual ao `scrollUntilVisible`, mas rolando para CIMA (elemento acima da parte visível).
+export const scrollUntilVisibleParaCima = async (
+    element: ChainablePromiseElement,
+    maxScrolls: number = 6
+  ) => {
+    for (let i = 0; i < maxScrolls; i++) {
+      const isVisible = await element.isDisplayed().catch(() => false);
+      console.log(`🔎⬆ Tentativa ${i + 1}/${maxScrolls} — visível?`, isVisible);
+      if (isVisible) {
+        console.log("✨ Elemento encontrado!");
+        return true;
+      }
+      await scrollFingerParaCima();
+      await driver.pause(500);
+    }
+    const achou = await element.isDisplayed().catch(() => false);
+    if (!achou) console.warn("⚠ Elemento NÃO encontrado após todos os scrolls para cima.");
+    return achou;
+};
+
 export const forceScrollBeforeSearching = async (scrolls: number = 6) => {
   for (let i = 0; i < scrolls; i++) {
     console.log(`🔄 Scroll obrigatório ${i + 1}/${scrolls}`);

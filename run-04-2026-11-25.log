@@ -1,0 +1,391 @@
+◇ injected env (0) from .env // tip: ⌁ auth for agents [www.vestauth.com]
+2026-11-25T19:42:13.241Z INFO @wdio/cli:launcher: Run onPrepare hook
+2026-11-25T19:42:13.267Z INFO @wdio/appium-service: Will spawn Appium process: cmd /c appium --base-path / --address 127.0.0.1 --port 4723 --relaxed-security --allow-cors
+2026-11-25T19:42:24.064Z INFO @wdio/appium-service: Appium started with ID: 20592
+2026-11-25T19:42:24.065Z INFO @wdio/appium-service: Appium logs written to stdout
+
+Execution of 1 workers started at 2026-11-25T19:42:24.067Z
+
+2026-11-25T19:42:24.070Z INFO @wdio/cli:launcher: Run onWorkerStart hook
+2026-11-25T19:42:24.124Z INFO @wdio/xvfb: XvfbManager.init() called
+2026-11-25T19:42:24.124Z INFO @wdio/xvfb: Xvfb not needed on current platform
+2026-11-25T19:42:24.127Z INFO @wdio/local-runner: Start worker 0-0 with arg: run ./wdio.conf.ts --spec ./test/specs/04-criar-conta.spec.ts
+2026-11-25T19:42:24.199Z INFO @wdio/xvfb:ProcessFactory: xvfb-run not found, falling back to regular fork
+2026-11-25T19:42:24.199Z INFO @wdio/xvfb:ProcessFactory: ProcessFactory: shouldRun=false, isAvailable=false
+2026-11-25T19:42:24.199Z INFO @wdio/xvfb:ProcessFactory: Creating worker process with regular fork
+[0-0] 2026-11-25T19:42:26.887Z INFO @wdio/local-runner: Run worker command: run
+[0-0] ◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
+[0-0] RUNNING in Android on Android - file:///C:/Users/Marcio/Desktop/Aramis_Projetos/MobileWDIO/test/specs/04-criar-conta.spec.ts
+[0-0] 2026-11-25T19:42:27.678Z INFO webdriver: Initiate new session using the WebDriver protocol
+[0-0] 2026-11-25T19:42:27.678Z INFO @wdio/utils: Connecting to existing driver at http://127.0.0.1:4723/
+[0-0] 2026-11-25T19:42:27.694Z INFO webdriver: [POST] http://127.0.0.1:4723/session
+[0-0] 
+[0-0] ⏳ Aguardando 10 segundos para o aplicativo carregar...
+[0-0] 
+[0-0] 2026-11-25T19:43:57.826Z INFO webdriver: COMMAND startRecordingScreen(<object>)
+[0-0] 2026-11-25T19:43:57.827Z INFO webdriver: [POST] http://127.0.0.1:4723/session/add6fbb5-142e-4436-8d74-86b16e517a5e/appium/start_recording_screen
+[0-0] 2026-11-25T19:43:57.828Z INFO webdriver: DATA { options: { timeLimit: 900 } }
+[0-0] 2026-11-25T19:44:02.152Z INFO webdriver: RESULT 
+[0-0] 🆕 Dados do cadastro: {"email":"informatica.mrn+cadastro-avd-s24-mwwj7v5h-59yq@gmail.com","nome":"Teste","sobrenome":"Automacao","cpf":"47299000903","cpfFormatado":"472.990.009-03","nascimento":"08091974","nascimentoFormatado":"08/09/1974","telefone":"11997091620","telefoneFormatado":"(11) 99709-1620","senha":"Aramis@TVTD3a"}
+[0-0] 2026-11-25T19:44:02.175Z INFO webdriver: COMMAND executeScript("mobile: shell", <object>)
+[0-0] 2026-11-25T19:44:02.180Z INFO webdriver: [POST] http://127.0.0.1:4723/session/add6fbb5-142e-4436-8d74-86b16e517a5e/execute/sync
+[0-0] 2026-11-25T19:44:02.180Z INFO webdriver: DATA {
+[0-0]   script: 'mobile: shell',
+[0-0]   args: [ { command: 'logcat', args: [Array] } ]
+[0-0] }
+[0-0] 2026-11-25T19:44:02.709Z INFO webdriver: RESULT 
+[0-0] 2026-11-25T19:44:02.713Z INFO webdriver: COMMAND findElement("id", "com.aramis.ecomm:id/insiderLayout")
+[0-0] 2026-11-25T19:44:02.714Z INFO webdriver: [POST] http://127.0.0.1:4723/session/add6fbb5-142e-4436-8d74-86b16e517a5e/element
+[0-0] 2026-11-25T19:44:02.714Z INFO webdriver: DATA { using: 'id', value: 'com.aramis.ecomm:id/insiderLayout' }
+[0-0] 2026-11-25T19:44:05.356Z INFO webdriver: RESULT {
+[0-0]   error: 'no such element',
+[0-0]   message: 'An element could not be located on the page using the given search parameters.',
+[0-0]   stacktrace: 'NoSuchElementError: An element could not be located on the page using the given search parameters.\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrEls (C:\\Users\\Marcio\\.appium\\node_modules\\appium-uiautomator2-driver\\node_modules\\appium-android-driver\\lib\\commands\\find.ts:86:11)\n' +
+[0-0]     '    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrElsWithProcessing (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:60:12)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElement (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:75:12)'
+[0-0] }
+[0-0] 2026-11-25T19:44:05.368Z INFO webdriver: COMMAND findElement("id", "com.aramis.ecomm:id/insiderLayout")
+[0-0] 2026-11-25T19:44:05.368Z INFO webdriver: [POST] http://127.0.0.1:4723/session/add6fbb5-142e-4436-8d74-86b16e517a5e/element
+[0-0] 2026-11-25T19:44:05.368Z INFO webdriver: DATA { using: 'id', value: 'com.aramis.ecomm:id/insiderLayout' }
+[0-0] 2026-11-25T19:44:06.978Z INFO webdriver: RESULT {
+[0-0]   error: 'no such element',
+[0-0]   message: 'An element could not be located on the page using the given search parameters.',
+[0-0]   stacktrace: 'NoSuchElementError: An element could not be located on the page using the given search parameters.\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrEls (C:\\Users\\Marcio\\.appium\\node_modules\\appium-uiautomator2-driver\\node_modules\\appium-android-driver\\lib\\commands\\find.ts:86:11)\n' +
+[0-0]     '    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrElsWithProcessing (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:60:12)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElement (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:75:12)'
+[0-0] }
+[0-0] 2026-11-25T19:44:06.988Z INFO webdriver: COMMAND updateSettings(<object>)
+[0-0] 2026-11-25T19:44:06.989Z INFO webdriver: [POST] http://127.0.0.1:4723/session/add6fbb5-142e-4436-8d74-86b16e517a5e/appium/settings
+[0-0] 2026-11-25T19:44:06.989Z INFO webdriver: DATA { settings: { enforceXPath1: true } }
+[0-0] 2026-11-25T19:44:07.354Z INFO webdriver: RESULT null
+[0-0] 2026-11-25T19:44:07.355Z INFO webdriver: COMMAND executeScript("mobile: clearApp", <object>)
+[0-0] 2026-11-25T19:44:07.356Z INFO webdriver: [POST] http://127.0.0.1:4723/session/add6fbb5-142e-4436-8d74-86b16e517a5e/execute/sync
+[0-0] 2026-11-25T19:44:07.356Z INFO webdriver: DATA { script: 'mobile: clearApp', args: [ { appId: 'com.aramis.ecomm' } ] }
+[0-0] 2026-11-25T19:44:20.016Z INFO webdriver: RESULT null
+[0-0] 2026-11-25T19:44:20.017Z INFO webdriver: COMMAND executeScript("mobile: activateApp", <object>)
+[0-0] 2026-11-25T19:44:20.017Z INFO webdriver: [POST] http://127.0.0.1:4723/session/add6fbb5-142e-4436-8d74-86b16e517a5e/execute/sync
+[0-0] 2026-11-25T19:44:20.017Z INFO webdriver: DATA {
+[0-0]   script: 'mobile: activateApp',
+[0-0]   args: [ { appId: 'com.aramis.ecomm' } ]
+[0-0] }
+[0-0] 2026-11-25T19:44:23.339Z INFO webdriver: RESULT null
+[0-0] 2026-11-25T19:44:23.340Z INFO webdriver: COMMAND findElement("xpath", "//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]")
+[0-0] 2026-11-25T19:44:23.343Z INFO webdriver: [POST] http://127.0.0.1:4723/session/add6fbb5-142e-4436-8d74-86b16e517a5e/element
+[0-0] 2026-11-25T19:44:23.343Z INFO webdriver: DATA {
+[0-0]   using: 'xpath',
+[0-0]   value: '//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]'
+[0-0] }
+[0-0] 2026-11-25T19:44:35.356Z INFO webdriver: RESULT {
+[0-0]   error: 'no such element',
+[0-0]   message: 'An element could not be located on the page using the given search parameters.',
+[0-0]   stacktrace: 'NoSuchElementError: An element could not be located on the page using the given search parameters.\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrEls (C:\\Users\\Marcio\\.appium\\node_modules\\appium-uiautomator2-driver\\node_modules\\appium-android-driver\\lib\\commands\\find.ts:86:11)\n' +
+[0-0]     '    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrElsWithProcessing (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:60:12)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElement (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:75:12)'
+[0-0] }
+[0-0] 2026-11-25T19:44:35.363Z INFO webdriver: COMMAND findElement("xpath", "//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]")
+[0-0] 2026-11-25T19:44:35.364Z INFO webdriver: [POST] http://127.0.0.1:4723/session/add6fbb5-142e-4436-8d74-86b16e517a5e/element
+[0-0] 2026-11-25T19:44:35.364Z INFO webdriver: DATA {
+[0-0]   using: 'xpath',
+[0-0]   value: '//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]'
+[0-0] }
+[0-0] 2026-11-25T19:44:56.499Z WARN webdriver: WebDriverError: io.appium.uiautomator2.common.exceptions.UiAutomator2Exception: Timed out after 19043ms waiting for the root AccessibilityNodeInfo in the active window. Make sure the active window is not constantly hogging the main UI thread (e.g. the application is being idle long enough), so the accessibility manager could do its work when running "element" with method "POST"
+[0-0] 2026-11-25T19:44:56.500Z INFO webdriver: Retrying 1/3
+[0-0] 2026-11-25T19:44:56.500Z INFO webdriver: [POST] http://127.0.0.1:4723/session/add6fbb5-142e-4436-8d74-86b16e517a5e/element
+[0-0] 2026-11-25T19:44:56.500Z INFO webdriver: DATA {
+[0-0]   using: 'xpath',
+[0-0]   value: '//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]'
+[0-0] }
+[0-0] 2026-11-25T19:45:13.495Z INFO webdriver: RESULT {
+[0-0]   error: 'no such element',
+[0-0]   message: 'An element could not be located on the page using the given search parameters.',
+[0-0]   stacktrace: 'NoSuchElementError: An element could not be located on the page using the given search parameters.\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrEls (C:\\Users\\Marcio\\.appium\\node_modules\\appium-uiautomator2-driver\\node_modules\\appium-android-driver\\lib\\commands\\find.ts:86:11)\n' +
+[0-0]     '    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrElsWithProcessing (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:60:12)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElement (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:75:12)'
+[0-0] }
+[0-0] 2026-11-25T19:45:13.506Z INFO webdriver: COMMAND findElement("xpath", "//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]")
+[0-0] 2026-11-25T19:45:13.506Z INFO webdriver: [POST] http://127.0.0.1:4723/session/add6fbb5-142e-4436-8d74-86b16e517a5e/element
+[0-0] 2026-11-25T19:45:13.506Z INFO webdriver: DATA {
+[0-0]   using: 'xpath',
+[0-0]   value: '//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]'
+[0-0] }
+[0-0] 2026-11-25T19:45:15.589Z INFO webdriver: RESULT {
+[0-0]   error: 'no such element',
+[0-0]   message: 'An element could not be located on the page using the given search parameters.',
+[0-0]   stacktrace: 'NoSuchElementError: An element could not be located on the page using the given search parameters.\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrEls (C:\\Users\\Marcio\\.appium\\node_modules\\appium-uiautomator2-driver\\node_modules\\appium-android-driver\\lib\\commands\\find.ts:86:11)\n' +
+[0-0]     '    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrElsWithProcessing (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:60:12)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElement (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:75:12)'
+[0-0] }
+[0-0] 2026-11-25T19:45:15.695Z INFO webdriver: COMMAND findElement("xpath", "//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]")
+[0-0] 2026-11-25T19:45:15.757Z INFO webdriver: [POST] http://127.0.0.1:4723/session/add6fbb5-142e-4436-8d74-86b16e517a5e/element
+[0-0] 2026-11-25T19:45:15.758Z INFO webdriver: DATA {
+[0-0]   using: 'xpath',
+[0-0]   value: '//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]'
+[0-0] }
+[0-0] 2026-11-25T19:45:17.686Z INFO webdriver: RESULT {
+[0-0]   error: 'no such element',
+[0-0]   message: 'An element could not be located on the page using the given search parameters.',
+[0-0]   stacktrace: 'NoSuchElementError: An element could not be located on the page using the given search parameters.\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrEls (C:\\Users\\Marcio\\.appium\\node_modules\\appium-uiautomator2-driver\\node_modules\\appium-android-driver\\lib\\commands\\find.ts:86:11)\n' +
+[0-0]     '    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrElsWithProcessing (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:60:12)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElement (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:75:12)'
+[0-0] }
+[0-0] 2026-11-25T19:45:17.713Z INFO webdriver: COMMAND findElement("xpath", "//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]")
+[0-0] 2026-11-25T19:45:17.714Z INFO webdriver: [POST] http://127.0.0.1:4723/session/add6fbb5-142e-4436-8d74-86b16e517a5e/element
+[0-0] 2026-11-25T19:45:17.714Z INFO webdriver: DATA {
+[0-0]   using: 'xpath',
+[0-0]   value: '//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]'
+[0-0] }
+[0-0] 2026-11-25T19:45:18.729Z INFO webdriver: RESULT {
+[0-0]   error: 'no such element',
+[0-0]   message: 'An element could not be located on the page using the given search parameters.',
+[0-0]   stacktrace: 'NoSuchElementError: An element could not be located on the page using the given search parameters.\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrEls (C:\\Users\\Marcio\\.appium\\node_modules\\appium-uiautomator2-driver\\node_modules\\appium-android-driver\\lib\\commands\\find.ts:86:11)\n' +
+[0-0]     '    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrElsWithProcessing (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:60:12)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElement (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:75:12)'
+[0-0] }
+[0-0] 2026-11-25T19:45:18.759Z INFO webdriver: COMMAND findElement("xpath", "//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]")
+[0-0] 2026-11-25T19:45:18.760Z INFO webdriver: [POST] http://127.0.0.1:4723/session/add6fbb5-142e-4436-8d74-86b16e517a5e/element
+[0-0] 2026-11-25T19:45:18.760Z INFO webdriver: DATA {
+[0-0]   using: 'xpath',
+[0-0]   value: '//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]'
+[0-0] }
+[0-0] 2026-11-25T19:45:21.434Z INFO webdriver: RESULT {
+[0-0]   error: 'no such element',
+[0-0]   message: 'An element could not be located on the page using the given search parameters.',
+[0-0]   stacktrace: 'NoSuchElementError: An element could not be located on the page using the given search parameters.\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrEls (C:\\Users\\Marcio\\.appium\\node_modules\\appium-uiautomator2-driver\\node_modules\\appium-android-driver\\lib\\commands\\find.ts:86:11)\n' +
+[0-0]     '    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrElsWithProcessing (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:60:12)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElement (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:75:12)'
+[0-0] }
+[0-0] 2026-11-25T19:45:21.445Z INFO webdriver: COMMAND findElement("xpath", "//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]")
+[0-0] 2026-11-25T19:45:21.446Z INFO webdriver: [POST] http://127.0.0.1:4723/session/add6fbb5-142e-4436-8d74-86b16e517a5e/element
+[0-0] 2026-11-25T19:45:21.446Z INFO webdriver: DATA {
+[0-0]   using: 'xpath',
+[0-0]   value: '//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]'
+[0-0] }
+[0-0] 2026-11-25T19:45:23.513Z INFO webdriver: RESULT {
+[0-0]   error: 'no such element',
+[0-0]   message: 'An element could not be located on the page using the given search parameters.',
+[0-0]   stacktrace: 'NoSuchElementError: An element could not be located on the page using the given search parameters.\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrEls (C:\\Users\\Marcio\\.appium\\node_modules\\appium-uiautomator2-driver\\node_modules\\appium-android-driver\\lib\\commands\\find.ts:86:11)\n' +
+[0-0]     '    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrElsWithProcessing (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:60:12)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElement (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:75:12)'
+[0-0] }
+[0-0] 2026-11-25T19:45:23.524Z INFO webdriver: COMMAND findElement("xpath", "//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]")
+[0-0] 2026-11-25T19:45:23.525Z INFO webdriver: [POST] http://127.0.0.1:4723/session/add6fbb5-142e-4436-8d74-86b16e517a5e/element
+[0-0] 2026-11-25T19:45:23.525Z INFO webdriver: DATA {
+[0-0]   using: 'xpath',
+[0-0]   value: '//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]'
+[0-0] }
+[0-0] 2026-11-25T19:45:24.309Z INFO webdriver: RESULT {
+[0-0]   error: 'no such element',
+[0-0]   message: 'An element could not be located on the page using the given search parameters.',
+[0-0]   stacktrace: 'NoSuchElementError: An element could not be located on the page using the given search parameters.\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrEls (C:\\Users\\Marcio\\.appium\\node_modules\\appium-uiautomator2-driver\\node_modules\\appium-android-driver\\lib\\commands\\find.ts:86:11)\n' +
+[0-0]     '    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrElsWithProcessing (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:60:12)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElement (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:75:12)'
+[0-0] }
+[0-0] 2026-11-25T19:45:24.334Z INFO webdriver: COMMAND findElement("xpath", "//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]")
+[0-0] 2026-11-25T19:45:24.335Z INFO webdriver: [POST] http://127.0.0.1:4723/session/add6fbb5-142e-4436-8d74-86b16e517a5e/element
+[0-0] 2026-11-25T19:45:24.336Z INFO webdriver: DATA {
+[0-0]   using: 'xpath',
+[0-0]   value: '//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]'
+[0-0] }
+[0-0] 2026-11-25T19:45:25.149Z INFO webdriver: RESULT {
+[0-0]   error: 'no such element',
+[0-0]   message: 'An element could not be located on the page using the given search parameters.',
+[0-0]   stacktrace: 'NoSuchElementError: An element could not be located on the page using the given search parameters.\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrEls (C:\\Users\\Marcio\\.appium\\node_modules\\appium-uiautomator2-driver\\node_modules\\appium-android-driver\\lib\\commands\\find.ts:86:11)\n' +
+[0-0]     '    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrElsWithProcessing (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:60:12)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElement (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:75:12)'
+[0-0] }
+[0-0] 2026-11-25T19:45:25.169Z INFO webdriver: COMMAND findElement("xpath", "//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]")
+[0-0] 2026-11-25T19:45:25.169Z INFO webdriver: [POST] http://127.0.0.1:4723/session/add6fbb5-142e-4436-8d74-86b16e517a5e/element
+[0-0] 2026-11-25T19:45:25.169Z INFO webdriver: DATA {
+[0-0]   using: 'xpath',
+[0-0]   value: '//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]'
+[0-0] }
+[0-0] 2026-11-25T19:45:26.673Z INFO webdriver: RESULT {
+[0-0]   error: 'no such element',
+[0-0]   message: 'An element could not be located on the page using the given search parameters.',
+[0-0]   stacktrace: 'NoSuchElementError: An element could not be located on the page using the given search parameters.\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrEls (C:\\Users\\Marcio\\.appium\\node_modules\\appium-uiautomator2-driver\\node_modules\\appium-android-driver\\lib\\commands\\find.ts:86:11)\n' +
+[0-0]     '    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrElsWithProcessing (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:60:12)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElement (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:75:12)'
+[0-0] }
+[0-0] 2026-11-25T19:45:26.699Z INFO webdriver: COMMAND findElement("xpath", "//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]")
+[0-0] 2026-11-25T19:45:26.699Z INFO webdriver: [POST] http://127.0.0.1:4723/session/add6fbb5-142e-4436-8d74-86b16e517a5e/element
+[0-0] 2026-11-25T19:45:26.699Z INFO webdriver: DATA {
+[0-0]   using: 'xpath',
+[0-0]   value: '//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]'
+[0-0] }
+[0-0] 2026-11-25T19:45:27.978Z INFO webdriver: RESULT {
+[0-0]   error: 'no such element',
+[0-0]   message: 'An element could not be located on the page using the given search parameters.',
+[0-0]   stacktrace: 'NoSuchElementError: An element could not be located on the page using the given search parameters.\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrEls (C:\\Users\\Marcio\\.appium\\node_modules\\appium-uiautomator2-driver\\node_modules\\appium-android-driver\\lib\\commands\\find.ts:86:11)\n' +
+[0-0]     '    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrElsWithProcessing (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:60:12)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElement (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:75:12)'
+[0-0] }
+[0-0] 2026-11-25T19:45:28.002Z INFO webdriver: COMMAND findElement("xpath", "//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]")
+[0-0] 2026-11-25T19:45:28.002Z INFO webdriver: [POST] http://127.0.0.1:4723/session/add6fbb5-142e-4436-8d74-86b16e517a5e/element
+[0-0] 2026-11-25T19:45:28.002Z INFO webdriver: DATA {
+[0-0]   using: 'xpath',
+[0-0]   value: '//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]'
+[0-0] }
+[0-0] 2026-11-25T19:45:31.402Z INFO webdriver: RESULT {
+[0-0]   error: 'no such element',
+[0-0]   message: 'An element could not be located on the page using the given search parameters.',
+[0-0]   stacktrace: 'NoSuchElementError: An element could not be located on the page using the given search parameters.\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrEls (C:\\Users\\Marcio\\.appium\\node_modules\\appium-uiautomator2-driver\\node_modules\\appium-android-driver\\lib\\commands\\find.ts:86:11)\n' +
+[0-0]     '    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrElsWithProcessing (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:60:12)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElement (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:75:12)'
+[0-0] }
+[0-0] 2026-11-25T19:45:31.421Z INFO webdriver: COMMAND findElement("xpath", "//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]")
+[0-0] 2026-11-25T19:45:31.422Z INFO webdriver: [POST] http://127.0.0.1:4723/session/add6fbb5-142e-4436-8d74-86b16e517a5e/element
+[0-0] 2026-11-25T19:45:31.422Z INFO webdriver: DATA {
+[0-0]   using: 'xpath',
+[0-0]   value: '//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]'
+[0-0] }
+[0-0] 2026-11-25T19:45:33.975Z INFO webdriver: RESULT {
+[0-0]   error: 'no such element',
+[0-0]   message: 'An element could not be located on the page using the given search parameters.',
+[0-0]   stacktrace: 'NoSuchElementError: An element could not be located on the page using the given search parameters.\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrEls (C:\\Users\\Marcio\\.appium\\node_modules\\appium-uiautomator2-driver\\node_modules\\appium-android-driver\\lib\\commands\\find.ts:86:11)\n' +
+[0-0]     '    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrElsWithProcessing (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:60:12)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElement (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:75:12)'
+[0-0] }
+[0-0] 2026-11-25T19:45:33.988Z INFO webdriver: COMMAND findElement("xpath", "//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]")
+[0-0] 2026-11-25T19:45:33.989Z INFO webdriver: [POST] http://127.0.0.1:4723/session/add6fbb5-142e-4436-8d74-86b16e517a5e/element
+[0-0] 2026-11-25T19:45:33.989Z INFO webdriver: DATA {
+[0-0]   using: 'xpath',
+[0-0]   value: '//*[@resource-id="first-access-item-animation"]/ancestor::*[@clickable="true"][1]'
+[0-0] }
+[0-0] 2026-11-25T19:45:35.365Z INFO webdriver: COMMAND findElement("-android uiautomator", "new UiSelector().resourceIdMatches(".*wrap-close-button.*")")
+[0-0] 2026-11-25T19:45:35.365Z INFO webdriver: [POST] http://127.0.0.1:4723/session/add6fbb5-142e-4436-8d74-86b16e517a5e/element
+[0-0] 2026-11-25T19:45:35.365Z INFO webdriver: DATA {
+[0-0]   using: '-android uiautomator',
+[0-0]   value: 'new UiSelector().resourceIdMatches(".*wrap-close-button.*")'
+[0-0] }
+[0-0] 2026-11-25T19:45:35.447Z INFO webdriver: RESULT {
+[0-0]   error: 'no such element',
+[0-0]   message: 'An element could not be located on the page using the given search parameters.',
+[0-0]   stacktrace: 'NoSuchElementError: An element could not be located on the page using the given search parameters.\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrEls (C:\\Users\\Marcio\\.appium\\node_modules\\appium-uiautomator2-driver\\node_modules\\appium-android-driver\\lib\\commands\\find.ts:86:11)\n' +
+[0-0]     '    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrElsWithProcessing (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:60:12)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElement (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:75:12)'
+[0-0] }
+[0-0] 2026-11-25T19:45:41.756Z INFO webdriver: RESULT {
+[0-0]   error: 'no such element',
+[0-0]   message: 'An element could not be located on the page using the given search parameters.',
+[0-0]   stacktrace: 'NoSuchElementError: An element could not be located on the page using the given search parameters.\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrEls (C:\\Users\\Marcio\\.appium\\node_modules\\appium-uiautomator2-driver\\node_modules\\appium-android-driver\\lib\\commands\\find.ts:86:11)\n' +
+[0-0]     '    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrElsWithProcessing (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:60:12)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElement (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:75:12)'
+[0-0] }
+[0-0] 2026-11-25T19:45:41.764Z INFO webdriver: COMMAND findElement("-android uiautomator", "new UiSelector().resourceIdMatches(".*wrap-close-button.*")")
+[0-0] 2026-11-25T19:45:41.765Z INFO webdriver: [POST] http://127.0.0.1:4723/session/add6fbb5-142e-4436-8d74-86b16e517a5e/element
+[0-0] 2026-11-25T19:45:41.765Z INFO webdriver: DATA {
+[0-0]   using: '-android uiautomator',
+[0-0]   value: 'new UiSelector().resourceIdMatches(".*wrap-close-button.*")'
+[0-0] }
+[0-0] 2026-11-25T19:45:42.734Z INFO webdriver: RESULT {
+[0-0]   error: 'no such element',
+[0-0]   message: 'An element could not be located on the page using the given search parameters.',
+[0-0]   stacktrace: 'NoSuchElementError: An element could not be located on the page using the given search parameters.\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrEls (C:\\Users\\Marcio\\.appium\\node_modules\\appium-uiautomator2-driver\\node_modules\\appium-android-driver\\lib\\commands\\find.ts:86:11)\n' +
+[0-0]     '    at processTicksAndRejections (node:internal/process/task_queues:105:5)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElOrElsWithProcessing (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:60:12)\n' +
+[0-0]     '    at AndroidUiautomator2Driver.findElement (C:\\Users\\Marcio\\AppData\\Roaming\\npm\\node_modules\\appium\\node_modules\\@appium\\base-driver\\lib\\basedriver\\commands\\find.ts:75:12)'
+[0-0] }
+[0-0] 2026-11-25T19:45:42.739Z INFO webdriver: COMMAND takeScreenshot()
+[0-0] 2026-11-25T19:45:42.739Z INFO webdriver: [GET] http://127.0.0.1:4723/session/add6fbb5-142e-4436-8d74-86b16e517a5e/screenshot
+[0-0] 2026-11-25T19:45:47.726Z INFO webdriver: RESULT iVBORw0KGgoAAAANSUhEUgAABDgAAAkkCAYAAAD508+vAAAAAXNSR0IArs4c6...
+[0-0] 2026-11-25T19:45:47.733Z INFO webdriver: COMMAND executeScript("mobile: queryAppState", <object>)
+[0-0] 2026-11-25T19:45:47.733Z INFO webdriver: [POST] http://127.0.0.1:4723/session/add6fbb5-142e-4436-8d74-86b16e517a5e/execute/sync
+[0-0] 2026-11-25T19:45:47.735Z INFO webdriver: DATA {
+[0-0]   script: 'mobile: queryAppState',
+[0-0]   args: [ { appId: 'com.aramis.ecomm' } ]
+[0-0] }
+[0-0] 2026-11-25T19:45:51.290Z INFO webdriver: RESULT 4
+[0-0] 2026-11-25T19:45:51.362Z INFO webdriver: COMMAND stopRecordingScreen()
+[0-0] 2026-11-25T19:45:51.362Z INFO webdriver: [POST] http://127.0.0.1:4723/session/add6fbb5-142e-4436-8d74-86b16e517a5e/appium/stop_recording_screen
+[0-0] 2026-11-25T19:45:59.826Z INFO webdriver: RESULT AAAAGGZ0eXBtcDQyAAAAAGlzb21tcDQyAAAKDG1vb3YAAABsbXZoZAAAAADnL...
+[0-0] 🎥 Vídeo anexado ao Allure.
+[0-0] 
+[0-0] 🔄 Limpando dados da aplicação (adb shell pm clear com.aramis.ecomm)...
+[0-0] Success
+[0-0] Error in "Criar Conta.Cadastro de conta nova, com os casos inválidos de cada etapa"
+Error: AssertionError: Boas-vindas não apareceu depois de limpar e ativar o app: o container clicável (ancestral de first-access-item-animation) não ficou visível em 60s. clearApp funcionou?
+    at OnboardingPage.abrirApp (C:\Users\Marcio\Desktop\Aramis_Projetos\MobileWDIO\test\pageobjects\OnboardingPage.ts:46:19)
+    at async <anonymous> (C:\Users\Marcio\Desktop\Aramis_Projetos\MobileWDIO\test\specs\04-criar-conta.spec.ts:61:85)
+    at async step (C:\Users\Marcio\Desktop\Aramis_Projetos\MobileWDIO\test\utils\allure-helpers.ts:39:13)
+    at async Context.<anonymous> (C:\Users\Marcio\Desktop\Aramis_Projetos\MobileWDIO\test\specs\04-criar-conta.spec.ts:61:13)
+    at async Context.executeAsync (C:\Users\Marcio\Desktop\Aramis_Projetos\MobileWDIO\node_modules\@wdio\utils\build\index.js:1132:20)
+    at async Context.testFrameworkFnWrapper (C:\Users\Marcio\Desktop\Aramis_Projetos\MobileWDIO\node_modules\@wdio\utils\build\index.js:1213:14)
+[0-0] 2026-11-25T19:46:04.847Z INFO webdriver: COMMAND deleteSession()
+[0-0] 2026-11-25T19:46:04.849Z INFO webdriver: [DELETE] http://127.0.0.1:4723/session/add6fbb5-142e-4436-8d74-86b16e517a5e
+[0-0] 2026-11-25T19:46:16.361Z INFO webdriver: RESULT null
+[0-0] FAILED in Android on Android - file:///C:/Users/Marcio/Desktop/Aramis_Projetos/MobileWDIO/test/specs/04-criar-conta.spec.ts
+2026-11-25T19:46:16.527Z INFO @wdio/cli:launcher: Run onWorkerEnd hook
+
+ "spec" Reporter:
+------------------------------------------------------------------
+[Android #0-0] Running: on Android
+[Android #0-0] Session ID: add6fbb5-142e-4436-8d74-86b16e517a5e
+[Android #0-0]
+[Android #0-0] » test\specs\04-criar-conta.spec.ts
+[Android #0-0] Criar Conta
+[Android #0-0]    ✖ Cadastro de conta nova, com os casos inválidos de cada etapa
+[Android #0-0]
+[Android #0-0] 1 failing (2m 18.5s)
+[Android #0-0]
+[Android #0-0] 1) Criar Conta Cadastro de conta nova, com os casos inválidos de cada etapa
+[Android #0-0] AssertionError: Boas-vindas não apareceu depois de limpar e ativar o app: o container clicável (ancestral de first-access-item-animation) não ficou visível em 60s. clearApp funcionou?
+[Android #0-0] Error: AssertionError: Boas-vindas não apareceu depois de limpar e ativar o app: o container clicável (ancestral de first-access-item-animation) não ficou visível em 60s. clearApp funcionou?
+[Android #0-0]     at OnboardingPage.abrirApp (C:\Users\Marcio\Desktop\Aramis_Projetos\MobileWDIO\test\pageobjects\OnboardingPage.ts:46:19)
+[Android #0-0]     at async <anonymous> (C:\Users\Marcio\Desktop\Aramis_Projetos\MobileWDIO\test\specs\04-criar-conta.spec.ts:61:85)
+[Android #0-0]     at async step (C:\Users\Marcio\Desktop\Aramis_Projetos\MobileWDIO\test\utils\allure-helpers.ts:39:13)
+[Android #0-0]     at async Context.<anonymous> (C:\Users\Marcio\Desktop\Aramis_Projetos\MobileWDIO\test\specs\04-criar-conta.spec.ts:61:13)
+[Android #0-0]     at async Context.executeAsync (C:\Users\Marcio\Desktop\Aramis_Projetos\MobileWDIO\node_modules\@wdio\utils\build\index.js:1132:20)
+[Android #0-0]     at async Context.testFrameworkFnWrapper (C:\Users\Marcio\Desktop\Aramis_Projetos\MobileWDIO\node_modules\@wdio\utils\build\index.js:1213:14)
+
+
+Spec Files:	 0 passed, 1 failed, 1 total (100% completed) in 00:03:52  
+
+2026-11-25T19:46:16.529Z INFO @wdio/local-runner: Shutting down spawned worker
+2026-11-25T19:46:16.788Z INFO @wdio/local-runner: Waiting for 0 to shut down gracefully
+2026-11-25T19:46:16.788Z INFO @wdio/local-runner: shutting down
+2026-11-25T19:46:16.788Z INFO @wdio/cli:launcher: Run onComplete hook
+
+📊 Gerando relatório Allure...
+
+Report successfully generated to allure-report
+
+📁 Relatório gerado em: ./allure-report
+
+2026-11-25T19:46:23.558Z INFO @wdio/appium-service: Killing entire Appium tree
+2026-11-25T19:46:23.900Z INFO @wdio/appium-service: Process and its children successfully terminated
+saida=1

@@ -1,0 +1,133 @@
+RELATÓRIO — CADASTRO E EDIÇÃO DE ENDEREÇO DE ENTREGA
+App Aramis Android — versão 1.23.1, build 557
+Data do teste: 23/11/2026
+Ambiente: emulador Android (AVD, 1080x2340), app limpo antes do teste
+Conta de teste: informatica.mrn+cadastro-avd-s24-mwtl74lw-paqq@gmail.com (criada no mesmo dia, sem endereço)
+
+
+==================================================================
+1. CADASTRO DO PRIMEIRO ENDEREÇO — FUNCIONA
+==================================================================
+
+Caminho
+  Login > produto na Mochila > "Finish purchase" (bag-checkout-button)
+  Com a conta sem endereço, o app abre direto o formulário "New delivery address".
+
+Passos e resultado
+  1. CEP incompleto "1234"
+     - Nenhuma mensagem no campo.
+     - Botão "Save information and proceed" desabilitado.
+
+  2. CEP inexistente "00000000" (formatado pelo app como 00000-000)
+     - Mensagem "CEP inválido" abaixo do campo; aparece também "Bairro obrigatório".
+     - Rua, Município, Número, Bairro, UF e Destinatário preenchidos à mão:
+       o botão continua desabilitado e o toque nele não faz nada.
+
+  3. CEP válido "01310-100"
+     - A mensagem de erro some.
+     - O app preenche sozinho Rua (Avenida Paulista), UF (SP), Município (São Paulo)
+       e Bairro (Bela Vista), sobrescrevendo o que tinha sido digitado.
+     - Com Número e Destinatário preenchidos, o botão habilita.
+       Complemento e "Marcar como endereço favorito" são opcionais.
+
+  4. Toque em "Save information and proceed" (1 toque)
+     - O endereço é salvo e o app abre a tela de Entrega ("Delivery"), com o endereço
+       selecionado ("ZIP code - 01310100") e as opções de frete.
+
+Resultado: OK.
+
+
+==================================================================
+2. EDIÇÃO DO ENDEREÇO — BUG
+==================================================================
+
+Caminho
+  Login > produto na Mochila > "Finish purchase" > "Meus endereços" > "Alterar"
+  O app abre o mesmo formulário, preenchido, com o botão "Update"
+  (desabilitado até alguma informação mudar).
+
+Endereço salvo antes da edição
+  Avenida Paulista, 1000, Bela Vista, São Paulo - SP, CEP 01310-100,
+  destinatário Teste Automacao.
+
+Passos e resultado
+  1. CEP inexistente "00000000"
+     - Mensagem "CEP inválido"; os outros campos continuam com o endereço antigo.
+     - "Update" desabilitado; o toque não faz nada.
+     - Comportamento correto.
+
+  2. CEP válido diferente "01226-030"   <<< BUG
+     - O app troca sozinho Rua (Rua Barão de Tatuí) e Bairro (Vila Buarque).
+       O Número antigo (1000) é mantido.
+     - "Update" fica habilitado.
+     - Toque em "Update": NADA ACONTECE. O app continua no formulário, sem mensagem
+       de sucesso ou de erro e sem indicador de carregamento. Esperado 16 s: igual.
+     - Ao voltar, a lista "Meus endereços" mostra o endereço ANTIGO.
+       Reabrindo "Alterar", o formulário também traz o endereço antigo.
+       Saindo para a Mochila e entrando de novo no checkout: endereço antigo.
+     - Reproduzido 2 de 2 vezes:
+         a) CEP novo + número trocado para 30, 2 toques em "Update";
+         b) só o CEP novo (número 1000), 1 toque em "Update".
+
+  3. Teste de controle: alterar SÓ o Número (1000 -> 1001), sem mudar o CEP
+     - Toque em "Update": o app volta para "Meus endereços" já com
+       "Avenida Paulista 1001". Gravou corretamente.
+
+Conclusão
+  A edição funciona quando o CEP não muda. Quando o CEP muda para outro CEP válido,
+  o "Update" não grava a alteração e não dá nenhum retorno ao usuário: o botão
+  parece funcionar (está habilitado), mas o toque é ignorado em silêncio.
+
+Esperado
+  Ao tocar em "Update" com um CEP válido novo, salvar o endereço com o novo CEP,
+  Rua e Bairro e voltar para "Meus endereços" mostrando o endereço atualizado
+  (como acontece ao alterar só o número). Se a troca de CEP não for permitida,
+  exibir mensagem ao usuário.
+
+Observações
+  - No log do aparelho (logcat) não aparece erro do app no momento do toque em "Update".
+  - Ao trocar o CEP, o Número antigo é mantido; o usuário pode salvar um endereço
+    com rua nova e número da rua antiga (vale conferir se é o comportamento desejado).
+  - A tela de edição mostra o título "New delivery address", o mesmo do cadastro.
+  - Não testado no iOS.
+
+Evidências (prints e árvore de elementos de cada passo)
+  Cadastro: .planning/drafts/app-migrado/android/captures-2026-11-23-build557-cadastro-endereco/
+            (19 a 29; CEP inválido: 21, 23, 24; salvo: 26)
+  Edição:   .planning/drafts/app-migrado/android/captures-2026-11-23-build557-alterar-endereco/
+            (02 a 17; CEP inválido: 03, 04; bug: 05 a 14; controle: 16, 17)
+
+
+==================================================================
+3. RETESTE NO BUILD 559 (versão 1.23.1, profile development) — 23/11/2026
+==================================================================
+
+Conta nova (sem endereço): informatica.mrn+cadastro-avd-s24-mwtqcv7f-fypr@gmail.com
+
+Cadastro do primeiro endereço
+  Igual ao build 557: CEP "1234" sem mensagem e botão desabilitado; CEP "00000000"
+  com "CEP inválido" e botão desabilitado mesmo com o resto preenchido; CEP "01310-100"
+  preenche Rua/UF/Município/Bairro e "Save information and proceed" leva à Entrega.
+  Resultado: OK.
+
+Edição do endereço
+  1. CEP "00000000": "CEP inválido", "Update" desabilitado, toque sem efeito. OK.
+  2. CEP válido novo "01226-030": toque em "Update" mostra um carregando (tela
+     escurecida com o logo Aramis) e, em cerca de 4 s, abre a Entrega com
+     "ZIP code - 01226030". A lista "Meus endereços" mostra o MESMO endereço já
+     editado (Rua Barão de Tatuí 1000, Vila Buarque) e, reabrindo "Alterar", o
+     formulário traz o CEP novo. Repetido com outro CEP (de volta para 01310-100):
+     gravou também. 2 de 2.
+  Resultado: o problema de não salvar o novo endereço está CORRIGIDO.
+
+Pontos que continuam / observações
+  - Não há mensagem de sucesso: o único retorno ao cliente é o carregando e a
+    mudança para a tela de Entrega.
+  - O botão "Update" já abre habilitado, sem nenhuma alteração feita no formulário.
+  - Em uma das edições, o botão "Update" constava como desabilitado logo após o CEP
+    válido ser preenchido e, mesmo assim, o toque gravou (estado do botão inconsistente).
+  - Ao trocar o CEP, o Número antigo continua no campo (rua nova com o número antigo).
+  - Não testado no iOS.
+
+Evidências: .planning/drafts/app-migrado/android/captures-2026-11-23-build559-endereco/
+  (cadastro: 03 a 09; edição: 11 a 24; carregando: 15-ed-update-t0)

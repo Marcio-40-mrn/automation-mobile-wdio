@@ -30,8 +30,10 @@ const APP = 'com.aramis.ecomm';
 // iOS 1.23.1/403 (Remote Access, 2026-11-18, `drafts/app-migrado/ios/captures-2026-11-18-compartilhar-1.23.1/`):
 // `https://applink.aramis.com.br/checkout?checkoutId=<uuid>`; o `aramisnova://share-bag/<uuid>` abre a
 // "Shared Backpack" logado e deslogado. Os dois formatos são aceitos, nas duas plataformas.
+// O texto copiado pode ser só a URL ou uma frase com a URL no meio. A frase não é fixa
+// (AVD, 2026-11-24: "I picked out a few pieces…" + `https://www.aramis.com.br/share-bag/<uuid>`).
 const ESQUEMA_DO_LINK = 'aramisnova://share-bag/';
-const FORMATO_DO_LINK = /^https:\/\/(?:applink|www)\.aramis\.com\.br\/(?:share-bag\/|checkout\?checkoutId=)([0-9a-f-]{36})$/;
+const FORMATO_DO_LINK = /https:\/\/(?:applink|www)\.aramis\.com\.br\/(?:share-bag\/|checkout\?checkoutId=)([0-9a-f-]{36})(?![0-9a-f/?#&-])/;
 const LINK_INEXISTENTE = `${ESQUEMA_DO_LINK}00000000-0000-0000-0000-000000000000`;
 // A área de transferência do emulador é compartilhada com o host: sem a sentinela, um texto antigo
 // seria lido como se fosse o link.
@@ -344,8 +346,8 @@ export class CompartilharPage extends BasePage {
         if (IOS) {
             await this.homePage.abrirCategorias();
             await this.buscaPage.abrirPelaLupaDeCategorias();
-            // O sheet leva a URL e o texto: o campo recebe a URL duas vezes, separada por espaço.
-            lido = (await this.buscaPage.colarNoCampoIOS()).trim().split(/\s+/)[0];
+            // O campo pode receber só a URL, a URL duas vezes, ou uma frase com a URL no meio.
+            lido = (await this.buscaPage.colarNoCampoIOS()).trim();
             await this.produtoPage.voltarAteCategorias();
         } else {
             const area = await lerAreaDeTransferencia();
@@ -355,10 +357,11 @@ export class CompartilharPage extends BasePage {
         return lido;
     }
 
-    // Link só com o código (no path ou no `checkoutId`): sem produto, CDV ou dado pessoal na URL.
-    validarFormatoDoLink(link: string): string {
-        const formato = link.match(FORMATO_DO_LINK);
-        if (!formato) throw new Error(`Link compartilhado fora do formato /share-bag/<uuid> ou /checkout?checkoutId=<uuid>: "${link}".`);
+    // Acha a URL dentro do texto copiado. A URL só tem o código (no path ou no `checkoutId`):
+    // sem produto, CDV ou dado pessoal. A frase em volta não entra.
+    validarFormatoDoLink(texto: string): string {
+        const formato = texto.match(FORMATO_DO_LINK);
+        if (!formato) throw new Error(`Link compartilhado fora do formato /share-bag/<uuid> ou /checkout?checkoutId=<uuid>: "${texto}".`);
         console.log('✅ Link só com o código, sem outro dado');
         return `${ESQUEMA_DO_LINK}${formato[1]}`;
     }

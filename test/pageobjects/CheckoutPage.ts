@@ -124,6 +124,47 @@ export class CheckoutPage extends BasePage {
         await driver.pause(timewhait);
     }
 
+    // Mochila → `bag-checkout-button`, sem exigir endereço salvo. Conta nova abre o formulário
+    // direto; `finalizarCompraESelecionarEndereco` espera a lista e um cartão, e não muda.
+    // Quem chama sai da PDP antes: a PDP não tem `tab-bag` (AVD, 2026-11-25, print do `04`).
+    // Android: `tab-bag`, como `abrirMochila`. Se o sheet de "produto adicionado" ainda cobrir
+    // a barra, o `bag-continue-shopping` fecha.
+    // iOS: na PDP não há `tab-bag`; a Mochila abre pelo `action-icon-button`. O
+    // `bottom-sheet-close` sai da frente se o sheet ainda estiver aberto.
+    async abrirCheckoutSemEnderecoSalvo() {
+        await this.fechaBanner();
+        if (!IOS) {
+            const sheet = await $(seletorTestId('bag-continue-shopping'));
+            if (await sheet.isDisplayed().catch(() => false)) {
+                await sheet.click();
+                await driver.pause(timewhait);
+            }
+            const aba = await $(seletorTestId('tab-bag'));
+            await this.waitForElement(aba);
+            await aba.click();
+        } else if (await $(seletorTestId('tab-bag')).isDisplayed().catch(() => false)) {
+            await $(seletorTestId('tab-bag')).click();
+        } else {
+            const fechar = await $(seletorTestId('bottom-sheet-close'));
+            if (await fechar.isDisplayed().catch(() => false)) {
+                await fechar.click();
+                await driver.pause(timewhait);
+            }
+            const icone = await $(seletorTestId('action-icon-button'));
+            await this.waitForElement(icone);
+            await icone.click();
+        }
+        await driver.pause(timewhait);
+
+        const finalizar = await $(seletorTestId('bag-checkout-button'));
+        if (!(await scrollUntilVisible(finalizar, 6))) {
+            throw new Error('Mochila: o botão de finalizar compra (bag-checkout-button) não apareceu.');
+        }
+        await this.fechaBanner();
+        await finalizar.click();
+        await driver.pause(timewhait);
+    }
+
     // Seleciona a entrega exibida e continua. A opção pode vir já marcada (rodada 1) ou não (rodada
     // 2): o botão `delivery-continue-button` só habilita com uma opção marcada (`selection-filled`).
     //
