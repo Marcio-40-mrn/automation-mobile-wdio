@@ -107,7 +107,7 @@ describe('Compartilhar carrinho', () => {
 
             // 40: produto diferente, somado aos que vieram do link.
             // Começa no card seguinte ao da 1ª camiseta, para ser outro produto.
-            await comprarNaBusca(primeirosCards(3, produtoPage.ultimaPosicaoComprada + 1).posicoes, 'Camiseta diferente');
+            await comprarNaBusca(primeirosCards(produtoPage.ultimaPosicaoComprada + 1).posicoes, 'Camiseta diferente');
             await step('checkoutPage.abrirMochila() - produto novo (40)', async () => { await checkoutPage.abrirMochila(compartilhados.length + 1); });
             let produtoNovo: ItemMochila | undefined;
             await step('compartilhar: produto diferente na Mochila (40)', async () => {

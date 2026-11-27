@@ -179,18 +179,29 @@ export class ProdutoPage extends BasePage {
         throw new Error(`Produto da posição ${posicao}: não alcançado em 40 rolagens (${vistos.length} cards vistos).`);
     }
 
-    // Compra o produto da 1ª posição da lista que tiver tamanho com estoque e devolve o preço lido na
-    // PDP. As posições vêm de `posicoesDoProduto()` (uma por bloco, todas deste device). Produto sem
-    // tamanho com estoque (`SemEstoqueError`) = volta para a listagem e tenta a próxima posição; outro
-    // erro sobe na hora. CI Run #41 (app 1.22.8/519, S26 Ultra): a camisa da posição 5 estava sem P e
-    // sem M, e o teste parou nela.
+    // Compra o 1º produto com tamanho em estoque a partir da posição `posicoes[0]` e devolve o preço lido
+    // na PDP. Sem estoque (`SemEstoqueError`) = volta para a listagem e tenta o card seguinte, card a card,
+    // até um produto adicionar ou a lista acabar (Marcio, 2026-11-26: os aparelhos do CI pegam o mesmo
+    // produto e tamanho ao mesmo tempo; 2, 3 ou 4 na mesma camiseta é normal, e sem estoque o certo é
+    // seguir para o próximo — CI Runs #60, #51 e #61, Android 1.23.3/562 e 1.23.1/557). Fim da lista =
+    // `cardNaPosicao` sem card novo ou sem alcançar o card. Outro erro sobe na hora. Nas duas plataformas.
     // Posição do último produto comprado: o `06` começa a "camiseta diferente" no card seguinte.
     ultimaPosicaoComprada = -1;
 
     async comprarNaPosicao(posicoes: number[], produto: string): Promise<number> {
+        const inicio = posicoes[0] ?? 0;
         const recusados: string[] = [];
-        for (const [i, posicao] of posicoes.entries()) {
-            await this.abrirProdutoNaPosicao(posicao);
+        for (let posicao = inicio; ; posicao++) {
+            try {
+                await this.abrirProdutoNaPosicao(posicao);
+            } catch (erro) {
+                const fimDaLista = /não trouxe card novo|não alcançado em/.test((erro as Error).message ?? '');
+                if (posicao === inicio || !fimDaLista) throw erro;
+                throw new Error(
+                    `Comprar ${produto}: nenhum produto a partir do card ${inicio} tinha tamanho com estoque até o fim ` +
+                    `da lista (${(erro as Error).message}).\n- ${recusados.join('\n- ')}`
+                );
+            }
             const preco = await this.lerPrecoDoProduto();
             try {
                 await this.comprar();
@@ -199,12 +210,10 @@ export class ProdutoPage extends BasePage {
             } catch (erro) {
                 if (!(erro instanceof SemEstoqueError)) throw erro;
                 recusados.push(`posição ${posicao}: ${erro.message}`);
-                if (i === posicoes.length - 1) break;
-                console.log(`⚠ ${produto} da posição ${posicao} sem tamanho com estoque — tentando a posição ${posicoes[i + 1]}`);
+                console.log(`⚠ ${produto} da posição ${posicao} sem tamanho com estoque — tentando a posição ${posicao + 1}`);
                 await this.voltarDaPdpParaListagem();
             }
         }
-        throw new Error(`Comprar ${produto}: nenhum produto das posições ${posicoes.join(', ')} tinha tamanho com estoque.\n- ${recusados.join('\n- ')}`);
     }
 
     private async voltarDaPdpParaListagem() {
@@ -352,8 +361,14 @@ export class ProdutoPage extends BasePage {
                 console.log(`⚠ Toque ${tentativa}/2 em adicionar não abriu o sheet de produto adicionado`);
             }
 
+            // Sem sheet e sem modal depois dos toques = o tamanho não adicionou: tratado como sem estoque, igual
+            // ao modal e ao iOS (`comprarIOS`). O `escolherTamanho` ignora os recusados; sem tamanho restante dá
+            // `SemEstoqueError` e o `comprarNaPosicao` passa ao produto seguinte (Marcio, 2026-11-26; CI Runs
+            // #60 e #51, Android 1.23.3/562: P marcado e "Add to cart" cinza, com os aparelhos no mesmo produto).
             if (!recusado) {
-                throw new Error('Comprar: o sheet de "produto adicionado" (bag-continue-shopping) não apareceu depois de tocar em adicionar.');
+                await anexarPrint(`Comprar — tamanho ${tamanho} não adicionou`);
+                console.log(`⚠ Tamanho ${tamanho}: o adicionar não abriu o sheet nem o modal — tratado como sem estoque`);
+                recusados.push(tamanho);
             }
             // O OK volta à PDP sem sheet (captura 30); se o sheet ficou aberto, fecha antes de reabrir.
             if (await $(adicionar).isDisplayed().catch(() => false)) {

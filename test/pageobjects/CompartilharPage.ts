@@ -307,6 +307,18 @@ export class CompartilharPage extends BasePage {
     async compartilharECopiar(): Promise<string | null> {
         await this.fechaBanner();
         if (!IOS) await gravarAreaDeTransferencia(SENTINELA);
+        // O botão fica abaixo dos cards e pode estar fora da tela depois da troca de quantidade (S26 Ultra, CI
+        // Runs #60 e #51, Android 1.23.3/562: Mochila no topo, share-bag-cta não achado). Rola como o
+        // `validarBotaoPresente`. Nas duas plataformas (Marcio, 2026-11-26).
+        let naTela = false;
+        for (let rolagem = 0; rolagem <= 6 && !naTela; rolagem++) {
+            naTela = await $(BOTAO_COMPARTILHAR).isDisplayed().catch(() => false);
+            if (!naTela) await this.rolarMochila();
+        }
+        if (!naTela) {
+            await anexarPrint('Compartilhar — botão fora da tela');
+            throw new Error('Compartilhar: o share-bag-cta não apareceu na tela depois de 6 rolagens.');
+        }
         await $(BOTAO_COMPARTILHAR).click();
         const abriu = await $(MENU_NATIVO).waitForDisplayed({ timeout: 15000 }).then(() => true).catch(() => false);
         if (!abriu) {

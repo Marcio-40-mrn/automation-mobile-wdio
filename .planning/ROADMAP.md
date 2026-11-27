@@ -53,6 +53,7 @@ automação do app e não tem data de término. Cada melhoria entra aqui como um
 | Resumo do job no GitHub: falha só quando o timeout de 120 min impede os testes de rodarem; erro de teste só no Allure | ✅ no código (2026-11-16), não rodado no CI |
 | Pix e cartão até a última tela antes de finalizar, sem criar pedido | ✅ rodado no CI Run #42 (2026-11-05, Android 1.22.9/534): `03` 6/6, `02` 5/6 (falha do S24+ por banner, `STATE.md`); iOS 5/5 iPhones |
 | Coleção Especial: rolar até a parte não visível, tocar no link e validar a tela de destino pelo cabeçalho | ⬜ não iniciado |
+| Sem estoque: próximo tamanho e próximo produto, card a card, nas duas plataformas; Número do endereço com o teclado da Samsung; `share-bag-cta` rolado antes do toque (`plans/2026-11-26-falhas-android-562.md`) | ✅ no código (2026-11-26), não rodado no CI |
 
 ### Melhoria — Coleção Especial até o destino do link (Marcio, 2026-11-06)
 
@@ -109,7 +110,7 @@ M1, M2, M3, M4, M6, M7 e M8 concluídos, e o histórico do levantamento (era o M
 ## M9 — Ampliar a cobertura com novos cenários ⬜ planejamento
 
 Aberto em 2026-10-21 (Marcio): os 4 testes (`01`–`04`) cobrem boa parte do app, e outras funcionalidades serão
-validadas no futuro. **Escolhidos:** Richard Stad Selection (2026-11-03, rodado no CI Run #42), Compartilhar carrinho (2026-11-06, escrito, não rodado) e Criar conta + cadastro e alteração de endereço com CEP inválido e válido (2026-11-23, elementos capturados; teste escrito em 2026-11-25 dentro do `04-criar-conta`; passou no AVD (Android 1.23.3/562) e no iOS (Remote Access) em 2026-11-25, CI não rodado, `STATE.md`). O resto
+validadas no futuro. **Escolhidos:** Richard Stad Selection (2026-11-03, rodado no CI Run #42), Compartilhar carrinho (2026-11-06, escrito, não rodado) e Criar conta + cadastro e alteração de endereço com CEP inválido e válido (2026-11-23, elementos capturados; teste escrito em 2026-11-25 dentro do `04-criar-conta`; **VALIDADO (Marcio, 2026-11-26)**: passou no AVD (Android 1.23.3/562, 2026-11-25) e no iOS (Remote Access, 1.23.3/409, 2026-11-25 e 2026-11-26); CI não rodado, `STATE.md`). O resto
 da lista abaixo continua backlog, sem escolha: tirado da seção 3 do `cenarios-gherkin-2026-09-28.pdf`
 (funcionalidades que os 4 testes não percorrem) e das pendências registradas; quais entram, em que ordem e com que
 massa é decisão do Marcio, cenário a cenário.
@@ -188,7 +189,7 @@ Mochila depois do logout no Android: não conferido. Copy nos Samsung do Device 
 
 Ordem do Marcio (2026-11-23): criar uma conta e, com ela, cadastrar um endereço, primeiro tentando um CEP inválido e
 depois salvando com um CEP válido. **Elementos capturados no Android 1.23.1/557** (AVD,
-`drafts/app-migrado/android/captures-2026-11-23-build557-cadastro-endereco/`, `NOTAS.md`, draft `39`); teste **escrito em 2026-11-25 dentro do `04-criar-conta`; passou no AVD (Android 1.23.3/562) e no iOS (Remote Access) em 2026-11-25, CI não rodado** (`STATE.md`). iOS capturado em 2026-11-24 no 1.23.2/408 (`drafts/app-migrado/ios/captures-2026-11-24-endereco/`, `NOTAS.md`): o formulário não tem os testIDs do Android (`address-zip-input` e os demais campos, fora `address-state-input` e `address-save-button`). Decisão 1 fechada: entrou no `04-criar-conta`.
+`drafts/app-migrado/android/captures-2026-11-23-build557-cadastro-endereco/`, `NOTAS.md`, draft `39`); teste **escrito em 2026-11-25 dentro do `04-criar-conta`; VALIDADO (Marcio, 2026-11-26): passou no AVD (Android 1.23.3/562, 2026-11-25) e no iOS (Remote Access, 1.23.3/409, 2026-11-25 e 2026-11-26); CI não rodado** (`STATE.md`). iOS capturado em 2026-11-24 no 1.23.2/408 (`drafts/app-migrado/ios/captures-2026-11-24-endereco/`, `NOTAS.md`): o formulário não tem os testIDs do Android (`address-zip-input` e os demais campos, fora `address-state-input` e `address-save-button`). Decisão 1 fechada: entrou no `04-criar-conta`.
 
 Caminho no app (Android 557): Criar Conta (igual ao `04`) → produto na Mochila → `bag-checkout-button` → formulário
 "New delivery address" direto (a conta nova não tem endereço; Menu e My Data não têm endereço).
@@ -205,7 +206,7 @@ em 2026-11-24 (drafts `16` e `51`); o plano guarda o que não pode ser copiado d
 **Alterar endereço com CEP inválido e CEP válido novo (ordem do Marcio, 2026-11-23).** Levantado no Android
 1.23.1/559 (`drafts/app-migrado/android/captures-2026-11-23-build559-endereco/`, `NOTAS.md`, drafts `16` e `39`; o 557,
 com o bug, ficou em `captures-2026-11-23-build557-alterar-endereco/` e no `RELATORIO-ENDERECO-DEV-2026-11-23.txt`);
-teste **escrito em 2026-11-25 dentro do `04-criar-conta`; passou no AVD (Android 1.23.3/562) e no iOS (Remote Access) em 2026-11-25, CI não rodado** (plano: `plans/2026-11-23-teste-endereco.md`, `STATE.md`). No iOS 1.23.2/408 o mesmo caminho abre a lista ("Alterar" sem id, `pressable` "Cadastrar novo endereço") e o formulário em modo Update; o CEP novo preenche a rua, o Update fica habilitado e o toque não sai da tela nem mostra carregando (gravação não conferida, `NOTAS.md`). Caminho: Entrega →
+teste **escrito em 2026-11-25 dentro do `04-criar-conta`; VALIDADO (Marcio, 2026-11-26): passou no AVD (Android 1.23.3/562, 2026-11-25) e no iOS (Remote Access, 1.23.3/409, 2026-11-25 e 2026-11-26); CI não rodado** (plano: `plans/2026-11-23-teste-endereco.md`, `STATE.md`). No iOS 1.23.2/408 o mesmo caminho abre a lista ("Alterar" sem id, `pressable` "Cadastrar novo endereço") e o formulário em modo Update; o CEP novo preenche a rua, o Update fica habilitado e o toque não sai da tela nem mostra carregando (gravação não conferida, `NOTAS.md`). Caminho: Entrega →
 "+ Add or choose another address" (ou login → Mochila → `bag-checkout-button`) → Meus endereços → "Alterar" (sem id;
 XPath por irmãos, draft `16`) → o mesmo formulário, com o `address-save-button` em modo Update.
 

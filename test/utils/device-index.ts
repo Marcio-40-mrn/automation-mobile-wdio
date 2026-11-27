@@ -34,11 +34,12 @@ export const deviceIndex: Record<'android', Record<string, number>> = {
 // estoque acabava no meio do run (CI Run #30, app 1.22.2). Desde 2026-11-04 nenhum teste cria pedido, e
 // pôr na Mochila não reserva estoque (Marcio). Ela levava o teste até o card 33–55, que a listagem nem
 // sempre tem; no AVD (Android 1.23.1/557) o app travou (ANR) nessa rolagem (`run-06e.log`, 2026-11-18).
-// Agora: `quantos` cards a partir de `inicio` (0 = 1º card); o seguinte só se o anterior não tiver
-// tamanho com estoque. Igual em local, Device Farm e iOS.
-export function primeirosCards(quantos = 3, inicio = 0): { posicoes: number[]; comoAchei: string } {
+// Agora: só a posição inicial (0 = 1º card). O `comprarNaPosicao` segue card a card a partir dela enquanto
+// o produto vier sem estoque, até a lista acabar (Marcio, 2026-11-26; era um limite de 3 cards).
+// Igual em local, Device Farm e iOS.
+export function primeirosCards(inicio = 0): { posicoes: number[]; comoAchei: string } {
     return {
-        posicoes: Array.from({ length: quantos }, (_, i) => inicio + i),
-        comoAchei: `${quantos} primeiros cards a partir do ${inicio}`,
+        posicoes: [inicio],
+        comoAchei: `card a card a partir do ${inicio}`,
     };
 }

@@ -214,6 +214,30 @@ export class EnderecoPage extends BasePage {
         }
         await this.waitForElement(campo);
         await campo.click();
+        // Teclado por cima do campo: o toque retorna OK e o campo sai da árvore (teclado numérico da Samsung,
+        // mais alto que o Gboard; S23+ e S26 Ultra nos CI Runs #60, #51 e #61, Android 1.23.3/562 e 1.23.1/557).
+        // Fecha o teclado, espera o campo voltar e digita sem tocar de novo (o addValue grava o texto no campo
+        // sem depender do teclado); nesse caminho o valor é conferido. Só Android (Marcio, 2026-11-26).
+        if (!(await $(seletorTestId(id)).isExisting().catch(() => false))) {
+            console.log(`⚠ ${id}: o campo saiu da árvore depois do toque (teclado por cima) — fechando o teclado e digitando`);
+            await this.fecharTeclado();
+            const voltou = await $(seletorTestId(id)).waitForDisplayed({ timeout: 5000 }).then(() => true).catch(() => false);
+            if (!voltou) {
+                await anexarPrint(`Endereço — ${id} fora da árvore`);
+                throw new Error(`Endereço: o campo ${id} saiu da árvore depois do toque e não voltou em 5s com o teclado fechado.`);
+            }
+            const deNovo = await $(seletorTestId(id));
+            await deNovo.clearValue();
+            await deNovo.addValue(valor);
+            await driver.pause(500);
+            const lido = await this.textoDoCampo(id);
+            const confere = /^\d+$/.test(valor) ? soDigitos(lido) === valor : lido === valor.trim();
+            if (!confere) {
+                await anexarPrint(`Endereço — ${id} com valor diferente`);
+                throw new Error(`Endereço: o campo ${id} ficou "${lido}", digitado "${valor}".`);
+            }
+            return;
+        }
         await campo.clearValue();
         await campo.addValue(valor);
         await driver.pause(500);
