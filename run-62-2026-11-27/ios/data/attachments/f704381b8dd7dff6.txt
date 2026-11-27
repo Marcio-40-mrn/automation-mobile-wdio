@@ -1,0 +1,14 @@
+Device: Apple iPhone 14
+E-mail: informatica.mrn+cadastro-apple-iphone-14-mwy5gvn5-a0oy@gmail.com
+Nome: Teste
+Sobrenome: Automacao
+CPF: 214.464.460-85
+Nascimento: 27/04/1987
+Telefone: (11) 96307-7061
+Senha: Aramis@JFGW5a
+Conta criada: sim (finalizar saiu da etapa 2)
+Destinatário do endereço: Teste Automacao
+Número: 1000 → 1001
+CEP inválido: 00000000
+CEP válido: 01310100
+CEP editado: 01226030

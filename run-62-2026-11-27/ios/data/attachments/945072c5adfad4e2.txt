@@ -1,0 +1,14 @@
+Device: Apple iPhone 15 Pro Max
+E-mail: informatica.mrn+cadastro-apple-iphone-15-pro-mwy7fy7t-91p3@gmail.com
+Nome: Teste
+Sobrenome: Automacao
+CPF: 158.827.994-49
+Nascimento: 02/08/1982
+Telefone: (11) 98693-7417
+Senha: Aramis@SKFC5a
+Conta criada: sim (finalizar saiu da etapa 2)
+Destinatário do endereço: Teste Automacao
+Número: 1000 → 1001
+CEP inválido: 00000000
+CEP válido: 01310100
+CEP editado: 01226030

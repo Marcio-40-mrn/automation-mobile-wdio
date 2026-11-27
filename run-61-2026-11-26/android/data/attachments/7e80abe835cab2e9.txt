@@ -1,0 +1,14 @@
+Device: Samsung Galaxy S24 Ultra
+E-mail: informatica.mrn+cadastro-samsung-galaxy-s24-u-mwy2k2i0-67x5@gmail.com
+Nome: Teste
+Sobrenome: Automacao
+CPF: 397.904.003-81
+Nascimento: 21/09/1986
+Telefone: (11) 94355-1151
+Senha: Aramis@VQVJ3a
+Conta criada: sim (finalizar saiu da etapa 2)
+Destinatário do endereço: Teste Automacao
+Número: 1000 → 1001
+CEP inválido: 00000000
+CEP válido: 01310100
+CEP editado: 01226030

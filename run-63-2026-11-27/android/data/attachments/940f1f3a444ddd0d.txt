@@ -1,0 +1,14 @@
+Device: Samsung Galaxy S25 Ultra
+E-mail: informatica.mrn+cadastro-samsung-galaxy-s25-u-mwzd9u5z-430q@gmail.com
+Nome: Teste
+Sobrenome: Automacao
+CPF: 272.847.557-17
+Nascimento: 01/02/1994
+Telefone: (11) 90434-0157
+Senha: Aramis@LBBV1a
+Conta criada: sim (finalizar saiu da etapa 2)
+Destinatário do endereço: Teste Automacao
+Número: 1000 → 1001
+CEP inválido: 00000000
+CEP válido: 01310100
+CEP editado: 01226030
